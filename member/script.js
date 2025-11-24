@@ -130,7 +130,7 @@ function generateQRCode(text, userInfo) {
   });
 
   //document.getElementById('qrUserInfo').innerText = `${userInfo.name} - ${userInfo.brand} ${userInfo.model} (${userInfo.year})`;
-  document.getElementById('qrUserInfo').innerText = `ชื่อ: ${userInfo.name} (เลือกรถที่หน้างาน)`
+  document.getElementById('qrUserInfo').innerText = `ชื่อ: ${userInfo.name} (แจ้งรุ่นรถกับพนักงานได้เลยค่ะ)`
   document.getElementById('closeQRBtn').addEventListener('click', closeQRSection);
 }
 
@@ -143,7 +143,7 @@ function generateQRCode(text, userInfo) {
 
 
     function startQRCountdown() {
-      let count = 600;
+      let count = 300;
       document.getElementById("qrCountdown").textContent = count;
       qrInterval = setInterval(() => {
         count--;
