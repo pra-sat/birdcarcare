@@ -44,22 +44,25 @@
 
             <div id="carPicker" class="car-picker"></div>
 
-            <!-- ── ทะเบียนรถ (ไม่บังคับ) ────────────────────────────────
+            <!-- ── ทะเบียนรถ (บังคับกรอก) ───────────────────────────────
                  เก็บลงคอลัมน์ R/S ของ Customer_Master ผ่าน plate.gs
-                 ถ้าเว้นว่าง ระบบก็สมัครให้ปกติ แอดมินเติมให้ทีหลังได้    -->
+                 ใช้เป็นตัวกันสมัครรถซ้ำด้วย จึงต้องกรอกให้ครบ         -->
             <div class="form-group" id="plateGroup">
-              <label>ทะเบียนรถ <span class="pl-opt">— ไม่บังคับ กรอกทีหลังได้</span></label>
+              <label>ทะเบียนรถ <span class="pl-req">*</span>
+                <span class="pl-opt">— ภาษาไทยเท่านั้น</span></label>
               <div class="pl-grid">
                 <div>
-                  <input type="text" id="plateHead" class="pl-in" placeholder="1กร" autocomplete="off" maxlength="7">
+                  <input type="text" id="plateHead" class="pl-in" placeholder="1กร"
+                         autocomplete="off" maxlength="5" lang="th" required>
                   <div class="pl-eg">หมวด เช่น <b>1กร</b> · <b>ขค</b></div>
                 </div>
                 <div>
-                  <input type="text" id="plateTail" class="pl-in" placeholder="1723" inputmode="numeric" autocomplete="off" maxlength="4">
+                  <input type="text" id="plateTail" class="pl-in" placeholder="1723"
+                         inputmode="numeric" autocomplete="off" maxlength="4" required>
                   <div class="pl-eg">เลขท้าย เช่น <b>1723</b></div>
                 </div>
               </div>
-              <select id="plateProvince" class="pl-in pl-prov"></select>
+              <select id="plateProvince" class="pl-in pl-prov" required></select>
               <div class="pl-eg">จังหวัดดูจากตัวหนังสือแถวล่างของป้าย</div>
               <div class="pl-preview" id="platePreview" hidden></div>
               <div class="pl-warn" id="plateWarn" hidden></div>

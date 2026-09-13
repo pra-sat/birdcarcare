@@ -385,22 +385,37 @@ function setupPlateFields() {
 
     prov.innerHTML = plateProvinceOptions('');
 
-    // เลขท้ายรับแต่ตัวเลข · หมวดตัดช่องว่างออก
+    // เลขท้ายรับแต่ตัวเลข
     tail.addEventListener('input', () => {
       const clean = tail.value.replace(/\D/g, '').slice(0, 4);
       if (tail.value !== clean) tail.value = clean;
       paint();
     });
+
+    // หมวดรับแต่เลขกับพยัญชนะไทย — กันพิมพ์อังกฤษตั้งแต่แรก ไม่ต้องรอเตือน
+    // ⚠️ ถ้าตัดทิ้งเฉย ๆ ตอนพิมพ์ผิด เคอร์เซอร์จะเด้งไปท้ายช่อง
+    //    จึงจำตำแหน่งเคอร์เซอร์ไว้แล้วเลื่อนกลับตามจำนวนตัวที่ถูกตัด
     head.addEventListener('input', () => {
-      const clean = head.value.replace(/\s+/g, '');
-      if (head.value !== clean) head.value = clean;
+      const before = head.value;
+      const clean = plateCleanHead(before);
+      if (before !== clean) {
+        const pos = head.selectionStart || 0;
+        const removed = before.slice(0, pos).length - plateCleanHead(before.slice(0, pos)).length;
+        head.value = clean;
+        try { head.setSelectionRange(pos - removed, pos - removed); } catch (e) {}
+        typedWrongScript = /[A-Za-z]/.test(before);
+      } else {
+        typedWrongScript = false;
+      }
       paint();
     });
     prov.addEventListener('change', paint);
 
+    let typedWrongScript = false;
+
     function paint() {
       const plate = platePretty(head.value, tail.value);
-      const v = plateValidate(head.value, tail.value);
+      const v = plateValidate(head.value, tail.value, { required: true });
 
       // แสดงตัวอย่างป้ายตามที่พิมพ์ (สีเทา = ยังไม่บันทึก)
       if (plate) {
@@ -412,8 +427,15 @@ function setupPlateFields() {
         prev.hidden = true;
       }
 
-      if (v.warn) { warn.textContent = (v.ok ? 'ℹ️ ' : '⚠️ ') + v.warn; warn.hidden = false; }
-      else { warn.textContent = ''; warn.hidden = true; }
+      // ยังไม่ได้เริ่มกรอกเลย ไม่ต้องขึ้นเตือนสีส้มตั้งแต่เปิดหน้า
+      const untouched = !head.value && !tail.value && !prov.value;
+      let msg = '';
+      if (typedWrongScript) msg = '⚠️ ทะเบียนไทยไม่มีภาษาอังกฤษ — สลับแป้นเป็นภาษาไทยก่อนนะ';
+      else if (!untouched && v.warn) msg = '⚠️ ' + v.warn;
+      else if (!untouched && v.ok && !prov.value) msg = '⚠️ ยังไม่ได้เลือกจังหวัด';
+
+      warn.textContent = msg;
+      warn.hidden = !msg;
     }
 
     // form.reset() ล้างช่องกรอกให้ แต่ไม่ล้างตัวอย่างป้ายกับข้อความเตือน
@@ -426,21 +448,23 @@ function setupPlateFields() {
 }
 
 // อ่านค่าทะเบียนที่กรอกไว้ ออกมาเป็นรูปแบบที่จะส่งไปเก็บ
-// คืน null ถ้ากรอกมาไม่ครบจนใช้ไม่ได้ (ผู้เรียกต้องหยุดแล้วเตือน)
-// คืน { plate:'', province:'' } ถ้าไม่ได้กรอกเลย (ปล่อยผ่านได้ ไม่บังคับ)
+// ทะเบียนเป็นข้อมูลบังคับ (เปลี่ยน 13 ก.ย. 2569) เพราะใช้เป็นตัวกันสมัครรถซ้ำด้วย
+// คืน { error } ถ้ายังใช้ไม่ได้ · คืน { plate, province } ถ้าผ่าน
 function readPlateFields() {
   const head = document.getElementById('plateHead');
   const tail = document.getElementById('plateTail');
   const prov = document.getElementById('plateProvince');
+
+  // ถ้า plate_data.js โหลดไม่ขึ้น จะบังคับไม่ได้ ปล่อยผ่านดีกว่าสมัครไม่ได้เลย
   if (!head || !tail || typeof plateValidate !== 'function') return { plate: '', province: '' };
 
-  const v = plateValidate(head.value, tail.value);
-  if (!v.ok) return null;
+  const v = plateValidate(head.value, tail.value, { required: true });
+  if (!v.ok) return { error: v.warn };
 
-  return {
-    plate: platePretty(head.value, tail.value),
-    province: prov ? prov.value.trim() : ''
-  };
+  const province = prov ? prov.value.trim() : '';
+  if (!province) return { error: 'กรุณาเลือกจังหวัดที่จดทะเบียน' };
+
+  return { plate: platePretty(head.value, tail.value), province };
 }
 
 function validatePhone(phoneInput) {
@@ -556,11 +580,11 @@ form.addEventListener('submit', async event => {
         return;
     }
 
-    // ทะเบียนรถ — ไม่บังคับ แต่ถ้ากรอกมาครึ่ง ๆ ให้หยุดก่อน
-    // readPlateFields() คืน null เมื่อกรอกมาแล้วใช้ไม่ได้จริง
+    // ทะเบียนรถ — บังคับกรอกให้ครบ (ใช้กันสมัครรถซ้ำด้วย)
     const plateData = readPlateFields();
-    if (plateData === null) {
-        Swal.fire('ทะเบียนรถยังไม่ครบ', 'กรอกให้ครบทั้งหมวดและเลขท้าย หรือลบออกให้ว่างทั้งคู่ก็ได้ (ไม่บังคับ)', 'warning');
+    if (plateData.error) {
+        Swal.fire('ทะเบียนรถยังไม่ถูกต้อง', plateData.error, 'warning');
+        document.getElementById('plateHead')?.focus();
         return;
     }
 
@@ -582,6 +606,55 @@ form.addEventListener('submit', async event => {
         pictureUrl: profile.pictureUrl || ""
     };
 
+    // ── ตรวจรถซ้ำก่อน แล้วค่อยให้ยืนยัน ────────────────────────────────
+    //
+    // ของเดิมเรียก ?action=register&check=1 ซึ่งดาวน์โหลด "เบอร์ลูกค้าทั้ง 487 คน"
+    // มาเทียบในเบราว์เซอร์ · ตอนนี้ย้ายไปเทียบฝั่งเซิร์ฟเวอร์ที่ action=check_duplicate
+    // ส่งกลับมาแค่ซ้ำ/ไม่ซ้ำ ไม่มีข้อมูลของใครติดมาด้วย
+    //
+    // ตัดสินจากทะเบียนเป็นหลัก เพราะ 1 คัน = 1 ทะเบียน แม่นกว่า ยี่ห้อ+รุ่น+ปี
+    // ที่ใช้เดิม (ซึ่งทั้งพลาดจับและจับผิด เพราะรถรุ่นเดียวกัน 2 คันก็มีจริง)
+    //
+    // ถ้าตรวจไม่ได้ (เน็ตหลุด / ยังไม่ deploy) ให้ไปต่อ ไม่ขวางการสมัคร
+    // เพราะฝั่ง Apps Script กันซ้ำอยู่อีกชั้นตอนบันทึกจริงอยู่แล้ว
+    let dup = null;
+    try {
+        const dupRes = await fetch(`${GAS_ENDPOINT}?action=check_duplicate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'check_duplicate',
+                userId, phone, brand, model, year,
+                plate: payload.plate, province: payload.province
+            })
+        });
+        dup = await dupRes.json();
+    } catch (checkError) {
+        console.warn('ตรวจข้อมูลซ้ำไม่สำเร็จ (ไปต่อ):', checkError);
+    }
+
+    if (dup && dup.status === 'block') {
+        await Swal.fire({
+            icon: 'error',
+            title: dup.title || 'ข้อมูลซ้ำ',
+            text: dup.message || 'รถคันนี้มีอยู่ในระบบแล้ว',
+            confirmButtonText: confirmText
+        });
+        return;
+    }
+
+    if (dup && dup.status === 'warn') {
+        const go = await Swal.fire({
+            icon: 'warning',
+            title: dup.title || 'ข้อมูลใกล้เคียงกับที่มีอยู่',
+            text: dup.message || '',
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยัน สมัครต่อ',
+            cancelButtonText: 'กลับไปแก้ไข'
+        });
+        if (!go.isConfirmed) return;
+    }
+
     const confirm = await Swal.fire({
         title: 'ยืนยันข้อมูลก่อนส่ง',
         html: `ชื่อ: ${escHtml(payload.name)}<br>
@@ -602,8 +675,8 @@ form.addEventListener('submit', async event => {
     const submitBtn = document.getElementById('submitBtn');  // ✅ ตรงนี้ควรอยู่ใน handler เสมอ
     if (submitBtn.disabled) return;  // ดักทันที
     submitBtn.disabled = true;
-    submitBtn.textContent = "Submitting...";
-    
+    submitBtn.textContent = "กำลังส่ง...";
+
     Swal.fire({
         title: 'กำลังส่งข้อมูล...',
         text: 'กรุณารอสักครู่',
@@ -612,37 +685,6 @@ form.addEventListener('submit', async event => {
             Swal.showLoading();
         }
     });
-
-    try {
-        const checkResponse = await fetch(`${GAS_ENDPOINT}?action=register&check=1`);
-        const checkData = await checkResponse.json();
-        const duplicate = checkData.find(row =>
-            row.phone.replace(/\D/g, '') === phoneRaw &&  // ✅ เปรียบเทียบแบบไม่มี -
-            row.brand === brand &&
-            row.model === model &&
-            row.year === year
-        );
-        if (duplicate) {
-            await Swal.fire({
-                icon: 'error',
-                title: '❗️ข้อมูลซ้ำ',
-                text: 'เบอร์โทร และ รถรุ่นนี้ มีในระบบแล้ว\n\nกรุณาติดต่อ Admin',
-                confirmButtonText: confirmText
-            });
-                submitBtn.disabled = false; // ✅ คืนค่า
-                submitBtn.textContent = "Submit"; // ✅ คืนข้อความ
-            return;
-        }
-    } catch (checkError) {
-        console.error("Error checking duplicates:", checkError);
-        await Swal.fire({
-            icon: 'warning',
-            title: '⚠ ไม่สามารถตรวจสอบข้อมูลซ้ำได้',
-            text: 'ระบบจะดำเนินการต่อ โปรดตรวจสอบข้อมูลอีกครั้ง',
-            confirmButtonText: confirmText
-        });
-        liff.closeWindow();
-    }
 
         console.log("Preparing to send payload:", payload);
 

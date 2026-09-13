@@ -54,6 +54,34 @@ body {
   z-index: 0; pointer-events: none; display: block;
 }
 
+/* ── กันจอเลื่อนซ้ายขวา ──────────────────────────────────────────────────
+   🔴 บั๊กที่แก้ 13 ก.ย. 2569 (แอดมินแจ้งว่า "หน้า admin กับข้อมูลร้าน ล้น ๆ เลื่อนซ้ายขวาได้")
+
+   info_ad/info/style.css กับ info_ad/main_admin/style.css เขียนไว้ว่า
+       .container { width: 100%; padding: 24px 16px; }
+   ทั้งโปรเจกต์ไม่มี box-sizing: border-box ที่ไหนเลย ทุกอย่างจึงเป็น content-box
+   -> ความกว้างจริง = 100% ของจอ + padding 32px + เส้นขอบ 2px (ที่ theme.css ใส่)
+      = กว้างเกินจอไป 34px พอดี จอจึงเลื่อนซ้ายขวาได้
+
+   หน้าสมาชิกกับหน้าสมัครไม่เป็น เพราะ .container ของสองหน้านั้นมีแค่ max-width
+   ไม่ได้สั่ง width:100% ความกว้างจึงคำนวณอัตโนมัติโดยหักลบ padding ให้เอง
+
+   ไล่ดูแล้วยังมีอีกหลายจุดที่เขียน width:100% คู่กับ padding โดยไม่มี border-box
+   (.scan-section .input-field · #feedbackPanel input/textarea · .feedback-text ·
+    register button) ทุกตัวล้นออกนอกกล่องแม่ 20-24px เหมือนกันหมด
+   จึงตั้ง border-box ให้ทั้งหน้าไปเลย เป็นวิธีมาตรฐานและกันเคสที่จะเกิดใหม่ด้วย
+
+   แก้ที่ต้นเหตุ ไม่ใช้ overflow-x:hidden ปิดอาการ
+   เพราะ overflow-x:hidden จะซ่อนของที่ล้นจริง ๆ ในอนาคตไว้จนหาไม่เจอ
+
+   ตรวจแล้วว่ามีแค่ 3 element ทั้งโปรเจกต์ที่กำหนดความกว้างเป็น px คู่กับ border
+   (.spinner 2 ที่ และ .vpick .tick) — สองตัวแรกสั่ง content-box คืนไว้ด้านล่าง
+   ให้หน้าตาเท่าเดิมเป๊ะ ส่วน .tick เป็นของใหม่ ออกแบบมาเป็น border-box อยู่แล้ว */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* คงขนาดเดิมของวงกลมหมุนรอโหลด ไม่ให้เล็กลงจากกฎด้านบน */
+.spinner { box-sizing: content-box; }
+
 /* เนื้อหาต้องลอยเหนือฟอง
    ⚠️ ห้ามใส่ .qr-popup / .loading-overlay / .popup / .scan-popup ในกฎนี้เด็ดขาด
       ของเดิมเป็น position:fixed ถ้าทับเป็น relative มันจะหลุดจากการเป็น overlay
@@ -61,6 +89,10 @@ body {
 .container { position: relative; z-index: 1; }
 
 h1, h2, h3, h2.title { font-family: var(--bc-disp) !important; font-weight: 500 !important; }
+
+/* ข้อความไทยยาว ๆ ไม่มีช่องว่างให้ตัดบรรทัด ถ้าเบราว์เซอร์ตัดคำไทยไม่ได้
+   จะดันจนจอเลื่อนซ้ายขวา · กันไว้อีกชั้นนอกเหนือจาก border-box ด้านบน */
+body, h1, h2, h3, p, div, span, td, th, label, button, li { overflow-wrap: break-word; }
 
 /* ── กล่องหลัก ───────────────────────────────────────────────────────── */
 .container {
@@ -560,6 +592,7 @@ select.pl-prov { margin-top: 9px; }
 .pl-eg { font-size: 11px; color: #9BB0BA; line-height: 1.5; margin-top: 4px; }
 .pl-eg b { color: #7B96A3; font-weight: 600; }
 .pl-opt { font-weight: 400; font-size: 11.5px; color: #9BB0BA; }
+.pl-req { color: var(--bc-rose); font-weight: 700; }
 .pl-warn { font-size: 11.5px; color: #B5760E; line-height: 1.55; margin-top: 7px; }
 .pl-preview {
   display: grid; place-items: center;

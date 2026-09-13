@@ -248,15 +248,44 @@ class QRScanner {
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}, ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
   }
 
+  // ── กลับไปสถานะพร้อมสแกนคนถัดไป ─────────────────────────────────────────
+  // 🔴 บั๊กที่แก้ 13 ก.ย. 2569:
+  //    ถ้าแอดมินปิดหน้าบันทึกบริการโดยไม่บันทึก (กดยกเลิก / กดนอกกรอบ / Esc)
+  //    ของเดิมไม่มีอะไรทำงานต่อเลย — กล้องถูกสั่งหยุดไปแล้วตอนสแกนติด
+  //    หน้าสแกนก็ถูกซ่อน และ this.foundUser กับเบอร์ที่ค้นหาค้างอยู่
+  //    ผลคือเปิดกล้องอีกไม่ได้ และถ้ากดค้นหาซ้ำจะเจอข้อมูลคนเก่า
+  async resetToScan() {
+    this.foundUser = null;
+    this.isRedeeming = false;
+    this.currentPoint = 0;
+    this.plateFormOpen = false;
+    this.isScanning = false;
+
+    const phoneEl = document.getElementById('manualPhone');
+    if (phoneEl) phoneEl.value = '';      // ล้างเบอร์เก่า ไม่ให้ค้างข้ามคน
+
+    this.togglePopup(true);               // โชว์หน้าสแกนกลับมา
+    await this.startCamera();             // เปิดกล้องใหม่ พร้อมสแกนคนถัดไป
+  }
+
   async manualSearch() {
     const phone = document.getElementById('manualPhone').value;
     if (!phone) return;
     Swal.fire({ title: '🔍 กำลังค้นหา...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    const res = await fetch(`${GAS_ENDPOINT}?action=search_phone&phone=${phone}`);
-    const result = await res.json();
+
+    let result;
+    try {
+      // ห่อ try/catch เพิ่ม — ของเดิมถ้าเน็ตหลุดระหว่างค้นหา
+      // หน้าจอจะค้างที่ "กำลังค้นหา..." ตลอดไป ปิดไม่ได้ ต้องปิดแอปทิ้ง
+      const res = await fetch(`${GAS_ENDPOINT}?action=search_phone&phone=${encodeURIComponent(phone)}`);
+      result = await res.json();
+    } catch (err) {
+      Swal.close();
+      return Swal.fire('❌ ค้นหาไม่สำเร็จ', 'เช็คสัญญาณเน็ตแล้วลองใหม่อีกครั้ง', 'error');
+    }
     Swal.close();
 
-    if (!result.success) return Swal.fire('ไม่พบข้อมูลลูกค้า', '', 'error');
+    if (!result || !result.success) return Swal.fire('ไม่พบข้อมูลลูกค้า', '', 'error');
     this.foundUser = result.data;
     this.closePopup();
     setTimeout(() => this.showCustomerPopup(), 300);
@@ -275,12 +304,22 @@ class QRScanner {
     }
   
     Swal.fire({ title: '🔍 กำลังค้นหา QR...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-  
-    const res = await fetch(`${GAS_ENDPOINT}?action=verify_token&token=${token}`);
-    const result = await res.json();
+
+    let result;
+    try {
+      // ห่อ try/catch เพิ่ม — เน็ตหลุดตอนนี้แล้วหน้าจะค้างที่ "กำลังค้นหา QR..."
+      const res = await fetch(`${GAS_ENDPOINT}?action=verify_token&token=${encodeURIComponent(token)}`);
+      result = await res.json();
+    } catch (err) {
+      Swal.close();
+      await Swal.fire('❌ อ่าน QR ไม่สำเร็จ', 'เช็คสัญญาณเน็ตแล้วสแกนใหม่อีกครั้ง', 'error');
+      this.isScanning = false;
+      this.startCamera();
+      return;
+    }
     Swal.close();
-  
-    if (!result.success) {
+
+    if (!result || !result.success) {
       Swal.fire('QR ไม่ถูกต้อง', '', 'error');
       this.isScanning = false;
       this.startCamera(); // รีสตาร์ทกล้องใหม่
@@ -388,26 +427,29 @@ class QRScanner {
     const v = (this.foundUser.vehicles || [])[i] || {};
     const plate = String(v.Plate || '').trim();
 
-    if (plate) {
-      box.innerHTML = `<div class="plate-have">
-        ${typeof plateHtml === 'function' ? plateHtml(plate, v.Province, false) : esc(plate)}
-        <button type="button" class="plate-edit" id="plateEditBtn">แก้ทะเบียน</button>
-      </div>`;
-      return;
-    }
-
+    // ⚠️ ต้องเช็ค plateFormOpen "ก่อน" เช็คว่ามีทะเบียนแล้วหรือยัง
+    //    ของเดิมเช็คว่ามีทะเบียนก่อนแล้ว return ทันที ปุ่ม "แก้ทะเบียน" จึงกดแล้วไม่มีอะไรเกิดขึ้น
+    //    (แอดมินแจ้งมา 13 ก.ย. 2569 — "เมนูแก้ไขทะเบียนกดไม่ได้")
     if (this.plateFormOpen) {
+      // แยกทะเบียนเดิมกลับเป็น หมวด + เลขท้าย เพื่อเติมลงช่องให้แก้ต่อได้เลย
+      const m = plate.match(/^(.*?)\s*(\d{1,4})$/);
+      const curHead = m ? m[1].trim() : plate;
+      const curTail = m ? m[2] : '';
       const provOpts = (typeof plateProvinceOptions === 'function')
         ? plateProvinceOptions(v.Province || '') : '<option value="">—</option>';
+
       box.innerHTML = `<div class="plate-form">
-        <div class="plate-form-hd">เพิ่มทะเบียนรถ <span>— ถามลูกค้าแล้วกรอกได้เลย</span></div>
+        <div class="plate-form-hd">${plate ? 'แก้ทะเบียนรถ' : 'เพิ่มทะเบียนรถ'}
+          <span>— ${plate ? 'ของเดิม ' + esc(plate) : 'ถามลูกค้าแล้วกรอกได้เลย'}</span></div>
         <div class="pl-grid">
           <div>
-            <input type="text" id="apHead" class="pl-in" placeholder="1กร" autocomplete="off" maxlength="7">
-            <div class="pl-eg">หมวด เช่น <b>1กร</b></div>
+            <input type="text" id="apHead" class="pl-in" placeholder="1กร" autocomplete="off"
+                   maxlength="7" value="${esc(curHead)}">
+            <div class="pl-eg">หมวด เช่น <b>1กร</b> (ภาษาไทยเท่านั้น)</div>
           </div>
           <div>
-            <input type="text" id="apTail" class="pl-in" placeholder="1723" inputmode="numeric" autocomplete="off" maxlength="4">
+            <input type="text" id="apTail" class="pl-in" placeholder="1723" inputmode="numeric"
+                   autocomplete="off" maxlength="4" value="${esc(curTail)}">
             <div class="pl-eg">เลขท้าย เช่น <b>1723</b></div>
           </div>
         </div>
@@ -416,14 +458,23 @@ class QRScanner {
         <div class="pl-warn" id="apWarn" hidden></div>
         <div class="plate-acts">
           <button type="button" class="plate-save" id="apSave">💾 บันทึกทะเบียน</button>
-          <button type="button" class="plate-skip" id="apSkip">ข้ามไปก่อน</button>
+          <button type="button" class="plate-skip" id="apSkip">${plate ? 'ยกเลิก' : 'ข้ามไปก่อน'}</button>
         </div>
       </div>`;
-    } else {
-      box.innerHTML = `<button type="button" class="plate-add" id="plateAddBtn">
-        ➕ รถคันนี้ยังไม่มีทะเบียน — เพิ่มเลย
-      </button>`;
+      return;
     }
+
+    if (plate) {
+      box.innerHTML = `<div class="plate-have">
+        ${typeof plateHtml === 'function' ? plateHtml(plate, v.Province, false) : esc(plate)}
+        <button type="button" class="plate-edit" id="plateEditBtn">แก้ทะเบียน</button>
+      </div>`;
+      return;
+    }
+
+    box.innerHTML = `<button type="button" class="plate-add" id="plateAddBtn">
+      ➕ รถคันนี้ยังไม่มีทะเบียน — เพิ่มเลย
+    </button>`;
   }
 
   // ส่งทะเบียนไปเก็บที่ชีต (action=set_plate ใน plate.gs)
@@ -439,7 +490,7 @@ class QRScanner {
     const warn = document.getElementById('apWarn');
 
     const check = (typeof plateValidate === 'function')
-      ? plateValidate(head.value, tail.value) : { ok: true, warn: '' };
+      ? plateValidate(head.value, tail.value, { required: true }) : { ok: true, warn: '' };
     const plate = (typeof platePretty === 'function')
       ? platePretty(head.value, tail.value) : (head.value + ' ' + tail.value).trim();
 
@@ -529,7 +580,11 @@ class QRScanner {
         <p id="pointInfo">แต้มที่จะได้: <span id="pointPreview">0</span></p>
         <input type="text" id="noteInput" placeholder="หมายเหตุ (ไม่บังคับ)" class="swal2-input">
       `,
-      confirmButtonText: 'บันทึก',
+      confirmButtonText: '✅ บันทึก',
+      // ปุ่มยกเลิกที่เห็นได้ชัด — ของเดิมต้องกดนอกกรอบหรือ Esc เท่านั้น
+      // ซึ่งพนักงานหน้าร้านไม่รู้ และกดนอกกรอบโดยบังเอิญก็หลุดออกมาแบบงง ๆ
+      showCancelButton: true,
+      cancelButtonText: 'ยกเลิก',
       didOpen: () => {
         const priceInput = document.getElementById('priceInput');
         const pointPreview = document.getElementById('pointPreview');
@@ -623,9 +678,15 @@ class QRScanner {
             const c = ev.target.value.replace(/\D/g, '').slice(0, 4);
             if (ev.target.value !== c) ev.target.value = c;
           }
-          if (ev.target.id === 'apHead') {
-            const c = ev.target.value.replace(/\s+/g, '');
-            if (ev.target.value !== c) ev.target.value = c;
+          // หมวดรับแต่เลขกับพยัญชนะไทย กันพิมพ์อังกฤษตั้งแต่แรก
+          if (ev.target.id === 'apHead' && typeof plateCleanHead === 'function') {
+            const c = plateCleanHead(ev.target.value);
+            if (ev.target.value !== c) {
+              const pos = ev.target.selectionStart || 0;
+              const cut = pos - plateCleanHead(ev.target.value.slice(0, pos)).length;
+              ev.target.value = c;
+              try { ev.target.setSelectionRange(pos - cut, pos - cut); } catch (e) {}
+            }
           }
           paintPlatePreview();
         });
@@ -698,6 +759,10 @@ class QRScanner {
         updateCurrentPoint();   // โหลดครั้งแรก
       },
       preConfirm: () => this.onServiceSave()
+    }).then(result => {
+      // ปิดหน้านี้โดยไม่ได้บันทึก -> กลับไปพร้อมสแกนคนถัดไปทันที
+      // ต้องเช็ค isDismissed เพราะกดบันทึกสำเร็จจะเข้า onServiceSave ซึ่งปิด LIFF ไปเอง
+      if (result.isDismissed) this.resetToScan();
     });
   }
 }
