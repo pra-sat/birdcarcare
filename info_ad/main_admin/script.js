@@ -584,6 +584,23 @@ class QRScanner {
         })
       });
       const out = await res.json();
+
+      // เซสชัน LINE หมดอายุ — ชวนเข้าสู่ระบบใหม่ ไม่ใช่แค่ขึ้นข้อความให้งง
+      if (out.code === 'IDTOKEN_INVALID') {
+        const relog = await Swal.fire({
+          icon: 'warning',
+          title: '🔐 เซสชันหมดอายุ',
+          text: 'ต้องเข้าสู่ระบบ LINE ใหม่ก่อนบันทึกทะเบียน',
+          showCancelButton: true,
+          confirmButtonText: 'เข้าสู่ระบบใหม่',
+          cancelButtonText: 'ไว้ก่อน'
+        });
+        if (relog.isConfirmed) { try { liff.login(); } catch (e) { location.reload(); } }
+        btn.disabled = false;
+        btn.textContent = label;
+        return;
+      }
+
       if (out.status !== 'success') throw new Error(out.message || 'บันทึกไม่สำเร็จ');
 
       // อัปเดตในหน่วยความจำด้วย เพื่อให้การ์ดกับบรรทัดสรุปเปลี่ยนทันที
