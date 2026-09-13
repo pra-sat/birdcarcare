@@ -231,6 +231,24 @@ class QRScanner {
       return false;
     }
 
+    // ── เซสชัน LINE หมดอายุ (เกิดได้ถ้าเปิดหน้าค้างไว้ทั้งวัน) ──────────────
+    // ต้องกู้คืนให้ได้ ไม่งั้นพอเปิดโหมดบังคับ ID token แล้วพนักงานจะติดตาย
+    // กลางรายการโดยไม่รู้ว่าต้องทำอะไร
+    if (result.code === 'IDTOKEN_INVALID') {
+      const relog = await Swal.fire({
+        icon: 'warning',
+        title: '🔐 เซสชันหมดอายุ',
+        text: 'ต้องเข้าสู่ระบบ LINE ใหม่อีกครั้ง แล้วค่อยบันทึกรายการนี้ซ้ำ (ข้อมูลลูกค้ายังอยู่ครบ)',
+        showCancelButton: true,
+        confirmButtonText: 'เข้าสู่ระบบใหม่',
+        cancelButtonText: 'ไว้ก่อน'
+      });
+      if (relog.isConfirmed) {
+        try { liff.login(); } catch (e) { location.reload(); }
+      }
+      return false;
+    }
+
     this.logAction('บันทึกบริการ', `❌ ล้มเหลว: ${name}, เหตุ: ${result.message}`);
     Swal.fire('❌ บันทึกไม่สำเร็จ', result.message || '', 'error');
     return false;
@@ -935,6 +953,13 @@ class AdminManager {
         token: this.token
       };
     }
+
+    // ปุ่มตรวจความปลอดภัย — เห็นเฉพาะแอดมิน ใช้ก่อนเปิดโหมดบังคับใน security.gs
+    const secBtn = document.getElementById('secTestBtn');
+    if (secBtn) {
+      secBtn.classList.remove('hidden');
+      secBtn.addEventListener('click', () => this.runSecuritySelfTest(secBtn));
+    }
     if (level >= 3) document.querySelector('[data-menu="stats"]')?.classList.remove("hidden");
     if (level >= 5) document.querySelector('[data-menu="settings"]')?.classList.remove("hidden");
   }
@@ -959,6 +984,60 @@ class AdminManager {
       console.log("📘 บันทึก Admin Log:", result);
     } catch (err) {
       console.warn("❌ บันทึก Log ไม่สำเร็จ:", err);
+    }
+  }
+
+  // ── ตรวจว่าเครื่องนี้ยืนยันตัวตนกับ LINE ได้ครบทุกข้อไหม ──────────────────
+  // ตรวจอย่างเดียว ไม่แก้ข้อมูลใด ๆ
+  //
+  // ทำไมต้องมีปุ่มนี้: การเปิดโหมดบังคับ ID token ใน security.gs ต้องรู้ก่อนว่า
+  // liff.getIDToken() ของเครื่องจริงคืน token ที่ LINE ยอมรับหรือเปล่า
+  // (ขึ้นกับว่า LIFF เปิดสิทธิ์ openid ไว้ไหม) ซึ่งทดสอบจากเครื่องนักพัฒนาไม่ได้
+  // แตะปุ่มนี้หนึ่งครั้งต่อเครื่อง = ได้คำตอบ และผลถูกบันทึกลง Security_Log ให้ด้วย
+  async runSecuritySelfTest(btn) {
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ กำลังตรวจ...';
+
+    try {
+      // ดึง token สดอีกครั้ง เผื่อของเดิมค้างมาตั้งแต่เปิดหน้า
+      if (liff.getIDToken && typeof liff.getIDToken === 'function') {
+        try { this.token = await liff.getIDToken(); } catch (e) { /* ใช้ตัวเดิม */ }
+      }
+
+      const res = await fetch(`${GAS_ENDPOINT}?action=security_selftest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'security_selftest',
+          adminUserId: this.userId,
+          idToken: this.token
+        })
+      });
+      const r = await res.json();
+
+      const rows = (r.checks || []).map(c =>
+        `<div style="display:flex;gap:8px;align-items:flex-start;text-align:left;margin:6px 0">
+           <span style="flex:0 0 auto">${c.pass ? '✅' : '❌'}</span>
+           <span style="flex:1">
+             <b>${esc(c.name)}</b><br>
+             <span style="font-size:12px;color:#5A7986">${esc(c.detail || '')}</span>
+           </span>
+         </div>`).join('');
+
+      await Swal.fire({
+        icon: r.ok ? 'success' : 'warning',
+        title: r.ok ? '✅ ผ่านครบทุกข้อ' : '⚠️ ยังไม่ผ่านครบ',
+        html: rows + `<p style="font-size:12.5px;margin-top:12px;color:#5A7986">${esc(r.message || '')}</p>` +
+              (r.ok ? `<p style="font-size:12px;color:#12A594">บันทึกผลไว้ในชีต Security_Log แล้ว<br>
+                       เจ้าของร้านรันฟังก์ชัน showSecurityStatus เพื่อดูว่าครบทุกคนหรือยังได้เลย</p>` : ''),
+        confirmButtonText: 'ปิด'
+      });
+    } catch (err) {
+      Swal.fire('❌ ตรวจไม่สำเร็จ', 'เช็คสัญญาณเน็ตแล้วลองใหม่', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
     }
   }
 
