@@ -35,6 +35,7 @@ class QRScanner {
     this.scanToken = '';        // QR ที่สแกนมาล่าสุด (ว่าง = ค้นด้วยเบอร์)
     this.requestId = '';        // รหัสคำขอ กันบันทึกซ้ำ
     this.forceDuplicate = false;
+    this.draft = null;          // ค่าที่กรอกไว้ เก็บตอนกดกลับไปแก้จากหน้ายืนยัน
 
     document.getElementById('manualPhone')?.addEventListener('keyup', (e) => {
       if (e.key === 'Enter') this.manualSearch();
@@ -111,27 +112,47 @@ class QRScanner {
     });
   }
 
-  async onServiceSave() {
+  // ═══════════════════════════════════════════════════════════════════════
+  //  แยกการบันทึกเป็น 2 ขั้น (รื้อใหม่ 14 ก.ย. 2569)
+  //
+  //  🔴 ต้นเหตุของบั๊ก: SweetAlert2 เปิดป๊อปอัปได้ทีละอันเท่านั้น
+  //     ของเดิมทำทุกอย่าง (ถามยืนยัน -> ยิง POST -> ถามเรื่องรายการซ้ำ)
+  //     อยู่ใน preConfirm ของป๊อปอัป "บันทึกบริการ"
+  //     พอเรียก Swal.fire ถามยืนยัน มันปิดป๊อปอัปเดิมทิ้งทันที
+  //     ทำให้เกิดปัญหาพร้อมกัน 3 อย่าง
+  //       1. กด "กลับไปแก้" แล้วฟอร์มหายหมด ต้องสแกนใหม่  <- ที่แจ้งมา
+  //       2. กล่องถาม "บันทึกซ้ำไหม" ใช้ไม่ได้ เพราะ element ในฟอร์มหายไปแล้ว
+  //       3. Swal.showValidationMessage เขียนลงป๊อปอัปที่ไม่มีอยู่แล้ว = เงียบหาย
+  //
+  //  วิธีแก้: ให้ preConfirm ทำแค่ "ตรวจและเก็บค่า" อย่างเดียว
+  //  ส่วนการถามยืนยันและยิง POST ย้ายไปทำใน .then หลังป๊อปอัปปิดแล้ว
+  //  ตอนนั้นไม่มีป๊อปอัปเปิดค้างอยู่ จึงเปิดกล่องถามซ้อนได้อย่างปลอดภัย
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ขั้นที่ 1 — ตรวจและเก็บค่าจากฟอร์ม (ทำงานใน preConfirm)
+  // คืน false = ฟอร์มยังไม่ครบ ป๊อปอัปจะเปิดค้างไว้ให้แก้ต่อ
+  collectForm() {
     const name = document.getElementById('serviceName').value.trim();
     const note = document.getElementById('noteInput').value.trim();
     const vehicleSelect = document.getElementById('vehicleSelect');
     const selectedIndex = vehicleSelect ? Number(vehicleSelect.value) : 0;
     const selectedVehicle = this.foundUser.vehicles?.[selectedIndex] || {};
     const availablePoint = parseInt(selectedVehicle.point || 0);
-  
+
     const priceInputEl = document.getElementById('priceInput');
     const priceValue = parseFloat(priceInputEl.value || '0');
-    
+
     // แยกข้อความให้ตรงกับว่าขาดอะไร ของเดิมรวมเป็นประโยคเดียวจึงไม่รู้ว่าขาดช่องไหน
+    // ตรงนี้ป๊อปอัปยังเปิดอยู่ showValidationMessage จึงใช้ได้จริง
     if (!name) {
       Swal.showValidationMessage('ยังไม่ได้เลือกบริการ');
-      return;
+      return false;
     }
     if (priceValue <= 0) {
       Swal.showValidationMessage(this.isRedeeming
         ? 'กรุณากรอกจำนวนแต้มที่จะใช้'
         : 'กรุณากรอกราคาให้ถูกต้อง');
-      return;
+      return false;
     }
 
     let price = priceValue;
@@ -141,7 +162,7 @@ class QRScanner {
     if (this.isRedeeming) {
       if (price > availablePoint) {
         Swal.showValidationMessage(`แต้มลูกค้าไม่พอ (มี ${availablePoint} จะใช้ ${priceValue})`);
-        return;
+        return false;
       }
       price = -price;
       point = -priceValue;
@@ -164,37 +185,61 @@ class QRScanner {
       <p>หมายเหตุ: ${esc(note || '-')}</p>
     `;
 
-    const confirm = await Swal.fire({
-      title: 'ตรวจข้อมูลก่อนบันทึก',
-      html: confirmHtml,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: '✅ ยืนยัน บันทึกเลย',
-      cancelButtonText: 'กลับไปแก้'
-    });
-  
-    if (!confirm.isConfirmed) return;
-  
+    // เก็บค่าที่กรอกไว้ ถ้าแอดมินกดกลับไปแก้ จะได้เติมกลับให้ครบ
+    this.draft = {
+      vehicleIndex: selectedIndex,
+      serviceName: name,
+      price: priceInputEl.value,
+      note: note,
+      isRedeeming: this.isRedeeming
+    };
+
+    // ส่งข้อมูลที่ตรวจแล้วออกไปให้ .then เอาไปทำต่อ
+    return {
+      name, note, price, point, label, confirmHtml,
+      vehicle: selectedVehicle
+    };
+  }
+
+  // ขั้นที่ 2 — ถามยืนยันแล้วบันทึก (ทำงานหลังป๊อปอัปฟอร์มปิดแล้ว)
+  // ตรงนี้ไม่มีป๊อปอัปเปิดค้าง จึงเปิดกล่องถามต่าง ๆ ได้อย่างปลอดภัย
+  // skipConfirm = true ใช้ตอนยิงซ้ำหลังแอดมินยืนยันไปแล้ว (รายการซ้ำ / เน็ตหลุด)
+  // จะได้ไม่ต้องกดยืนยันหน้าเดิมซ้ำอีกรอบให้เสียเวลาหน้าร้าน
+  async confirmAndSave(data, skipConfirm) {
+    if (!skipConfirm) {
+      const confirm = await Swal.fire({
+        title: 'ตรวจข้อมูลก่อนบันทึก',
+        html: data.confirmHtml,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: '✅ ยืนยัน บันทึกเลย',
+        cancelButtonText: 'กลับไปแก้'
+      });
+
+      // กลับไปแก้ -> เปิดฟอร์มเดิมขึ้นมาใหม่พร้อมค่าที่กรอกไว้ ไม่ใช่รีเซ็ตกลับหน้าสแกน
+      if (!confirm.isConfirmed) return this.reopenForm();
+    }
+
     Swal.fire({ title: '⏳ กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-  
+
     const payload = {
       action: 'record_service',
       userId: this.foundUser.UserID,
       nameLine: this.foundUser.nameLine || '',
       statusMessage: this.foundUser.statusMessage || '',
       pictureUrl: this.foundUser.pictureUrl || '',
-      brand: selectedVehicle.Brand || '',
-      model: selectedVehicle.Model || '',
-      year: selectedVehicle.Year || '',
-      category: selectedVehicle.Category || '',
-      serviceName: name,
-      price,
-      point,
-      note,
-      timestamp: scanner.getThaiDateTime(),
+      brand: data.vehicle.Brand || '',
+      model: data.vehicle.Model || '',
+      year: data.vehicle.Year || '',
+      category: data.vehicle.Category || '',
+      serviceName: data.name,
+      price: data.price,
+      point: data.point,
+      note: data.note,
+      timestamp: this.getThaiDateTime(),
       admin: this.adminName,
 
-      // ── ของใหม่ 13 ก.ย. 2569 — ด่านตรวจใน security.gs ใช้ทั้ง 4 ช่องนี้ ──
+      // ── ด่านตรวจใน security.gs ใช้ทั้ง 4 ช่องนี้ ──
       adminUserId: this.adminUserId,   // ใครเป็นคนกดบันทึก
       idToken: this.token,             // LINE ID token ยืนยันว่าเป็นคนนั้นจริง
       scanToken: this.scanToken || '', // QR ที่สแกนมา (ว่างได้ถ้าค้นด้วยเบอร์)
@@ -214,16 +259,24 @@ class QRScanner {
       Swal.close();
       // เน็ตหลุดตอนนี้ = ไม่รู้ว่าเซิร์ฟเวอร์บันทึกไปแล้วหรือยัง
       // แต่ requestId เดิมทำให้กดซ้ำได้อย่างปลอดภัย ไม่เกิดรายการซ้ำ
-      Swal.showValidationMessage('ส่งข้อมูลไม่สำเร็จ เช็คเน็ตแล้วกดบันทึกอีกครั้งได้เลย (ระบบกันบันทึกซ้ำให้แล้ว)');
-      return false;
+      const retry = await Swal.fire({
+        icon: 'error',
+        title: '❌ ส่งข้อมูลไม่สำเร็จ',
+        text: 'เช็คสัญญาณเน็ตแล้วลองบันทึกอีกครั้งได้เลย ระบบกันบันทึกซ้ำให้แล้ว',
+        showCancelButton: true,
+        confirmButtonText: 'ลองอีกครั้ง',
+        cancelButtonText: 'กลับไปแก้'
+      });
+      return retry.isConfirmed ? this.confirmAndSave(data, true) : this.reopenForm();
     }
     Swal.close();
 
     if (result.success) {
-      this.logAction('บันทึกบริการ', `✅ ${name} (${price} บาท)`);
-      Swal.fire('✅ บันทึกสำเร็จ', `บริการ: ${esc(name)}<br>แต้ม: ${esc(result.point ?? point)}`, 'success')
+      this.draft = null;   // บันทึกสำเร็จแล้ว ไม่ต้องเก็บร่างไว้
+      this.logAction('บันทึกบริการ', `✅ ${data.name} (${data.price} บาท)`);
+      return Swal.fire('✅ บันทึกสำเร็จ',
+        `บริการ: ${esc(data.name)}<br>แต้ม: ${esc(result.point ?? data.point)}`, 'success')
         .then(() => liff.closeWindow());
-      return true;
     }
 
     // ── รายการนี้เพิ่งถูกบันทึกไปเมื่อกี้ ให้แอดมินยืนยันก่อนว่าตั้งใจซ้ำจริง ──
@@ -236,18 +289,15 @@ class QRScanner {
         confirmButtonText: 'ยืนยัน บันทึกซ้ำ',
         cancelButtonText: 'ไม่บันทึก'
       });
-      if (again.isConfirmed) {
-        this.forceDuplicate = true;
-        this.requestId = 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
-        return this.onServiceSave();   // ยิงใหม่พร้อมธงยืนยัน
-      }
-      Swal.showValidationMessage('ยกเลิกการบันทึกซ้ำแล้ว');
-      return false;
+      if (!again.isConfirmed) return this.reopenForm();
+
+      // ยิงใหม่พร้อมธงยืนยัน และเปลี่ยนรหัสคำขอ ไม่งั้นจะไปชนตัวกันซ้ำของตัวเอง
+      this.forceDuplicate = true;
+      this.requestId = 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
+      return this.confirmAndSave(data, true);   // ยืนยันไปแล้ว ไม่ต้องถามซ้ำ
     }
 
     // ── เซสชัน LINE หมดอายุ (เกิดได้ถ้าเปิดหน้าค้างไว้ทั้งวัน) ──────────────
-    // ต้องกู้คืนให้ได้ ไม่งั้นพอเปิดโหมดบังคับ ID token แล้วพนักงานจะติดตาย
-    // กลางรายการโดยไม่รู้ว่าต้องทำอะไร
     if (result.code === 'IDTOKEN_INVALID') {
       const relog = await Swal.fire({
         icon: 'warning',
@@ -259,13 +309,20 @@ class QRScanner {
       });
       if (relog.isConfirmed) {
         try { liff.login(); } catch (e) { location.reload(); }
+        return;
       }
-      return false;
+      return this.reopenForm();
     }
 
-    this.logAction('บันทึกบริการ', `❌ ล้มเหลว: ${name}, เหตุ: ${result.message}`);
-    Swal.fire('❌ บันทึกไม่สำเร็จ', result.message || '', 'error');
-    return false;
+    this.logAction('บันทึกบริการ', `❌ ล้มเหลว: ${data.name}, เหตุ: ${result.message}`);
+    await Swal.fire('❌ บันทึกไม่สำเร็จ', result.message || '', 'error');
+    return this.reopenForm();
+  }
+
+  // เปิดฟอร์มบันทึกบริการขึ้นมาใหม่ พร้อมค่าที่กรอกค้างไว้ (this.draft)
+  // หน่วงนิดหนึ่งให้ SweetAlert ปิดตัวเก่าเสร็จก่อน ไม่งั้นตัวใหม่จะถูกกลืน
+  reopenForm() {
+    setTimeout(() => this.showCustomerPopup(), 150);
   }
 
 
@@ -334,6 +391,7 @@ class QRScanner {
     this.isScanning = false;
     this.scanToken = '';
     this.forceDuplicate = false;
+    this.draft = null;          // เริ่มลูกค้าคนใหม่ ไม่เอาร่างของคนเก่าติดมา
 
     const phoneEl = document.getElementById('manualPhone');
     if (phoneEl) phoneEl.value = '';      // ล้างเบอร์เก่า ไม่ให้ค้างข้ามคน
@@ -662,7 +720,7 @@ class QRScanner {
             ? ` <span class="fld-sub">— มี ${this.foundUser.vehicles.length} คันในระบบ</span>` : ''}</label>
           <div class="vpick-list" id="vpickList"></div>
           <!-- ⚠️ select ตัวนี้ถูกซ่อนไว้ ห้ามลบ
-               onServiceSave() กับ updateCurrentPoint() อ่านค่าจาก #vehicleSelect
+               collectForm() กับ updateCurrentPoint() อ่านค่าจาก #vehicleSelect
                การ์ดด้านบนเป็นแค่หน้าตา กดแล้วมาเขียนค่าลง select ตัวนี้ -->
           <select id="vehicleSelect" hidden>${vehicleOptions}</select>
           <div class="plate-box" id="plateBox"></div>
@@ -849,13 +907,35 @@ class QRScanner {
           updatePointDisplay();
         });
 
-        setMode(false);         // เริ่มที่จ่ายเงินเสมอ
+        // ── เติมค่าที่กรอกไว้กลับ ถ้ากดกลับไปแก้มาจากหน้ายืนยัน ──────────
+        // ต้องทำหลังผูกตัวฟังทั้งหมดแล้ว เพื่อให้ setMode/updateCurrentPoint
+        // คำนวณจากค่าที่เติมกลับเข้าไปได้ถูกต้อง
+        const d = this.draft;
+        if (d) {
+          this.draft = null;                       // ใช้ครั้งเดียวแล้วทิ้ง
+          vehicleSelect.value = String(d.vehicleIndex || 0);
+          serviceInput.value = d.serviceName || '';
+          priceInput.value = d.price || '';
+          const noteEl = document.getElementById('noteInput');
+          if (noteEl) noteEl.value = d.note || '';
+          this.renderVehiclePicks();
+          this.renderPlateBox();
+          this.renderServiceChips();
+          setMode(!!d.isRedeeming);                // คืนโหมดจ่ายเงิน/แลกแต้ม
+        } else {
+          setMode(false);       // เปิดใหม่ปกติ เริ่มที่จ่ายเงินเสมอ
+        }
         updateCurrentPoint();   // โหลดครั้งแรก
       },
-      preConfirm: () => this.onServiceSave()
+      // ตรวจและเก็บค่าเท่านั้น ห้ามเปิดป๊อปอัปอื่นในนี้เด็ดขาด (ดูคำอธิบายที่ collectForm)
+      preConfirm: () => this.collectForm()
     }).then(result => {
-      // ปิดหน้านี้โดยไม่ได้บันทึก -> กลับไปพร้อมสแกนคนถัดไปทันที
-      // ต้องเช็ค isDismissed เพราะกดบันทึกสำเร็จจะเข้า onServiceSave ซึ่งปิด LIFF ไปเอง
+      if (result.isConfirmed && result.value) {
+        // ฟอร์มผ่านแล้วและป๊อปอัปปิดไปแล้ว -> ค่อยถามยืนยันและบันทึก
+        this.confirmAndSave(result.value);
+        return;
+      }
+      // ปิดหน้านี้โดยไม่ได้บันทึก -> กลับไปพร้อมสแกนคนถัดไป
       if (result.isDismissed) this.resetToScan();
     });
   }
