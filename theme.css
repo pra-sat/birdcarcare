@@ -968,6 +968,35 @@ input#userId, input#name, input#phone { padding: 10px 12px; }
 .scan-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 11px; }
 .scan-controls .btn { margin: 0 !important; }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   หน้าแอดมิน — ย่อให้กระชับขึ้น (13 ก.ย. 2569 ตามที่แจ้งว่ารู้สึกล้น ๆ)
+
+   ต้นเหตุที่ดูล้นนอกจากเรื่อง box-sizing คือ #scanSection เป็นพี่น้องกับ
+   .container ไม่ได้อยู่ข้างใน และไม่มี max-width/margin ของตัวเอง
+   มันจึงกว้างเต็มจอชนขอบซ้ายขวา ในขณะที่กล่องด้านบนมีขอบเว้น ดูไม่เข้าชุดกัน
+   -> จับให้กว้างเท่ากันและอยู่กึ่งกลางเหมือนกัน
+   ═══════════════════════════════════════════════════════════════════════ */
+.scan-section {
+  max-width: 500px;
+  margin: 12px auto 24px !important;
+  width: auto;
+}
+
+/* ลดที่ว่างด้านบนกับขนาดตัวอักษรลง ให้เห็นปุ่มสแกนโดยไม่ต้องเลื่อน */
+body > .container { margin-top: 16px !important; margin-bottom: 12px; }
+body > .container > h2 { font-size: 1.28rem !important; margin: 0 0 10px !important; }
+
+.profile { padding: 10px 12px !important; margin-bottom: 12px; }
+.profile p { margin: 3px 0 !important; font-size: 13.5px !important; }
+
+.admin-buttons { margin-top: 12px !important; gap: 9px !important; }
+#scanBtn { font-size: 16px; padding: 14px 12px; }
+
+.scan-section h3 { font-size: 15px; margin: 0 0 9px; }
+.scan-section .input-field { margin-top: 10px; padding: 10px 12px; }
+.scan-controls { margin-top: 9px; }
+.scan-controls .btn { padding: 11px 8px; font-size: 14px; }
+
 /* ── เมนูปุ่ม ───────────────────────────────────────────────────────── */
 .admin-buttons, .menu-buttons, .button-group { gap: 10px; }
 .admin-buttons .btn, .menu-buttons .btn { white-space: normal !important; }

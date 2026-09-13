@@ -32,6 +32,9 @@ class QRScanner {
     this.currentCameraIndex = 0;
     this.html5QrCode = null;
     this.cameraList = [];
+    this.scanToken = '';        // QR ที่สแกนมาล่าสุด (ว่าง = ค้นด้วยเบอร์)
+    this.requestId = '';        // รหัสคำขอ กันบันทึกซ้ำ
+    this.forceDuplicate = false;
 
     document.getElementById('manualPhone')?.addEventListener('keyup', (e) => {
       if (e.key === 'Enter') this.manualSearch();
@@ -175,25 +178,62 @@ class QRScanner {
       point,
       note,
       timestamp: scanner.getThaiDateTime(),
-      admin: this.adminName
+      admin: this.adminName,
+
+      // ── ของใหม่ 13 ก.ย. 2569 — ด่านตรวจใน security.gs ใช้ทั้ง 4 ช่องนี้ ──
+      adminUserId: this.adminUserId,   // ใครเป็นคนกดบันทึก
+      idToken: this.token,             // LINE ID token ยืนยันว่าเป็นคนนั้นจริง
+      scanToken: this.scanToken || '', // QR ที่สแกนมา (ว่างได้ถ้าค้นด้วยเบอร์)
+      requestId: this.requestId,       // กันกดซ้ำ/เน็ตสะดุดแล้วยิงซ้ำ
+      force: !!this.forceDuplicate     // แอดมินยืนยันแล้วว่าตั้งใจบันทึกซ้ำ
     };
-  
-    const res = await fetch(GAS_ENDPOINT + '?action=record_service', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-  
-    const result = await res.json();
+
+    let result;
+    try {
+      const res = await fetch(GAS_ENDPOINT + '?action=record_service', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      result = await res.json();
+    } catch (err) {
+      Swal.close();
+      // เน็ตหลุดตอนนี้ = ไม่รู้ว่าเซิร์ฟเวอร์บันทึกไปแล้วหรือยัง
+      // แต่ requestId เดิมทำให้กดซ้ำได้อย่างปลอดภัย ไม่เกิดรายการซ้ำ
+      Swal.showValidationMessage('ส่งข้อมูลไม่สำเร็จ เช็คเน็ตแล้วกดบันทึกอีกครั้งได้เลย (ระบบกันบันทึกซ้ำให้แล้ว)');
+      return false;
+    }
     Swal.close();
-  
+
     if (result.success) {
       this.logAction('บันทึกบริการ', `✅ ${name} (${price} บาท)`);
-      Swal.fire('✅ บันทึกสำเร็จ', `บริการ: ${esc(name)}<br>แต้ม: ${esc(point)}`, 'success').then(() => liff.closeWindow());
-    } else {
-      this.logAction('บันทึกบริการ', `❌ ล้มเหลว: ${name}, เหตุ: ${result.message}`);
-      Swal.fire('❌ บันทึกไม่สำเร็จ', result.message || '', 'error');
+      Swal.fire('✅ บันทึกสำเร็จ', `บริการ: ${esc(name)}<br>แต้ม: ${esc(result.point ?? point)}`, 'success')
+        .then(() => liff.closeWindow());
+      return true;
     }
+
+    // ── รายการนี้เพิ่งถูกบันทึกไปเมื่อกี้ ให้แอดมินยืนยันก่อนว่าตั้งใจซ้ำจริง ──
+    if (result.code === 'DUPLICATE') {
+      const again = await Swal.fire({
+        icon: 'warning',
+        title: '⚠️ รายการนี้เพิ่งบันทึกไปแล้ว',
+        text: result.message || '',
+        showCancelButton: true,
+        confirmButtonText: 'ยืนยัน บันทึกซ้ำ',
+        cancelButtonText: 'ไม่บันทึก'
+      });
+      if (again.isConfirmed) {
+        this.forceDuplicate = true;
+        this.requestId = 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
+        return this.onServiceSave();   // ยิงใหม่พร้อมธงยืนยัน
+      }
+      Swal.showValidationMessage('ยกเลิกการบันทึกซ้ำแล้ว');
+      return false;
+    }
+
+    this.logAction('บันทึกบริการ', `❌ ล้มเหลว: ${name}, เหตุ: ${result.message}`);
+    Swal.fire('❌ บันทึกไม่สำเร็จ', result.message || '', 'error');
+    return false;
   }
 
 
@@ -260,6 +300,8 @@ class QRScanner {
     this.currentPoint = 0;
     this.plateFormOpen = false;
     this.isScanning = false;
+    this.scanToken = '';
+    this.forceDuplicate = false;
 
     const phoneEl = document.getElementById('manualPhone');
     if (phoneEl) phoneEl.value = '';      // ล้างเบอร์เก่า ไม่ให้ค้างข้ามคน
@@ -287,6 +329,7 @@ class QRScanner {
 
     if (!result || !result.success) return Swal.fire('ไม่พบข้อมูลลูกค้า', '', 'error');
     this.foundUser = result.data;
+    this.scanToken = '';        // ค้นด้วยเบอร์ ไม่มี QR เกี่ยวข้อง
     this.closePopup();
     setTimeout(() => this.showCustomerPopup(), 300);
   }
@@ -327,6 +370,9 @@ class QRScanner {
     }
   
     this.foundUser = result.data;
+    // เก็บ token ที่สแกนมา ส่งไปกับตอนบันทึกด้วย
+    // เซิร์ฟเวอร์จะปิด token ทิ้งหลังบันทึกสำเร็จ สแกน QR อันเดิมซ้ำจึงบันทึกไม่ได้อีก
+    this.scanToken = token;
     this.togglePopup(false); // ซ่อนหน้า scan
     setTimeout(() => this.showCustomerPopup(), 300);
   }
@@ -510,10 +556,13 @@ class QRScanner {
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: 'set_plate',
-          userId: this.foundUser.UserID,
+          userId: this.foundUser.UserID,          // เจ้าของรถ
           brand: v.Brand, model: v.Model, year: v.Year,
           plate, province: prov ? prov.value : '',
-          admin: this.adminName
+          admin: this.adminName,
+          // ── ข้อมูลยืนยันตัวตนคนที่กดแก้ (ด่านตรวจใน security.gs ใช้) ──
+          adminUserId: this.adminUserId,
+          idToken: this.token
         })
       });
       const out = await res.json();
@@ -537,6 +586,12 @@ class QRScanner {
     this.isRedeeming = false;
     this.currentPoint = 0;
     this.plateFormOpen = false;
+
+    // สร้างรหัสคำขอใหม่ทุกครั้งที่เปิดหน้าบันทึก
+    // เซิร์ฟเวอร์จำรหัสนี้ไว้ 6 ชั่วโมง ยิงมาด้วยรหัสเดิม = คำขอเดิม ไม่ใช่รายการใหม่
+    // ทำให้กดบันทึกซ้ำหรือเน็ตสะดุดแล้วยิงซ้ำ ไม่เกิดรายการซ้ำและแต้มไม่เด้งสองรอบ
+    this.requestId = 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
+    this.forceDuplicate = false;
   
     const vehicleOptions = this.foundUser.vehicles.map((v, i) =>
       `<option value="${i}">${esc(v.Brand)} ${esc(v.Model)} (${esc(v.Year)}) - ${esc(v.point)} แต้ม</option>`
