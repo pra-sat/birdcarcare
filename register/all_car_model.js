@@ -224,18 +224,47 @@ const carData = {
       // อยู่ใต้ยี่ห้อ Honda เดียวกับรถยนต์โดยตั้งใจ เพราะข้อมูลเดิมในระบบ
       // เก็บ PCX / Wave / Forza ไว้ใต้ "Honda" อยู่แล้ว
       // การแยกประเภทใช้ category: "Motorcycle" ไม่ใช่แยกเป็นคนละยี่ห้อ
+      // ครอบครัวเวฟ / คับ
       "Wave 110i": { th: ["เวฟ110", "wave 110", "เวฟ"], category: "Motorcycle" },
       "Wave 125i": { th: ["เวฟ125", "wave 125"], category: "Motorcycle" },
+      "Dream 110i": { th: ["ดรีม", "dream"], category: "Motorcycle" },
+      "Super Cub C125": { th: ["ซุปเปอร์คับ", "super cub", "cub"], category: "Motorcycle" },
+      "MSX125 (Grom)": { th: ["เอ็มเอสเอ็กซ์", "msx", "grom"], category: "Motorcycle" },
+      // สกู๊ตเตอร์
+      "Scoopy i": { th: ["สกู๊ปปี้", "สกูปปี้", "scoopy"], category: "Motorcycle" },
       "Click 125i": { th: ["คลิก125", "click 125"], category: "Motorcycle" },
       "Click 160": { th: ["คลิก160", "click 160", "คลิก"], category: "Motorcycle" },
+      "Zoomer-X": { th: ["ซูมเมอร์", "zoomer"], category: "Motorcycle" },
+      "Giorno+": { th: ["จอร์โน่", "giorno"], category: "Motorcycle" },
+      "Moove": { th: ["มูฟ", "moove"], category: "Motorcycle" },
+      "Lead 125": { th: ["ลีด", "lead"], category: "Motorcycle" },
       "PCX 160": { th: ["พีซีเอ็กซ์", "pcx 160", "pcx"], category: "Motorcycle" },
+      "PCX e:HEV": { th: ["พีซีเอ็กซ์ไฮบริด", "pcx hybrid", "pcx hev"], category: "Motorcycle" },
+      "ADV 160": { th: ["เอดีวี", "adv", "adv160"], category: "Motorcycle" },
       "Forza 350": { th: ["ฟอร์ซ่า", "forza 350", "forza"], category: "Motorcycle" },
-      "ADV 350": { th: ["เอดีวี", "adv"], category: "Motorcycle" },
-      "Scoopy i": { th: ["สกู๊ปปี้", "scoopy"], category: "Motorcycle" },
-      "CB150R": { th: ["ซีบี150", "cb150", "cb 150r"], category: "Motorcycle" },
-      "CBR": { th: ["ซีบีอาร์", "cbr"], category: "Motorcycle" },
+      // สปอร์ต / เนคเก็ด
+      "CBR150R": { th: ["ซีบีอาร์150", "cbr150", "cbr"], category: "Motorcycle" },
+      "CBR250RR": { th: ["ซีบีอาร์250", "cbr250"], category: "Motorcycle" },
+      "CBR300R": { th: ["ซีบีอาร์300", "cbr300"], category: "Motorcycle" },
+      "CBR500R": { th: ["ซีบีอาร์500", "cbr500"], category: "Motorcycle" },
+      "CB150R": { th: ["ซีบี150", "cb150", "cb 150r", "exmotion"], category: "Motorcycle" },
+      "CB300R": { th: ["ซีบี300", "cb300"], category: "Motorcycle" },
+      "CB500F": { th: ["ซีบี500", "cb500"], category: "Motorcycle" },
+      "CB650R": { th: ["ซีบี650", "cb650"], category: "Motorcycle" },
+      "CB1000R": { th: ["ซีบี1000", "cb1000"], category: "Motorcycle" },
+      // วิบาก / แอดเวนเจอร์
+      "CRF250L": { th: ["ซีอาร์เอฟ250", "crf250", "crf"], category: "Motorcycle" },
+      "CRF250 Rally": { th: ["ซีอาร์เอฟแรลลี่", "crf rally"], category: "Motorcycle" },
+      "CRF300L": { th: ["ซีอาร์เอฟ300", "crf300"], category: "Motorcycle" },
+      "CT125": { th: ["ซีที125", "ct125", "ฮันเตอร์คับ"], category: "Motorcycle" },
+      "NX500": { th: ["เอ็นเอ็กซ์500", "nx500"], category: "Motorcycle" },
+      // ครุยเซอร์ / คลาสสิก
+      "Rebel 300": { th: ["รีเบล300", "rebel 300"], category: "Motorcycle" },
       "Rebel 500": { th: ["รีเบล", "rebel"], category: "Motorcycle" },
-      "CRF300": { th: ["ซีอาร์เอฟ", "crf"], category: "Motorcycle" }
+      "GB350": { th: ["จีบี350", "gb350"], category: "Motorcycle" },
+      "GB350C": { th: ["จีบี350ซี", "gb350c"], category: "Motorcycle" },
+      // ไฟฟ้า
+      "UC3": { th: ["ยูซี3", "uc3"], category: "Motorcycle", ev: true }
     }
   },
 
@@ -556,10 +585,16 @@ const carData = {
       "Jimny": { th: ["จิมนี่", "jimny"], category: "SUV" },
 
       // ── มอเตอร์ไซค์ Suzuki ── (เหตุผลเดียวกับ Honda)
-      "GSX-R150": { th: ["จีเอสเอ็กซ์อาร์", "gsx r150", "gsx"], category: "Motorcycle" },
+      "GSX-R150": { th: ["จีเอสเอ็กซ์อาร์150", "gsx r150", "gsx"], category: "Motorcycle" },
+      "GSX-S150": { th: ["จีเอสเอ็กซ์เอส", "gsx s150"], category: "Motorcycle" },
+      "GSX-R1000": { th: ["จีเอสเอ็กซ์อาร์1000", "gsx r1000"], category: "Motorcycle" },
       "Burgman 400": { th: ["เบอร์แมน", "burgman"], category: "Motorcycle" },
+      "Burgman Street": { th: ["เบอร์แมนสตรีท", "burgman street"], category: "Motorcycle" },
       "Smash": { th: ["สแมช", "smash"], category: "Motorcycle" },
-      "Avenis": { th: ["อเวนิส", "avenis"], category: "Motorcycle" }
+      "Avenis": { th: ["อเวนิส", "avenis"], category: "Motorcycle" },
+      "Address": { th: ["แอดเดรส", "address"], category: "Motorcycle" },
+      "Raider R150": { th: ["ไรเดอร์", "raider"], category: "Motorcycle" },
+      "V-Strom 250": { th: ["วีสตรอม", "v strom", "vstrom"], category: "Motorcycle" }
     }
   },
 
@@ -735,15 +770,40 @@ const carData = {
     th: ["ยามาฮ่า", "ยามาฮา", "yamaha", "เอ็นแม็กซ์", "nmax", "เอ็กซ์แม็กซ์", "xmax", "แกรนด์ฟิลาโน่", "ฟีโน่", "aerox"],
     moto: true,
     models: {
-      "NMAX 155": { th: ["เอ็นแม็กซ์", "nmax"], category: "Motorcycle" },
-      "XMAX 300": { th: ["เอ็กซ์แม็กซ์", "xmax", "x-max"], category: "Motorcycle" },
-      "Aerox 155": { th: ["แอร็อกซ์", "aerox"], category: "Motorcycle" },
-      "Grand Filano": { th: ["แกรนด์ฟิลาโน่", "filano"], category: "Motorcycle" },
-      "Fino": { th: ["ฟีโน่", "fino"], category: "Motorcycle" },
+      // สกู๊ตเตอร์
+      "Grand Filano Hybrid": { th: ["แกรนด์ฟิลาโน่", "ฟิลาโน่", "filano"], category: "Motorcycle" },
+      "Fino 125": { th: ["ฟีโน่", "fino"], category: "Motorcycle" },
+      "Fazzio": { th: ["แฟซซิโอ", "fazzio"], category: "Motorcycle" },
+      "QBIX": { th: ["คิวบิกซ์", "qbix"], category: "Motorcycle" },
+      "Freego": { th: ["ฟรีโก", "freego"], category: "Motorcycle" },
+      "Mio": { th: ["มีโอ", "mio"], category: "Motorcycle" },
+      "GT125": { th: ["จีที125", "gt125"], category: "Motorcycle" },
+      "Aerox 155": { th: ["แอร็อกซ์", "แอโรกซ์", "aerox"], category: "Motorcycle" },
+      "NMAX 155": { th: ["เอ็นแม็กซ์", "nmax", "n max"], category: "Motorcycle" },
+      "XMAX 300": { th: ["เอ็กซ์แม็กซ์", "xmax", "x-max", "x max"], category: "Motorcycle" },
+      "TMAX 560": { th: ["ทีแม็กซ์", "tmax"], category: "Motorcycle" },
+      // ครอบครัวเวฟ / คับ
+      "Finn": { th: ["ฟินน์", "finn"], category: "Motorcycle" },
+      "Spark 135": { th: ["สปาร์ค", "spark"], category: "Motorcycle" },
       "Exciter 155": { th: ["เอ็กไซเตอร์", "exciter"], category: "Motorcycle" },
-      "MT-15": { th: ["เอ็มที15", "mt15"], category: "Motorcycle" },
-      "R15": { th: ["อาร์15", "r15"], category: "Motorcycle" },
-      "XSR155": { th: ["เอ็กซ์เอสอาร์", "xsr"], category: "Motorcycle" }
+      "PG-1": { th: ["พีจี1", "pg1", "pg-1"], category: "Motorcycle" },
+      // สปอร์ต / เนคเก็ด
+      "YZF-R15": { th: ["อาร์15", "r15", "yzf r15"], category: "Motorcycle" },
+      "YZF-R3": { th: ["อาร์3", "r3", "yzf r3"], category: "Motorcycle" },
+      "YZF-R7": { th: ["อาร์7", "r7", "yzf r7"], category: "Motorcycle" },
+      "YZF-R1": { th: ["อาร์1", "r1", "yzf r1"], category: "Motorcycle" },
+      "MT-15": { th: ["เอ็มที15", "mt15", "mt 15"], category: "Motorcycle" },
+      "MT-03": { th: ["เอ็มที03", "mt03", "mt 03"], category: "Motorcycle" },
+      "MT-07": { th: ["เอ็มที07", "mt07", "mt 07"], category: "Motorcycle" },
+      "MT-09": { th: ["เอ็มที09", "mt09", "mt 09"], category: "Motorcycle" },
+      "XSR155": { th: ["เอ็กซ์เอสอาร์155", "xsr155", "xsr"], category: "Motorcycle" },
+      "XSR700": { th: ["เอ็กซ์เอสอาร์700", "xsr700"], category: "Motorcycle" },
+      "XSR900": { th: ["เอ็กซ์เอสอาร์900", "xsr900"], category: "Motorcycle" },
+      "SR400": { th: ["เอสอาร์400", "sr400"], category: "Motorcycle" },
+      // วิบาก / ทัวริ่ง
+      "WR155R": { th: ["ดับเบิลยูอาร์155", "wr155", "wr"], category: "Motorcycle" },
+      "Tenere 700": { th: ["เทเนเร่", "tenere"], category: "Motorcycle" },
+      "Tracer 9 GT": { th: ["เทรเซอร์", "tracer"], category: "Motorcycle" }
     }
   },
 
@@ -751,13 +811,23 @@ const carData = {
     th: ["คาวาซากิ", "คาวา", "kawasaki", "เคเอสอาร์", "ksr", "นินจา", "ninja"],
     moto: true,
     models: {
-      "Ninja 400": { th: ["นินจา400", "ninja 400"], category: "Motorcycle" },
+      "Ninja 250": { th: ["นินจา250", "ninja 250"], category: "Motorcycle" },
+      "Ninja 400": { th: ["นินจา400", "ninja 400", "นินจา"], category: "Motorcycle" },
       "Ninja 650": { th: ["นินจา650", "ninja 650"], category: "Motorcycle" },
+      "Ninja ZX-4R": { th: ["zx4r", "zx-4r"], category: "Motorcycle" },
+      "Ninja ZX-10R": { th: ["zx10r", "zx-10r"], category: "Motorcycle" },
+      "Z250": { th: ["แซด250", "z250"], category: "Motorcycle" },
+      "Z400": { th: ["แซด400", "z400"], category: "Motorcycle" },
       "Z650": { th: ["แซด650", "z650"], category: "Motorcycle" },
       "Z900": { th: ["แซด900", "z900"], category: "Motorcycle" },
-      "KSR": { th: ["เคเอสอาร์", "ksr"], category: "Motorcycle" },
+      "KSR Pro": { th: ["เคเอสอาร์", "ksr"], category: "Motorcycle" },
       "W175": { th: ["ดับเบิลยู175", "w175"], category: "Motorcycle" },
-      "Versys": { th: ["เวอร์ซิส", "versys"], category: "Motorcycle" }
+      "W800": { th: ["ดับเบิลยู800", "w800"], category: "Motorcycle" },
+      "Versys 650": { th: ["เวอร์ซิส", "versys"], category: "Motorcycle" },
+      "Versys-X 300": { th: ["เวอร์ซิสเอ็กซ์", "versys x"], category: "Motorcycle" },
+      "KLX230": { th: ["เคแอลเอ็กซ์", "klx"], category: "Motorcycle" },
+      "Eliminator 450": { th: ["อิลิมิเนเตอร์", "eliminator"], category: "Motorcycle" },
+      "Vulcan S": { th: ["วัลแคน", "vulcan"], category: "Motorcycle" }
     }
   },
 
@@ -765,10 +835,16 @@ const carData = {
     th: ["จีพีเอ็กซ์", "gpx", "เดโมน", "demon", "เลเจนด้า", "legend"],
     moto: true,
     models: {
-      "Demon 150GR": { th: ["เดโมน", "demon"], category: "Motorcycle" },
-      "Legend 150S": { th: ["เลเจนด้า", "legend"], category: "Motorcycle" },
+      "Demon 150GR": { th: ["เดโมน150", "demon 150"], category: "Motorcycle" },
+      "Demon GR200R": { th: ["เดโมน200", "demon gr200", "เดโมน"], category: "Motorcycle" },
+      "Legend 150S": { th: ["เลเจนด้า150", "legend 150"], category: "Motorcycle" },
+      "Legend 250 Twin": { th: ["เลเจนด้า250", "legend 250", "เลเจนด้า"], category: "Motorcycle" },
       "Drone 150": { th: ["โดรน", "drone"], category: "Motorcycle" },
-      "Razer 220": { th: ["เรเซอร์", "razer"], category: "Motorcycle" }
+      "Razer 220": { th: ["เรเซอร์", "razer"], category: "Motorcycle" },
+      "Rock 110": { th: ["ร็อค", "rock"], category: "Motorcycle" },
+      "Popz 110": { th: ["ป๊อปซ์", "popz"], category: "Motorcycle" },
+      "Gentleman 200": { th: ["เจนเทิลแมน", "gentleman"], category: "Motorcycle" },
+      "MAD 300": { th: ["แมด", "gpx mad"], category: "Motorcycle" }
     }
   },
 
@@ -778,20 +854,31 @@ const carData = {
     models: {
       "Sprint": { th: ["สปรินท์", "sprint"], category: "Motorcycle" },
       "Primavera": { th: ["พรีมาเวร่า", "primavera"], category: "Motorcycle" },
-      "GTS": { th: ["จีทีเอส", "gts"], category: "Motorcycle" }
+      "GTS 300": { th: ["จีทีเอส", "gts"], category: "Motorcycle" },
+      "LX 125": { th: ["แอลเอ็กซ์", "vespa lx"], category: "Motorcycle" },
+      "Sei Giorni": { th: ["เซอิจอร์นี่", "sei giorni"], category: "Motorcycle" },
+      "946": { th: ["946"], category: "Motorcycle" },
+      "Elettrica": { th: ["อิเล็กทริก้า", "elettrica"], category: "Motorcycle", ev: true }
     }
   },
 
-  "Ducati": { th: ["ดูคาติ", "ducati"], moto: true, models: { "Monster": { th: ["มอนสเตอร์"], category: "Motorcycle" }, "Panigale": { th: ["ปานิกาเล่"], category: "Motorcycle" }, "Scrambler": { th: ["สแครมเบลอร์"], category: "Motorcycle" } } },
-  "Triumph": { th: ["ไทรอัมพ์", "triumph"], moto: true, models: { "Bonneville": { th: ["บอนเนวิลล์"], category: "Motorcycle" }, "Speed Twin": { th: ["สปีดทวิน"], category: "Motorcycle" }, "Tiger": { th: ["ไทเกอร์"], category: "Motorcycle" } } },
-  "Harley-Davidson": { th: ["ฮาร์เลย์", "harley"], moto: true, models: { "Sportster": { th: ["สปอร์ตสเตอร์"], category: "Motorcycle" }, "Street Glide": { th: ["สตรีทไกลด์"], category: "Motorcycle" } } },
-  "Royal Enfield": { th: ["รอยัลเอนฟีลด์", "royal enfield"], moto: true, models: { "Classic 350": { th: ["คลาสสิค350"], category: "Motorcycle" }, "Hunter 350": { th: ["ฮันเตอร์"], category: "Motorcycle" }, "Himalayan": { th: ["หิมาลายัน"], category: "Motorcycle" } } },
-  "Lambretta": { th: ["แลมเบรตต้า", "lambretta"], moto: true, models: { "V200": { th: ["วี200"], category: "Motorcycle" }, "X300": { th: ["เอ็กซ์300"], category: "Motorcycle" } } },
-  "Scomadi": { th: ["สโกมาดิ", "scomadi"], moto: true, models: { "TL200": { th: ["ทีแอล200"], category: "Motorcycle" } } },
-  "Benelli": { th: ["เบเนลลี่", "benelli"], moto: true, models: { "TNT": { th: ["ทีเอ็นที"], category: "Motorcycle" }, "Leoncino": { th: ["ลีออนชิโน่"], category: "Motorcycle" } } },
-  "KTM": { th: ["เคทีเอ็ม", "ktm"], moto: true, models: { "Duke": { th: ["ดุ๊ก", "duke"], category: "Motorcycle" }, "RC": { th: ["อาร์ซี"], category: "Motorcycle" } } },
+  "Ducati": { th: ["ดูคาติ", "ducati"], moto: true, models: { "Monster": { th: ["มอนสเตอร์", "monster"], category: "Motorcycle" }, "Panigale V2": { th: ["ปานิกาเล่วี2", "panigale v2"], category: "Motorcycle" }, "Panigale V4": { th: ["ปานิกาเล่วี4", "panigale v4", "ปานิกาเล่"], category: "Motorcycle" }, "Scrambler": { th: ["สแครมเบลอร์", "scrambler"], category: "Motorcycle" }, "Multistrada": { th: ["มัลติสตราด้า", "multistrada"], category: "Motorcycle" }, "Diavel": { th: ["ดิอาเวล", "diavel"], category: "Motorcycle" }, "Streetfighter": { th: ["สตรีทไฟท์เตอร์", "streetfighter"], category: "Motorcycle" }, "Hypermotard": { th: ["ไฮเปอร์โมทาร์ด", "hypermotard"], category: "Motorcycle" } } },
+  "Triumph": { th: ["ไทรอัมพ์", "triumph"], moto: true, models: { "Bonneville T100": { th: ["บอนเนวิลล์t100", "bonneville t100"], category: "Motorcycle" }, "Bonneville T120": { th: ["บอนเนวิลล์", "bonneville"], category: "Motorcycle" }, "Speed Twin": { th: ["สปีดทวิน", "speed twin"], category: "Motorcycle" }, "Speed 400": { th: ["สปีด400", "speed 400"], category: "Motorcycle" }, "Scrambler 400X": { th: ["สแครมเบลอร์400", "scrambler 400"], category: "Motorcycle" }, "Tiger 900": { th: ["ไทเกอร์900", "tiger 900"], category: "Motorcycle" }, "Rocket 3": { th: ["ร็อคเก็ต", "rocket"], category: "Motorcycle" }, "Street Triple": { th: ["สตรีททริปเปิ้ล", "street triple"], category: "Motorcycle" } } },
+  "Harley-Davidson": { th: ["ฮาร์เลย์", "harley", "ฮาเล่", "hd"], moto: true, models: { "Sportster S": { th: ["สปอร์ตสเตอร์", "sportster"], category: "Motorcycle" }, "Nightster": { th: ["ไนท์สเตอร์", "nightster"], category: "Motorcycle" }, "Street Glide": { th: ["สตรีทไกลด์", "street glide"], category: "Motorcycle" }, "Road Glide": { th: ["โร้ดไกลด์", "road glide"], category: "Motorcycle" }, "Fat Boy": { th: ["แฟตบอย", "fat boy"], category: "Motorcycle" }, "Pan America": { th: ["แพนอเมริกา", "pan america"], category: "Motorcycle" }, "X440": { th: ["x440"], category: "Motorcycle" } } },
+  "Royal Enfield": { th: ["รอยัลเอนฟีลด์", "royal enfield", "เอนฟีลด์"], moto: true, models: { "Classic 350": { th: ["คลาสสิค350", "classic 350"], category: "Motorcycle" }, "Hunter 350": { th: ["ฮันเตอร์", "hunter"], category: "Motorcycle" }, "Meteor 350": { th: ["มีเทีย", "meteor"], category: "Motorcycle" }, "Himalayan": { th: ["หิมาลายัน", "himalayan"], category: "Motorcycle" }, "Interceptor 650": { th: ["อินเตอร์เซปเตอร์", "interceptor"], category: "Motorcycle" }, "Continental GT 650": { th: ["คอนติเนนทัลจีที", "continental gt"], category: "Motorcycle" }, "Scram 411": { th: ["สแครม", "scram"], category: "Motorcycle" } } },
+  "Lambretta": { th: ["แลมเบรตต้า", "lambretta", "แลมเบรต"], moto: true, models: { "V125": { th: ["วี125"], category: "Motorcycle" }, "V200": { th: ["วี200"], category: "Motorcycle" }, "X300": { th: ["เอ็กซ์300"], category: "Motorcycle" }, "G350": { th: ["จี350"], category: "Motorcycle" } } },
+  "Scomadi": { th: ["สโกมาดิ", "scomadi", "สโคมาดิ"], moto: true, models: { "TL125": { th: ["ทีแอล125", "tl125"], category: "Motorcycle" }, "TL200": { th: ["ทีแอล200", "tl200"], category: "Motorcycle" }, "TT200": { th: ["ทีที200", "tt200"], category: "Motorcycle" } } },
+  "Benelli": { th: ["เบเนลลี่", "benelli"], moto: true, models: { "TNT 300": { th: ["ทีเอ็นที", "tnt"], category: "Motorcycle" }, "Leoncino 250": { th: ["ลีออนชิโน่", "leoncino"], category: "Motorcycle" }, "TRK 502": { th: ["ทีอาร์เค", "trk"], category: "Motorcycle" }, "Imperiale 400": { th: ["อิมพีเรียล", "imperiale"], category: "Motorcycle" }, "502C": { th: ["502c"], category: "Motorcycle" } } },
+  "KTM": { th: ["เคทีเอ็ม", "ktm"], moto: true, models: { "Duke 200": { th: ["ดุ๊ก200", "duke 200"], category: "Motorcycle" }, "Duke 250": { th: ["ดุ๊ก250", "duke 250"], category: "Motorcycle" }, "Duke 390": { th: ["ดุ๊ก390", "duke 390", "ดุ๊ก"], category: "Motorcycle" }, "RC 390": { th: ["อาร์ซี390", "rc 390", "อาร์ซี"], category: "Motorcycle" }, "Adventure 390": { th: ["แอดเวนเจอร์390", "adventure 390"], category: "Motorcycle" }, "SX-F": { th: ["เอสเอ็กซ์เอฟ", "sxf"], category: "Motorcycle" } } },
   "Zeeho": { th: ["ซีโฮ่", "zeeho"], moto: true, models: { "AE8": { th: ["เออี8"], category: "Motorcycle", ev: true }, "AE6": { th: ["เออี6"], category: "Motorcycle", ev: true } } },
-  "Deco": { th: ["เดโค", "deco"], moto: true, models: { "Espresso": { th: ["เอสเพรสโซ่"], category: "Motorcycle", ev: true } } },
+  "Deco": { th: ["เดโค", "deco"], moto: true, models: { "Espresso": { th: ["เอสเพรสโซ่", "espresso"], category: "Motorcycle", ev: true }, "Chill": { th: ["ชิล", "chill"], category: "Motorcycle", ev: true } } },
+
+  // ── มอเตอร์ไซค์ไฟฟ้า ที่เริ่มเห็นตามถนนในไทย ──
+  "ETRAN": { th: ["อีทราน", "etran"], moto: true, models: { "MYRA": { th: ["ไมร่า", "myra"], category: "Motorcycle", ev: true }, "KRAF": { th: ["คราฟ", "kraf"], category: "Motorcycle", ev: true } } },
+  "NIU": { th: ["นิว", "niu"], moto: true, models: { "NQi": { th: ["เอ็นคิว", "nqi"], category: "Motorcycle", ev: true }, "MQi": { th: ["เอ็มคิว", "mqi"], category: "Motorcycle", ev: true } } },
+  "Yadea": { th: ["ยาเดีย", "yadea"], moto: true, models: { "G5": { th: ["จี5"], category: "Motorcycle", ev: true }, "T9": { th: ["ที9"], category: "Motorcycle", ev: true } } },
+  "SLEEK": { th: ["สลีค", "sleek"], moto: true, models: { "Play": { th: ["เพลย์", "play"], category: "Motorcycle", ev: true } } },
+  "Strom": { th: ["สตรอม", "strom"], moto: true, models: { "Sport": { th: ["สปอร์ต"], category: "Motorcycle", ev: true } } },
 
   // ─────────────────────────────────────────────────────────────────────
   // ยี่ห้อหายาก — ยกมาจากไฟล์เดิมเพื่อไม่ให้ลูกค้าที่ขับรถพวกนี้ลงทะเบียนไม่ได้
@@ -838,8 +925,16 @@ function normalizeKey(s) {
 function keyMatches(key, q) {
   const k = normalizeKey(key);
   if (!k) return false;
+
+  // ทางปกติ: คีย์มีคำที่พิมพ์อยู่ข้างใน -> พิมพ์ทีละน้อยแล้วกรอง
   if (k.indexOf(q) >= 0) return true;
-  if (k.length >= 3 && q.indexOf(k) >= 0) return true;
+
+  // ทางย้อนกลับ: คำที่พิมพ์มีคีย์อยู่ข้างใน -> วางข้อความยาวมาทั้งก้อนก็ยังเจอ
+  //   เงื่อนไขเข้มกว่าเพราะเสี่ยงจับผิด:
+  //   - คีย์ต้องยาว 4 ตัวขึ้นไป
+  //   - ห้ามเป็นตัวเลขล้วน  ("300" ของ Hino ไปโผล่ใน "X-max300" ของ Yamaha)
+  if (k.length >= 4 && !/^\d+$/.test(k) && q.indexOf(k) >= 0) return true;
+
   return false;
 }
 
