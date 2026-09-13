@@ -54,9 +54,11 @@ body {
   z-index: 0; pointer-events: none; display: block;
 }
 
-/* เนื้อหาต้องลอยเหนือฟอง */
-.container, .qr-popup, .loading-overlay, .popup, .scan-popup { position: relative; z-index: 1; }
-.qr-popup, .loading-overlay, .popup, .scan-popup { z-index: 9999; }
+/* เนื้อหาต้องลอยเหนือฟอง
+   ⚠️ ห้ามใส่ .qr-popup / .loading-overlay / .popup / .scan-popup ในกฎนี้เด็ดขาด
+      ของเดิมเป็น position:fixed ถ้าทับเป็น relative มันจะหลุดจากการเป็น overlay
+      แล้วไหลไปอยู่ท้ายหน้าแทน (เคยพลาดมาแล้ว 13/9/2569) */
+.container { position: relative; z-index: 1; }
 
 h1, h2, h3, h2.title { font-family: var(--bc-disp) !important; font-weight: 500 !important; }
 
@@ -136,6 +138,51 @@ h1, h2, h3, h2.title { font-family: var(--bc-disp) !important; font-weight: 500 
 }
 .btn.disabled, .btn:disabled, button:disabled { opacity: .45 !important; box-shadow: none !important; }
 
+/* ── แถบเลือกวิธีชำระ (หน้าบันทึกบริการของแอดมิน) ────────────────────
+   ⚠️ ตัวเลือกต้องชนะกฎ button:not(.swal2-close):not(.swal2-cancel) ด้านบน
+      ซึ่งมี specificity 0,2,1 จึงต้องเขียนเป็น .pay-seg button.pay-opt
+      (0,2,1 เท่ากัน แต่อยู่ทีหลังในไฟล์ จึงชนะ) ห้ามลดเหลือ .pay-seg .pay-opt */
+.pay-seg {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  margin: 12px 0 6px;
+  padding: 4px;
+  background: #EDF5FA;
+  border: 1px solid var(--bc-line);
+  border-radius: 13px;
+  box-sizing: border-box;
+}
+.pay-seg button.pay-opt {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 9px 4px;
+  font-family: var(--bc-body) !important;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--bc-ink2) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.pay-seg button.pay-opt:active { transform: none; }
+.pay-seg button.pay-opt.is-on {
+  background: var(--bc-water) !important;
+  background-color: var(--bc-water) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px -2px rgba(10, 79, 122, .55) !important;
+}
+.pay-seg button#modePts.is-on {
+  background: var(--bc-sun) !important;
+  background-color: var(--bc-sun) !important;
+  box-shadow: 0 2px 6px -2px rgba(198, 130, 26, .6) !important;
+}
+
 /* ── ช่องกรอก ────────────────────────────────────────────────────────── */
 input[type="text"], input[type="tel"], input[type="number"], input[list],
 select, textarea, .feedback-text, .input-field, .swal2-input {
@@ -207,31 +254,17 @@ tbody tr:hover { background-color: #F6FBFE !important; }
   text-align: center;
 }
 
-/* จองพื้นที่กล้องไว้ล่วงหน้า จอจะได้ไม่กระตุกตอนกล้องขึ้น */
+/* จองพื้นที่กล้องไว้ล่วงหน้า จอจะได้ไม่กระตุกตอนกล้องขึ้น
+   ตั้งใจแตะให้น้อยที่สุด ไม่ยุ่งกับขนาดของ video เพราะ html5-qrcode
+   คำนวณกรอบสแกนจากขนาดจริงของ element ถ้าเราบังคับด้วย !important มันจะคำนวณเพี้ยน */
 #reader, .camera-box {
-  width: 100% !important;
+  width: 100%;
   aspect-ratio: 1 / 1;
-  max-height: none !important;
-  border-radius: 14px !important;
-  overflow: hidden !important;
-  background: #0E2A35 !important;
-  background-color: #0E2A35 !important;
-  position: relative;
-  display: block;
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: #0E2A35;
 }
-#reader::after {
-  content: "กำลังเปิดกล้องหลัง…";
-  position: absolute; inset: 0; z-index: 0;
-  display: grid; place-items: center;
-  color: rgba(255, 255, 255, .8);
-  font-size: 13px; font-family: var(--bc-body);
-}
-#reader video, #reader canvas, #reader img {
-  position: relative; z-index: 1;
-  width: 100% !important; height: 100% !important;
-  object-fit: cover; display: block;
-}
-#reader > div { border: none !important; }
+#reader video { max-width: 100%; }
 
 .scan-section .input-field { width: 100%; margin-top: 12px; padding: 11px 12px; }
 .scan-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 11px; }

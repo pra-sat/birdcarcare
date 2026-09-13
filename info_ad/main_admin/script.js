@@ -211,25 +211,17 @@ class QRScanner {
       if (!this.html5QrCode) this.html5QrCode = new Html5Qrcode('reader');
       if (this.html5QrCode._isScanning) await this.html5QrCode.stop();
 
-      // ชั้น 1 — ขอกล้องหลังตรง ๆ จากเบราว์เซอร์
-      // แม่นที่สุดเพราะไม่ขึ้นกับชื่อกล้องหรือภาษาของเครื่อง
-      try {
-        await this.html5QrCode.start({ facingMode: { exact: "environment" } }, cfg, onOk);
-        this.cameraList = await Html5Qrcode.getCameras().catch(() => []);
-        this.currentCameraIndex = 0;
-        return;
-      } catch (errExact) {
-        // เครื่องนี้ไม่มีกล้องหลัง (เช่นคอมพิวเตอร์) หรือไม่รองรับ exact -> ลองชั้นถัดไป
-      }
-
+      // เคยลองวิธี facingMode:{exact:"environment"} แล้วพบว่าถ้ามันล้มเหลว
+      // html5-qrcode จะค้างอยู่ในสถานะครึ่ง ๆ กลาง ๆ ต้องกดสลับกล้องก่อนภาพถึงจะขึ้น
+      // จึงเลิกใช้ เหลือวิธีเดียวคือเลือกจากรายการกล้องเหมือนเดิม แค่เลือกให้ถูกตัว
       const cameras = await Html5Qrcode.getCameras();
       if (!cameras.length) throw new Error('ไม่พบกล้อง');
       this.cameraList = cameras;
 
-      // ชั้น 2 — หาจากชื่อกล้องที่มีคำว่า back / rear / environment / หลัง
+      // หากล้องหลังจากชื่อ — เป็นวิธีเดียวกับที่โฟลเดอร์ scan/ (โค้ดเก่า) ใช้อยู่
       const back = cameras.find(c => /back|rear|environment|หลัง/i.test(c.label || ''));
 
-      // ชั้น 3 — ไม่เจอจริง ๆ ค่อยใช้ตัวแรกเหมือนโค้ดเดิม
+      // ไม่เจอจริง ๆ ค่อยใช้ตัวแรกเหมือนโค้ดเดิม จึงไม่มีทางแย่ลงกว่าเดิม
       const camId = back ? back.id : cameras[0].id;
       this.currentCameraIndex = Math.max(0, cameras.findIndex(c => c.id === camId));
 
@@ -332,8 +324,11 @@ class QRScanner {
         <p>เบอร์: ${esc(this.foundUser.Phone)}</p>
         <p>รถ: <select id="vehicleSelect" class="swal2-input">${vehicleOptions}</select></p>
         <input list="serviceOptions" id="serviceName" placeholder="ชื่อบริการ" class="swal2-input">
-        <input type="number" id="priceInput" placeholder="ราคา" class="swal2-input">
-        <button id="redeemBtn" class="swal2-confirm" style="margin-bottom: 6px;">🎁 แลกแต้ม</button>
+        <div class="pay-seg" role="group" aria-label="เลือกวิธีชำระ">
+          <button type="button" id="modeCash" class="pay-opt is-on">💰 จ่ายเงิน</button>
+          <button type="button" id="modePts"  class="pay-opt">🎁 แลกแต้ม</button>
+        </div>
+        <input type="number" id="priceInput" placeholder="ราคา (บาท)" class="swal2-input">
         <p id="pointInfo">แต้มที่จะได้: <span id="pointPreview">0</span></p>
         <input type="text" id="noteInput" placeholder="หมายเหตุ" class="swal2-input">
       `,
@@ -342,7 +337,8 @@ class QRScanner {
         const priceInput = document.getElementById('priceInput');
         const pointPreview = document.getElementById('pointPreview');
         const pointInfo = document.getElementById('pointInfo');
-        const redeemBtn = document.getElementById('redeemBtn');
+        const modeCash = document.getElementById('modeCash');
+        const modePts = document.getElementById('modePts');
         const vehicleSelect = document.getElementById('vehicleSelect');
   
         const updatePointDisplay = () => {
@@ -375,16 +371,20 @@ class QRScanner {
         vehicleSelect.addEventListener('change', updateCurrentPoint);
         priceInput.addEventListener('input', updatePointDisplay);
   
-        // ปุ่มสลับโหมดแลกแต้ม
-        redeemBtn.addEventListener('click', () => {
-          this.isRedeeming = !this.isRedeeming;
-          redeemBtn.classList.toggle('redeem-active', this.isRedeeming);
-          redeemBtn.textContent = this.isRedeeming ? '🟣 ใช้แต้มสะสม' : '🎁 แลกแต้ม';
-          priceInput.placeholder = this.isRedeeming ? "จำนวนแต้มที่ใช้" : "ราคา";
+        // แถบเลือกวิธีชำระ — เห็นทั้ง 2 ทางเลือกพร้อมกัน และรู้ว่าตอนนี้อยู่โหมดไหน
+        // ของเดิมเป็นปุ่มเดียวที่กดสลับไปมา ซึ่งชวนสับสนว่ากดแล้วบันทึกเลยหรือเปล่า
+        const setMode = (redeem) => {
+          this.isRedeeming = redeem;
+          modeCash.classList.toggle('is-on', !redeem);
+          modePts.classList.toggle('is-on', redeem);
+          priceInput.placeholder = redeem ? 'จำนวนแต้มที่ใช้' : 'ราคา (บาท)';
           updatePointDisplay();
-        });
-  
-        updateCurrentPoint(); // โหลดครั้งแรก
+        };
+        modeCash.addEventListener('click', () => setMode(false));
+        modePts.addEventListener('click', () => setMode(true));
+
+        setMode(false);         // เริ่มที่จ่ายเงินเสมอ
+        updateCurrentPoint();   // โหลดครั้งแรก
       },
       preConfirm: () => this.onServiceSave()
     });
