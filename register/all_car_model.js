@@ -218,7 +218,24 @@ const carData = {
       "Brio Amaze": { th: ["อเมซ", "amaze"], category: "Sedan" },
       "Freed": { th: ["ฟรีด", "freed"], category: "MPV" },
       "Odyssey": { th: ["โอดิสซีย์", "odyssey"], category: "MPV" },
-      "e:N1": { th: ["อีเอ็น1", "en1"], category: "SUV", ev: true }
+      "e:N1": { th: ["อีเอ็น1", "en1"], category: "SUV", ev: true },
+
+      // ── มอเตอร์ไซค์ Honda ──
+      // อยู่ใต้ยี่ห้อ Honda เดียวกับรถยนต์โดยตั้งใจ เพราะข้อมูลเดิมในระบบ
+      // เก็บ PCX / Wave / Forza ไว้ใต้ "Honda" อยู่แล้ว
+      // การแยกประเภทใช้ category: "Motorcycle" ไม่ใช่แยกเป็นคนละยี่ห้อ
+      "Wave 110i": { th: ["เวฟ110", "wave 110", "เวฟ"], category: "Motorcycle" },
+      "Wave 125i": { th: ["เวฟ125", "wave 125"], category: "Motorcycle" },
+      "Click 125i": { th: ["คลิก125", "click 125"], category: "Motorcycle" },
+      "Click 160": { th: ["คลิก160", "click 160", "คลิก"], category: "Motorcycle" },
+      "PCX 160": { th: ["พีซีเอ็กซ์", "pcx 160", "pcx"], category: "Motorcycle" },
+      "Forza 350": { th: ["ฟอร์ซ่า", "forza 350", "forza"], category: "Motorcycle" },
+      "ADV 350": { th: ["เอดีวี", "adv"], category: "Motorcycle" },
+      "Scoopy i": { th: ["สกู๊ปปี้", "scoopy"], category: "Motorcycle" },
+      "CB150R": { th: ["ซีบี150", "cb150", "cb 150r"], category: "Motorcycle" },
+      "CBR": { th: ["ซีบีอาร์", "cbr"], category: "Motorcycle" },
+      "Rebel 500": { th: ["รีเบล", "rebel"], category: "Motorcycle" },
+      "CRF300": { th: ["ซีอาร์เอฟ", "crf"], category: "Motorcycle" }
     }
   },
 
@@ -419,10 +436,10 @@ const carData = {
     }
   },
 
-  "GWM / Ora": {
-    th: ["เกรทวอลล์", "โอร่า", "ora", "gwm", "great wall", "กู๊ดแคท", "แมวดี"],
+  "Ora": {
+    th: ["โอร่า", "ora", "เกรทวอลล์", "gwm", "great wall", "กู๊ดแคท", "แมวดี"],
     models: {
-      "Ora Good Cat": { th: ["กู๊ดแคท", "แมวดี", "good cat"], category: "Hatchback", ev: true },
+      "Good Cat": { th: ["กู๊ดแคท", "แมวดี", "good cat"], category: "Hatchback", ev: true },
       "Ora 07": { th: ["โอร่า07", "ora 07"], category: "Sedan", ev: true }
     }
   },
@@ -436,13 +453,20 @@ const carData = {
     }
   },
 
-  "Deepal / Changan": {
-    th: ["ดีพอล", "ฉางอาน", "deepal", "changan", "ลูมิน", "lumin"],
+  "Deepal": {
+    th: ["ดีพอล", "deepal"],
     models: {
-      "Deepal S07": { th: ["เอส07", "s07"], category: "SUV", ev: true },
-      "Deepal L07": { th: ["แอล07", "l07"], category: "Sedan", ev: true },
-      "Deepal E07": { th: ["อี07", "e07"], category: "Pickup", ev: true },
-      "Lumin": { th: ["ลูมิน", "lumin"], category: "Hatchback", ev: true }
+      "S07": { th: ["เอส07", "s07"], category: "SUV", ev: true },
+      "L07": { th: ["แอล07", "l07"], category: "Sedan", ev: true },
+      "E07": { th: ["อี07", "e07"], category: "Pickup", ev: true }
+    }
+  },
+
+  "Changan": {
+    th: ["ฉางอาน", "changan", "ลูมิน", "lumin"],
+    models: {
+      "Lumin": { th: ["ลูมิน", "lumin"], category: "Hatchback", ev: true },
+      "CS55 Plus": { th: ["ซีเอส55", "cs55"], category: "SUV" }
     }
   },
 
@@ -484,13 +508,20 @@ const carData = {
     }
   },
 
-  "JAECOO / OMODA": {
-    th: ["เจคู", "โอโมดา", "jaecoo", "omoda", "เชอรี่", "chery"],
+  "Jaecoo": {
+    th: ["เจคู", "jaecoo", "เชอรี่", "chery"],
     models: {
       "Jaecoo 5": { th: ["เจคู5", "jaecoo 5"], category: "SUV" },
       "Jaecoo 6": { th: ["เจคู6", "jaecoo 6"], category: "SUV", ev: true },
-      "Jaecoo 7": { th: ["เจคู7", "jaecoo 7"], category: "SUV" },
-      "Omoda C5": { th: ["โอโมดาซี5", "omoda c5"], category: "SUV" }
+      "Jaecoo 7": { th: ["เจคู7", "jaecoo 7"], category: "SUV" }
+    }
+  },
+
+  "Omoda": {
+    th: ["โอโมดา", "omoda", "เชอรี่", "chery"],
+    models: {
+      "Omoda C5": { th: ["ซี5", "omoda c5"], category: "SUV" },
+      "Omoda C7": { th: ["ซี7", "omoda c7"], category: "SUV" }
     }
   },
 
@@ -522,7 +553,13 @@ const carData = {
       "Ertiga": { th: ["เออร์ติก้า", "ertiga"], category: "MPV" },
       "XL7": { th: ["เอ็กซ์แอล7", "xl7"], category: "MPV" },
       "Carry": { th: ["แครี่", "carry"], category: "Pickup" },
-      "Jimny": { th: ["จิมนี่", "jimny"], category: "SUV" }
+      "Jimny": { th: ["จิมนี่", "jimny"], category: "SUV" },
+
+      // ── มอเตอร์ไซค์ Suzuki ── (เหตุผลเดียวกับ Honda)
+      "GSX-R150": { th: ["จีเอสเอ็กซ์อาร์", "gsx r150", "gsx"], category: "Motorcycle" },
+      "Burgman 400": { th: ["เบอร์แมน", "burgman"], category: "Motorcycle" },
+      "Smash": { th: ["สแมช", "smash"], category: "Motorcycle" },
+      "Avenis": { th: ["อเวนิส", "avenis"], category: "Motorcycle" }
     }
   },
 
@@ -694,25 +731,6 @@ const carData = {
   // ─────────────────────────────────────────────────────────────────────
   // มอเตอร์ไซค์ — ร้านรับล้างด้วย (ปัจจุบันมีในระบบแล้ว 6 คัน)
   // ─────────────────────────────────────────────────────────────────────
-  "Honda (มอเตอร์ไซค์)": {
-    th: ["ฮอนด้ามอไซค์", "honda moto", "เวฟ", "wave", "พีซีเอ็กซ์", "pcx", "คลิก", "click", "ฟอร์ซ่า", "forza"],
-    moto: true,
-    models: {
-      "Wave 110i": { th: ["เวฟ110", "wave 110"], category: "Motorcycle" },
-      "Wave 125i": { th: ["เวฟ125", "wave 125"], category: "Motorcycle" },
-      "Click 125i": { th: ["คลิก125", "click 125"], category: "Motorcycle" },
-      "Click 160": { th: ["คลิก160", "click 160"], category: "Motorcycle" },
-      "PCX 160": { th: ["พีซีเอ็กซ์160", "pcx 160", "pcx"], category: "Motorcycle" },
-      "Forza 350": { th: ["ฟอร์ซ่า350", "forza 350"], category: "Motorcycle" },
-      "ADV 350": { th: ["เอดีวี", "adv"], category: "Motorcycle" },
-      "Scoopy i": { th: ["สกู๊ปปี้", "scoopy"], category: "Motorcycle" },
-      "CB150R": { th: ["ซีบี150", "cb150"], category: "Motorcycle" },
-      "CBR": { th: ["ซีบีอาร์", "cbr"], category: "Motorcycle" },
-      "Rebel 500": { th: ["รีเบล", "rebel"], category: "Motorcycle" },
-      "CRF300": { th: ["ซีอาร์เอฟ", "crf"], category: "Motorcycle" }
-    }
-  },
-
   "Yamaha": {
     th: ["ยามาฮ่า", "ยามาฮา", "yamaha", "เอ็นแม็กซ์", "nmax", "เอ็กซ์แม็กซ์", "xmax", "แกรนด์ฟิลาโน่", "ฟีโน่", "aerox"],
     moto: true,
@@ -740,17 +758,6 @@ const carData = {
       "KSR": { th: ["เคเอสอาร์", "ksr"], category: "Motorcycle" },
       "W175": { th: ["ดับเบิลยู175", "w175"], category: "Motorcycle" },
       "Versys": { th: ["เวอร์ซิส", "versys"], category: "Motorcycle" }
-    }
-  },
-
-  "Suzuki (มอเตอร์ไซค์)": {
-    th: ["ซูซูกิมอไซค์", "suzuki moto", "จีเอสเอ็กซ์", "gsx", "เบอร์แมน", "burgman"],
-    moto: true,
-    models: {
-      "GSX-R150": { th: ["จีเอสเอ็กซ์อาร์", "gsx r150"], category: "Motorcycle" },
-      "Burgman 400": { th: ["เบอร์แมน", "burgman"], category: "Motorcycle" },
-      "Smash": { th: ["สแมช", "smash"], category: "Motorcycle" },
-      "Avenis": { th: ["อเวนิส", "avenis"], category: "Motorcycle" }
     }
   },
 
