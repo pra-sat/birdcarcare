@@ -28,23 +28,28 @@
                 <label for="phone">เบอร์โทร:</label>
                 <input type="tel" id="phone" name="phone" placeholder="0812345678" required>
             </div>
+
+            <!-- ── เลือกรถ ──────────────────────────────────────────────────
+                 ยี่ห้อ / รุ่น / ปี ถูกเก็บใน input hidden 3 ช่องด้านล่าง
+                 ส่วนที่เห็นด้านบนเป็นตัวช่วยเลือกเท่านั้น
+                 ⚠️ ห้ามเปลี่ยน id ของ hidden ทั้ง 4 ช่อง (brand/model/year/category)
+                    โค้ดส่งข้อมูลอ่านจาก 4 ช่องนี้ตรง ๆ                        -->
             <div class="form-group">
-                <label for="brand">ยี่ห้อ:</label>
-                <input list="brandList" id="brand" name="brand" placeholder="เลือกหรือพิมพ์ยี่ห้อ" required>
-                <datalist id="brandList"></datalist>
+                <label>ประเภทรถ:</label>
+                <div class="veh-seg" role="group" aria-label="เลือกประเภทรถ">
+                    <button type="button" id="tyCar"  class="veh-opt is-on">🚙 รถยนต์</button>
+                    <button type="button" id="tyMoto" class="veh-opt">🛵 มอเตอร์ไซค์</button>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="model">รุ่น:</label>
-                <input list="modelList" id="model" name="model" placeholder="เลือกหรือพิมพ์รุ่น" required>
-                <datalist id="modelList"></datalist>
-            </div>
-            <div class="form-group">
-                <label for="year">ปี:</label>
-                <input list="yearList" id="year" name="year" placeholder="เลือกหรือพิมพ์ปี" required>
-                <datalist id="yearList"></datalist>
-            </div>
+
+            <div id="carPicker" class="car-picker"></div>
+
+            <input type="hidden" id="brand" name="brand">
+            <input type="hidden" id="model" name="model">
+            <input type="hidden" id="year"  name="year">
             <input type="hidden" id="category">
             <input type="hidden" id="channel" value="LINE">
+
             <button id="submitBtn" type="submit">สมัครสมาชิก</button>
             <div id="statusMessage" style="text-align:center; color:green; font-weight:bold;"></div>
         </form>

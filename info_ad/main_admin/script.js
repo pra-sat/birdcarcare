@@ -294,19 +294,50 @@ class QRScanner {
 
 
   loadServices() {
+    // ฟังก์ชันนี้ถูกเรียก 2 ที่ (init กับ openScanPopup) ของเดิมจึงสร้าง
+    // <datalist id="serviceOptions"> ซ้อนกัน 2 อัน id ชนกัน
+    // ตอนนี้เลิกใช้ datalist แล้ว เก็บแต่รายการไว้ใน this.serviceList
+    // แล้ววาดเป็นปุ่มให้แตะเลือกใน showCustomerPopup()
+    if (this._loadingServices) return;
+    this._loadingServices = true;
     fetch(`${GAS_ENDPOINT}?action=service_list`)
       .then(res => res.json())
-      .then(data => {
-        this.serviceList = data;
-        const datalist = document.createElement('datalist');
-        datalist.id = 'serviceOptions';
-        data.forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.name;
-          datalist.appendChild(opt);
-        });
-        document.body.appendChild(datalist);
-      });
+      .then(data => { this.serviceList = Array.isArray(data) ? data : []; })
+      .catch(err => console.warn('โหลดรายการบริการไม่สำเร็จ:', err))
+      .finally(() => { this._loadingServices = false; });
+  }
+
+  // วาดปุ่มบริการให้แตะเลือก · กรองตามคำที่พิมพ์ในช่องค้นหา
+  // แตะแล้วเติมชื่อบริการลงช่อง และถ้าบริการนั้นมีราคาตั้งไว้ จะเติมราคาให้
+  // เฉพาะเมื่อช่องราคายังว่าง (กันการเขียนทับตัวเลขที่แอดมินพิมพ์เอง)
+  renderServiceChips(filter) {
+    const box = document.getElementById('svcChips');
+    if (!box) return;
+
+    const q = String(filter || '').trim().toLowerCase();
+    const list = (this.serviceList || []).filter(s =>
+      !q || String(s.name || '').toLowerCase().includes(q)
+    );
+
+    if (!this.serviceList || !this.serviceList.length) {
+      box.innerHTML = '<span class="svc-empty">กำลังโหลดรายการบริการ… พิมพ์ชื่อบริการเองได้เลย</span>';
+      return;
+    }
+    if (!list.length) {
+      box.innerHTML = '<span class="svc-empty">ไม่พบบริการนี้ในรายการ — พิมพ์เองได้เลย</span>';
+      return;
+    }
+
+    // ตัวที่ตรงกับช่องพอดีจะติดสี ให้แอดมินเห็นว่าเลือกอันไหนอยู่
+    const chosen = String(filter || '').trim();
+    box.innerHTML = list.map(s => {
+      const price = parseFloat(s.price) || 0;
+      const on = String(s.name || '') === chosen ? ' is-on' : '';
+      return `<button type="button" class="svc-chip${on}" data-name="${esc(s.name)}" data-price="${price}">`
+        + esc(s.name)
+        + (price > 0 ? `<span class="svc-price">${price}฿</span>` : '')
+        + `</button>`;
+    }).join('');
   }
 
   showCustomerPopup() {
@@ -323,14 +354,25 @@ class QRScanner {
         <p>ชื่อ: ${esc(this.foundUser.Name)}</p>
         <p>เบอร์: ${esc(this.foundUser.Phone)}</p>
         <p>รถ: <select id="vehicleSelect" class="swal2-input">${vehicleOptions}</select></p>
-        <input list="serviceOptions" id="serviceName" placeholder="ชื่อบริการ" class="swal2-input">
-        <div class="pay-seg" role="group" aria-label="เลือกวิธีชำระ">
-          <button type="button" id="modeCash" class="pay-opt is-on">💰 จ่ายเงิน</button>
-          <button type="button" id="modePts"  class="pay-opt">🎁 แลกแต้ม</button>
+
+        <div class="fld">
+          <label class="fld-lbl" for="serviceName">บริการ</label>
+          <input type="text" id="serviceName" class="swal2-input"
+                 placeholder="แตะเลือกด้านล่าง หรือพิมพ์ชื่อบริการ" autocomplete="off">
+          <div class="svc-chips" id="svcChips"></div>
         </div>
+
+        <div class="fld">
+          <label class="fld-lbl">วิธีชำระ</label>
+          <div class="pay-seg" role="group" aria-label="เลือกวิธีชำระ">
+            <button type="button" id="modeCash" class="pay-opt is-on">💰 จ่ายเงิน</button>
+            <button type="button" id="modePts"  class="pay-opt">🎁 แลกแต้ม</button>
+          </div>
+        </div>
+
         <input type="number" id="priceInput" placeholder="ราคา (บาท)" class="swal2-input">
         <p id="pointInfo">แต้มที่จะได้: <span id="pointPreview">0</span></p>
-        <input type="text" id="noteInput" placeholder="หมายเหตุ" class="swal2-input">
+        <input type="text" id="noteInput" placeholder="หมายเหตุ (ไม่บังคับ)" class="swal2-input">
       `,
       confirmButtonText: 'บันทึก',
       didOpen: () => {
@@ -382,6 +424,28 @@ class QRScanner {
         };
         modeCash.addEventListener('click', () => setMode(false));
         modePts.addEventListener('click', () => setMode(true));
+
+        // ── รายการบริการให้แตะเลือก ─────────────────────────────────────
+        const serviceInput = document.getElementById('serviceName');
+        const svcChips = document.getElementById('svcChips');
+
+        this.renderServiceChips('');
+        serviceInput.addEventListener('input', () => this.renderServiceChips(serviceInput.value));
+
+        // ใช้ตัวฟังตัวเดียวที่กล่องแม่ เพราะปุ่มถูกวาดใหม่ทุกครั้งที่พิมพ์
+        svcChips.addEventListener('click', (ev) => {
+          const chip = ev.target.closest('.svc-chip');
+          if (!chip) return;
+          serviceInput.value = chip.dataset.name || '';
+
+          // เติมราคาให้เฉพาะตอนช่องราคายังว่าง และไม่ใช่โหมดแลกแต้ม
+          const p = parseFloat(chip.dataset.price) || 0;
+          if (p > 0 && !this.isRedeeming && !priceInput.value) {
+            priceInput.value = p;
+          }
+          this.renderServiceChips(serviceInput.value);
+          updatePointDisplay();
+        });
 
         setMode(false);         // เริ่มที่จ่ายเงินเสมอ
         updateCurrentPoint();   // โหลดครั้งแรก

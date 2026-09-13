@@ -19,45 +19,72 @@
   </div>
 
   <div class="container hidden" id="userView">
-    <h2>Bird CarCare</h2>
-    <!--<p>🕵️‍♀️ ไม่สามารถยืนยันว่าเป็นแอดมินได้</p>-->
-    <p><strong>ติดต่อร้าน / ข้อเสนอแนะ</strong></p>
-    <p>ล้างรถ อัดฉีด ดูดฝุ่น ห้องเครื่อง ระบบแอร์รถยนต์ ช่วงล่าง</p>
-    <p>📞 <a href="tel:0867876441">086-787-6441</a> : <a href="tel:0947727755">094-772-7755</a> </p>
-    <p>📍 <a href="https://maps.app.goo.gl/S42pp9yoS9FZriR9A">เทพกุญชร10 ต.คลองหนึ่ง อ.คลองหลวง จ.ปทุมธานี 12120</a></p>
-    <p>⏰ เปิดบริการทุกวัน: 08:00 - 17:30</p>
-    <p>**หยุดวันที่ 1-2 ของทุกเดือน**</p>
-    <iframe
-      src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d2301.1199526043665!2d100.62503328617657!3d14.076761609775225!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x311d81000c308719%3A0x6bc6f5f62861f3b3!2z4LmA4Lia4Li04Lij4LmM4LiU4LiE4Liy4Lij4LmM4LmB4LiE4Lij4LmMIOC4quC4suC4guC4siAx!5e0!3m2!1sth!2sth!4v1748771775070!5m2!1sth!2sth" width="400" height="300" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-      width="90%"
-      height="300"
-      style="border:0;"
-      allowfullscreen=""
-      loading="lazy"
-      referrerpolicy="no-referrer-when-downgrade">
-    </iframe>
+    <!-- ป้ายชื่อร้าน -->
+    <div class="shop-hero">
+      <h2>Bird CarCare</h2>
+      <p class="shop-tag">ล้างรถ · อัดฉีด · ดูดฝุ่น · ห้องเครื่อง · ระบบแอร์ · ช่วงล่าง</p>
+    </div>
 
-    <button id="openFeedbackBtn" class="btn">✍️ ส่งข้อเสนอแนะ</button>
+    <!-- เวลาทำการ -->
+    <div class="info-card">
+      <div class="irow"><span class="ilbl">เปิดบริการ</span><span class="ival">ทุกวัน 08:00 – 17:30</span></div>
+      <div class="irow"><span class="ilbl">วันหยุด</span><span class="ival">วันที่ 1–2 ของทุกเดือน</span></div>
+    </div>
+
+    <!-- ที่อยู่ -->
+    <div class="info-card addr-card">
+      <span class="ilbl">ที่ตั้งร้าน</span>
+      <p class="addr-text">เทพกุญชร 10 ต.คลองหนึ่ง อ.คลองหลวง จ.ปทุมธานี 12120</p>
+    </div>
+
+    <!-- โทร / แผนที่ : แผนที่ซ่อนไว้ก่อน กดแล้วค่อยโหลด (ประหยัดเน็ตตอนเปิดหน้า) -->
+    <div class="info-grid2">
+      <a class="btn outline" href="tel:0867876441">📞 086-787-6441</a>
+      <a class="btn outline" href="tel:0947727755">📞 094-772-7755</a>
+    </div>
+    <button id="mapBtn" class="btn outline" aria-expanded="false" aria-controls="mapPanel">📍 แผนที่ร้าน</button>
+
+    <div id="mapPanel" class="map-panel hidden">
+      <!-- iframe ไม่มี src ตั้งแต่แรก · script.js จะเติม src จาก data-src เมื่อกดปุ่ม -->
+      <iframe
+        id="mapFrame"
+        title="แผนที่ร้าน Bird CarCare"
+        data-src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d2301.1199526043665!2d100.62503328617657!3d14.076761609775225!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x311d81000c308719%3A0x6bc6f5f62861f3b3!2z4LmA4Lia4Li04Lij4LmM4LiU4LiE4Liy4Lij4LmM4LmB4LiE4Lij4LmMIOC4quC4suC4guC4siAx!5e0!3m2!1sth!2sth!4v1748771775070!5m2!1sth!2sth"
+        allowfullscreen=""
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <div class="map-foot">
+        <span class="map-note">เปิดในแอปแผนที่<br>เพื่อนำทางจากตำแหน่งคุณ</span>
+        <a class="btn map-go" href="https://maps.app.goo.gl/S42pp9yoS9FZriR9A" target="_blank" rel="noopener">นำทาง</a>
+      </div>
+    </div>
+
+    <button id="openFeedbackBtn" class="btn btn-gold">✍️ ส่งข้อเสนอแนะ</button>
 
     <div id="feedbackPanel" class="hidden">
       <h3>ข้อเสนอแนะ</h3>
 
-            <!--
-      <label for="phoneInput">📱 เบอร์โทร</label>
-      <input id="phoneInput" type="text" placeholder="เบอร์โทร" />
-      -->
-      
       <!-- ✅ ปิดการแสดง input เบอร์โทร (ซ่อนไว้) -->
       <input id="phoneInput" type="text" value="0" hidden />
 
-      <label for="scoreInput">คะแนน (1-5)</label>
-      <input id="scoreInput" type="number" placeholder="ให้คะแนนบริการ (1-5)" />
+      <label for="scoreInput">ให้คะแนนบริการ</label>
+      <!-- ดาวกดเลือก · ค่าจริงยังเก็บใน #scoreInput เหมือนเดิม
+           ไม่ได้เปลี่ยนสิ่งที่ส่งไป Apps Script แม้แต่ช่องเดียว -->
+      <div class="star-pick" id="starPick" role="radiogroup" aria-label="ให้คะแนนบริการ 1 ถึง 5 ดาว">
+        <button type="button" class="sp" role="radio" aria-checked="false" data-v="1" aria-label="1 ดาว">☆</button>
+        <button type="button" class="sp" role="radio" aria-checked="false" data-v="2" aria-label="2 ดาว">☆</button>
+        <button type="button" class="sp" role="radio" aria-checked="false" data-v="3" aria-label="3 ดาว">☆</button>
+        <button type="button" class="sp" role="radio" aria-checked="false" data-v="4" aria-label="4 ดาว">☆</button>
+        <button type="button" class="sp" role="radio" aria-checked="false" data-v="5" aria-label="5 ดาว">☆</button>
+        <span class="sp-txt" id="starText">แตะดาวเพื่อให้คะแนน</span>
+      </div>
+      <input id="scoreInput" type="number" min="1" max="5" hidden />
 
       <label for="feedbackInput">ข้อเสนอแนะ</label>
-      <textarea id="feedbackInput" placeholder="พิมพ์ข้อเสนอแนะของคุณ..."></textarea>
+      <textarea id="feedbackInput" placeholder="อยากให้เราปรับปรุงอะไรบ้างคะ"></textarea>
 
       <button class="btn" id="submitFeedbackBtn">✅ ส่งข้อเสนอแนะ</button>
-      <button class="btn" id="closeLiffBtn">❌ ปิดหน้าต่าง</button>
+      <button class="btn outline" id="closeLiffBtn">ปิดหน้าต่าง</button>
     </div>
   </div>
 </body>

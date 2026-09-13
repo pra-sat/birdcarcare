@@ -202,34 +202,98 @@ h1, h2, h3, h2.title { font-family: var(--bc-disp) !important; font-weight: 500 
   outline-offset: 2px;
 }
 
-/* ปุ่มรอง */
-.btn.outline, .btn-secondary, .btn.close, .history-toggle {
+/* ปุ่มรอง
+   ⚠️ ต้องมีรูปแบบที่นำหน้าด้วย button ด้วย
+      เพราะ .btn.outline (0,2,0) แพ้กฎปุ่มหลัก button:not(...):not(...) (0,2,1)
+      ที่อยู่เหนือขึ้นไป ทำให้ <button class="btn outline"> เคยออกมาเป็นสีฟ้า
+      ส่วน button.btn.outline (0,2,1) เสมอกัน แต่อยู่ทีหลังจึงชนะ
+      (ของ <a class="btn outline"> ใช้ .btn.outline ได้อยู่แล้ว
+       เพราะกฎปุ่มหลักเจาะจง element button)
+      ตรวจพบตอนคำนวณ cascade 13/9/2569 — ห้ามลดรูปกลับ */
+.btn.outline,        button.btn.outline,
+.btn-secondary,      button.btn.btn-secondary,
+.btn.close,          button.btn.close,
+.history-toggle,     button.btn.history-toggle {
   background: var(--bc-foam) !important;
   background-color: var(--bc-foam) !important;
   color: var(--bc-waterD) !important;
   border: 1.5px solid #BFDDF0 !important;
   box-shadow: none !important;
 }
-.btn.outline:hover, .btn-secondary:hover, .btn.close:hover, .history-toggle:hover {
+.btn.outline:hover,    button.btn.outline:hover,
+.btn-secondary:hover,  button.btn.btn-secondary:hover,
+.btn.close:hover,      button.btn.close:hover,
+.history-toggle:hover, button.btn.history-toggle:hover {
   background-color: #F2FAFE !important;
 }
-/* ปุ่มอันตราย */
-.btn.danger, .btn-delete {
+/* ปุ่มอันตราย (ออกจากระบบ / ลบบริการ)
+   ⚠️ หน้าตั้งค่าบริการมีปุ่ม class="danger" เดี่ยว ๆ ไม่มี .btn ด้วย
+      ซึ่ง (0,1,0) และ button.danger (0,1,1) ก็ยังแพ้กฎปุ่มหลัก (0,2,1)
+      จึงเขียนซ้ำคลาสเป็น button.danger.danger ให้ได้ (0,2,1) แล้วชนะด้วยลำดับ
+      ถ้าไม่ทำ ปุ่ม "🗑️ ลบ" จะเป็นสีฟ้าเหมือนปุ่ม "❌ ปิด" ข้าง ๆ กันเลย */
+.btn.danger,          button.btn.danger,
+.danger,              button.danger.danger,
+.btn-delete {
   background: var(--bc-rose) !important;
   background-color: var(--bc-rose) !important;
   color: #fff !important;
   box-shadow: 0 3px 0 #A93636 !important;
 }
-.btn.danger:hover { background-color: #B83A3A !important; }
-.btn-delete { background: transparent !important; color: var(--bc-rose) !important; box-shadow: none !important; }
-/* ปุ่มแลกแต้ม */
-.redeem-active {
-  background: var(--bc-sun) !important;
-  background-color: var(--bc-sun) !important;
-  color: #fff !important;
-  box-shadow: 0 3px 0 #C6821A !important;
+.btn.danger:hover, button.btn.danger:hover,
+.danger:hover,     button.danger.danger:hover { background-color: #B83A3A !important; }
+.btn-delete, button.btn-delete.btn-delete {
+  background: transparent !important;
+  color: var(--bc-rose) !important;
+  box-shadow: none !important;
 }
 .btn.disabled, .btn:disabled, button:disabled { opacity: .45 !important; box-shadow: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ป๊อปอัปบันทึกบริการของแอดมิน — ป้ายหัวข้อ + รายการบริการให้แตะเลือก
+   ⚠️ ปุ่มทุกตัวในนี้ต้องชนะกฎ button:not(.swal2-close):not(.swal2-cancel)
+      ที่มี specificity 0,2,1 จึงต้องเขียนเป็น .svc-chips button.svc-chip
+   ═══════════════════════════════════════════════════════════════════════ */
+.swal2-popup .fld { text-align: left; margin: 11px 0 0; }
+.swal2-popup .fld-lbl {
+  display: block;
+  font-size: 12.5px; font-weight: 600; color: var(--bc-ink2);
+  margin: 0 0 4px 2px;
+}
+/* .swal2-input ของ SweetAlert มี margin ซ้ายขวาเอง ในกรอบ .fld ไม่ต้องการ */
+.swal2-popup .fld .swal2-input { width: 100%; margin: 0 !important; box-sizing: border-box; }
+.swal2-popup .fld .pay-seg { margin: 0; }
+
+.svc-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 8px;
+  max-height: 132px; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.svc-chips button.svc-chip {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  font-family: var(--bc-body) !important;
+  font-size: 13.5px; font-weight: 500;
+  padding: 7px 11px;
+  background: #F4FAFE !important;
+  background-color: #F4FAFE !important;
+  color: var(--bc-deep) !important;
+  border: 1px solid #CFE6F4 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.svc-chips button.svc-chip:hover { background-color: #E7F4FC !important; }
+.svc-chips button.svc-chip:active { transform: scale(.96); }
+.svc-chips button.svc-chip.is-on {
+  background: var(--bc-water) !important;
+  background-color: var(--bc-water) !important;
+  color: #fff !important;
+  border-color: var(--bc-water) !important;
+  font-weight: 600;
+}
+.svc-chips .svc-price { font-size: 11.5px; opacity: .75; font-variant-numeric: tabular-nums; }
+.svc-chips button.svc-chip.is-on .svc-price { opacity: .9; }
+.svc-chips .svc-empty { font-size: 12.5px; color: var(--bc-ink2); padding: 3px 2px; }
 
 /* ── แถบเลือกวิธีชำระ (หน้าบันทึกบริการของแอดมิน) ────────────────────
    ⚠️ ตัวเลือกต้องชนะกฎ button:not(.swal2-close):not(.swal2-cancel) ด้านบน
@@ -312,14 +376,330 @@ tbody tr:hover { background-color: #F6FBFE !important; }
 .loading-box { color: var(--bc-deep) !important; }
 .spinner { border: 5px solid #C9E2F1 !important; border-top: 5px solid var(--bc-water) !important; }
 
-/* ── QR ──────────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+   หน้าสมัครสมาชิก — ตัวช่วยเลือกรถทีละขั้น (คลาสขึ้นต้น pk- / veh-)
+
+   ⚠️ register/style.css มีกฎ `button { width:100%; padding:10px; ... }`
+      เป็น element selector ดังนั้นปุ่มชิปทุกตัวจะกว้างเต็มแถวถ้าไม่สั่ง width
+      และต้องเขียนเป็น `.pk-chips button.pk-chip` (0,2,1) ให้ชนะกฎ
+      `button:not(.swal2-close):not(.swal2-cancel)` (0,2,1) ที่อยู่ก่อนหน้า
+      ห้ามลดรูปเหลือ `.pk-chip` เฉย ๆ เพราะจะกลายเป็นปุ่มสีฟ้าเต็มแถว
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* แถบเลือกประเภทรถ */
+.veh-seg {
+  display: flex; gap: 6px;
+  background: #EDF5FA;
+  border: 1px solid var(--bc-line);
+  border-radius: 13px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+.veh-seg button.veh-opt {
+  flex: 1 1 0; min-width: 0; width: auto !important;
+  padding: 10px 4px !important;
+  font-family: var(--bc-body) !important;
+  font-size: 14.5px; font-weight: 600; line-height: 1.25;
+  white-space: nowrap;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--bc-ink2) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.veh-seg button.veh-opt.is-on {
+  background: var(--bc-water) !important;
+  background-color: var(--bc-water) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px -2px rgba(10, 79, 122, .55) !important;
+}
+.veh-seg button.veh-opt:active { transform: none; }
+
+/* ขั้นตอน */
+.car-picker { margin-bottom: 15px; }
+.pk-step {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 4px 10px;
+  margin-bottom: 14px;
+}
+.pk-step .pk-no {
+  grid-row: 1; grid-column: 1;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--bc-disp); font-size: 12px;
+  background: #DCEDF8; color: var(--bc-waterD);
+}
+.pk-step .pk-no.done { background: var(--bc-mint); color: #fff; }
+.pk-step .pk-no.now  { background: var(--bc-water); color: #fff; box-shadow: 0 0 0 4px rgba(11, 127, 199, .16); }
+.pk-step .pk-title {
+  grid-row: 1; grid-column: 2;
+  align-self: center;
+  font-size: 12.5px; font-weight: 600; color: var(--bc-ink2) !important;
+  margin: 0;
+}
+.pk-step.now .pk-title { color: var(--bc-deep) !important; }
+.pk-step .pk-body { grid-row: 2; grid-column: 2; min-width: 0; }
+
+/* ช่องพิมพ์ค้นหาในแต่ละขั้น
+   ⚠️ เขียนเป็น input.pk-input (0,1,1) เพื่อเสมอกับกฎ input[type="text"]
+      ของ register/style.css แล้วชนะเพราะ theme.css โหลดหลัง
+      ถ้าเขียน .pk-input เฉย ๆ (0,1,0) padding จะถูกดึงกลับไปเป็น 8px */
+input.pk-input {
+  width: 100%; box-sizing: border-box;
+  padding: 10px 12px;
+  font-family: var(--bc-body) !important;
+  font-size: 15px;
+  background: #FBFDFE !important;
+  color: var(--bc-ink) !important;
+  border: 1.5px solid var(--bc-line) !important;
+  border-radius: 11px !important;
+}
+input.pk-input-sm { font-size: 14px; padding: 8px 11px; }
+
+.pk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pk-chips button.pk-chip {
+  width: auto !important;
+  padding: 7px 12px !important;
+  font-family: var(--bc-body) !important;
+  font-size: 13.5px; font-weight: 500; line-height: 1.3;
+  background: #F4FAFE !important;
+  background-color: #F4FAFE !important;
+  color: var(--bc-deep) !important;
+  border: 1px solid #CFE6F4 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.pk-chips button.pk-chip:hover { background-color: #E7F4FC !important; }
+.pk-chips button.pk-chip:active { transform: scale(.96); }
+.pk-chips button.pk-chip.is-on {
+  background: var(--bc-water) !important;
+  background-color: var(--bc-water) !important;
+  color: #fff !important;
+  border-color: var(--bc-water) !important;
+  font-weight: 600;
+}
+
+/* ค่าที่เลือกแล้ว */
+.pk-picked {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--bc-foam);
+  border: 1.5px solid var(--bc-water);
+  border-radius: 11px;
+  padding: 8px 10px 8px 13px;
+  font-weight: 600; font-size: 15px; color: var(--bc-deep);
+  box-shadow: 0 0 0 3px rgba(11, 127, 199, .13);
+  max-width: 100%;
+}
+.pk-picked button.pk-x {
+  width: auto !important;
+  padding: 0 3px !important;
+  font-size: 16px; line-height: 1;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--bc-ink2) !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.pk-ev {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  background: #1D9E5E; color: #fff;
+  padding: 2px 7px; border-radius: 999px;
+}
+
+/* หัวข้อกลุ่มปี (ชื่อโฉม) — มีเส้นลากต่อท้ายให้แยกกลุ่มได้ชัด */
+.pk-gh {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; font-weight: 600; color: var(--bc-waterD);
+  margin: 11px 0 0;
+}
+.pk-gh::after { content: ""; flex: 1; height: 1px; background: #DCEDF8; }
+.pk-body > .pk-gh:first-child { margin-top: 0; }
+
+/* ปุ่มข้อความล้วน — ดูปีเก่า / ใช้ตามที่พิมพ์ */
+.pk-body button.pk-more, .pk-body button.pk-own {
+  width: auto !important;
+  margin-top: 9px;
+  padding: 6px 2px !important;
+  font-family: var(--bc-body) !important;
+  font-size: 13px; font-weight: 600;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--bc-waterD) !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-align: left;
+  cursor: pointer;
+}
+.pk-body button.pk-own {
+  padding: 8px 13px !important;
+  background: #FFF6E6 !important;
+  background-color: #FFF6E6 !important;
+  color: #96601A !important;
+  border: 1px solid #F0DBB0 !important;
+  border-radius: 11px !important;
+}
+
+/* ช่องชื่อ/เบอร์/userId ของเดิม padding 8px แน่นไปเมื่ออยู่กับช่องใหม่
+   เขียน input#id (1,0,1) เพื่อชนะกฎ input[type="text"] ของ register/style.css */
+input#userId, input#name, input#phone { padding: 10px 12px; }
+#submitBtn { padding: 13px !important; font-size: 15px !important; margin-top: 6px; }
+
+.pk-hint { font-size: 11px; color: #9BB0BA; line-height: 1.55; margin-top: 7px; }
+.pk-own-year { margin-top: 12px; }
+.pk-own-year label { font-size: 11.5px; color: var(--bc-ink2); margin-bottom: 4px; }
+.pk-own-year .pk-input { max-width: 150px; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   หน้าข้อมูลร้าน (info_ad/info) — คลาสขึ้นต้น info- / shop- / map- / sp
+   มีเฉพาะหน้านี้หน้าเดียว ตรวจแล้วว่าไม่ชนกับไฟล์อื่น
+   ═══════════════════════════════════════════════════════════════════════ */
+.shop-hero {
+  background: linear-gradient(160deg, #F4FAFE, #E7F4FC);
+  border: 1px solid #CFE6F4;
+  border-radius: 16px;
+  padding: 16px 14px 14px;
+  margin-bottom: 11px;
+}
+.shop-hero h2 { margin: 0 !important; font-size: 1.45rem !important; color: var(--bc-deep) !important; }
+.shop-hero .shop-tag {
+  margin: 5px 0 0 !important;
+  font-size: 12.5px !important;
+  line-height: 1.6;
+  color: var(--bc-ink2);
+}
+
+.info-card {
+  background: var(--bc-foam);
+  border: 1px solid var(--bc-line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 11px;
+  text-align: left;
+}
+.info-card .irow {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+}
+.info-card .irow + .irow { margin-top: 5px; }
+.info-card .ilbl { font-size: 12.5px; color: var(--bc-ink2); flex: 0 0 auto; }
+.info-card .ival { font-size: 14px; font-weight: 600; text-align: right; }
+.addr-card .addr-text {
+  margin: 5px 0 0 !important;
+  font-size: 14px !important;
+  line-height: 1.6;
+  font-weight: 600;
+  color: var(--bc-ink);
+}
+
+.info-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 9px; }
+/* ปุ่มโทรเป็น <a> จึงต้องล้าง margin ของ .btn เดิมและจัดข้อความให้อยู่กลาง */
+.info-grid2 .btn { margin: 0 !important; text-decoration: none; font-size: 14px; padding: 12px 6px; }
+#mapBtn { display: block; width: 100%; margin: 0 0 11px !important; }
+
+.map-panel {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #CFE6F4;
+  margin-bottom: 11px;
+  background: #E8F1E4;
+}
+.map-panel iframe { display: block; width: 100%; height: 260px; border: 0; }
+.map-foot {
+  background: var(--bc-foam);
+  padding: 10px 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  text-align: left;
+}
+.map-foot .map-note { font-size: 12px; color: var(--bc-ink2); line-height: 1.45; }
+.map-foot .map-go {
+  margin: 0 !important; flex: 0 0 auto; white-space: nowrap;
+  padding: 10px 15px; font-size: 13px; text-decoration: none;
+}
+
+/* ปุ่มส่งข้อเสนอแนะ — การกระทำหลักของหน้านี้
+   เขียน .btn.btn-gold (0,2,0) ให้ชนะกฎ .btn (0,1,0) ที่อยู่ด้านล่างของไฟล์
+   ห้ามลดเหลือ .btn-gold เฉย ๆ เพราะจะแพ้แล้วกลับเป็นสีฟ้า */
+.btn.btn-gold, #openFeedbackBtn {
+  display: block; width: 100%;
+  background: var(--bc-sun) !important;
+  background-color: var(--bc-sun) !important;
+  box-shadow: 0 3px 0 #C6821A !important;
+  margin: 3px 0 0 !important;
+}
+#openFeedbackBtn:hover { background-color: #E29A20 !important; }
+
+/* ดาวให้คะแนน
+   ⚠️ ต้องเขียน .star-pick button.sp (0,2,1) ไม่ใช่ .star-pick .sp (0,2,0)
+      ไม่งั้นแพ้กฎ button:not(.swal2-close):not(.swal2-cancel) แล้วดาวจะกลายเป็นปุ่มฟ้า */
+.star-pick { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; margin-bottom: 12px; }
+.star-pick button.sp {
+  background: none !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #D3E0E7 !important;
+  font-size: 30px;
+  line-height: 1;
+  padding: 2px 1px;
+  cursor: pointer;
+  border-radius: 8px !important;
+}
+.star-pick button.sp.on { color: var(--bc-sun) !important; }
+.star-pick button.sp:active { transform: scale(.9); }
+.star-pick .sp-txt { font-size: 12.5px; color: var(--bc-ink2); margin-left: 7px; }
+
+#feedbackPanel label { font-size: 12.5px; }
+#feedbackPanel .btn { display: block; width: 100%; margin: 4px 0 0 !important; }
+#feedbackPanel textarea { min-height: 86px; }
+
+/* ── จอ QR ───────────────────────────────────────────────────────────
+   ⚠️ แตะได้แค่หน้าตา ห้ามแตะ position ของ .qr-popup (ต้องเป็น fixed)  */
 .qr-popup { background: rgba(10, 40, 55, .72) !important; }
 .qr-popup-inner {
   background: var(--bc-foam) !important;
   color: var(--bc-ink) !important;
-  border-radius: 20px !important;
+  border-radius: 22px !important;
   border: 1px solid var(--bc-line);
+  padding: 20px 18px 16px !important;
+  box-shadow: 0 22px 50px -20px rgba(4, 26, 38, .6);
 }
+.qr-popup-inner .qr-head {
+  margin: 0;
+  font-family: var(--bc-disp);
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--bc-deep);
+}
+/* QRious วาดลงบน canvas ขนาด 200px กำหนดกรอบขาวรอบให้กล้องจับง่ายขึ้น */
+.qr-popup-inner #qrCanvas {
+  background: #fff;
+  border: 1px solid var(--bc-line);
+  border-radius: 14px;
+  padding: 9px;
+  box-sizing: content-box;
+}
+.qr-popup-inner #qrUserInfo { margin: 4px 0 0; }
+.qr-popup-inner .qr-name {
+  display: block;
+  font-family: var(--bc-disp); font-weight: 500; font-size: 17px;
+  color: var(--bc-ink);
+}
+.qr-popup-inner .qr-hint { display: block; font-size: 12.5px; color: var(--bc-ink2); margin-top: 2px; }
+.qr-popup-inner .qr-timer {
+  margin-top: 13px; padding-top: 12px;
+  border-top: 1px dashed var(--bc-line);
+  display: flex; align-items: baseline; justify-content: center; gap: 8px;
+}
+.qr-popup-inner .qr-timer-lbl { font-size: 12.5px; color: var(--bc-ink2); }
+.qr-popup-inner .qrcount {
+  font-family: var(--bc-disp); font-weight: 500; font-size: 1.5rem;
+  color: var(--bc-waterD); font-variant-numeric: tabular-nums; line-height: 1;
+}
+.qr-popup-inner #closeQRBtn { width: 100%; margin: 14px 0 0 !important; }
 
 /* ── SweetAlert ──────────────────────────────────────────────────────── */
 .swal2-popup { font-family: var(--bc-body) !important; border-radius: 18px !important; }

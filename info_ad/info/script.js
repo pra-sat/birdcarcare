@@ -1,6 +1,62 @@
 const SHEET_API = 'https://script.google.com/macros/s/AKfycbxdxUvmwLS3_nETwGLk4J8ipPq2LYNSWyhJ2ZwVsEJQgONG11NSSX3jVaeqWCU1TXvE5g/exec';
 const liffId = '2007421084-2OgzWbpV';
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  ส่วนหน้าตา (เพิ่ม 13 ก.ย. 2569) — ไม่แตะข้อมูลที่ส่งไป Apps Script เลย
+//  ทั้งสองฟังก์ชันห่อ try/catch ไว้ ถ้าพังจะไม่ลากหน้าทั้งหน้าตายไปด้วย
+// ═══════════════════════════════════════════════════════════════════════════
+
+// กดปุ่ม "แผนที่ร้าน" แล้วค่อยโหลดแผนที่
+// ของเดิม iframe โหลดทุกครั้งที่เปิดหน้า กินเน็ตและทำให้หน้ากระตุก
+function setupMapToggle() {
+  try {
+    const btn = document.getElementById('mapBtn');
+    const panel = document.getElementById('mapPanel');
+    const frame = document.getElementById('mapFrame');
+    if (!btn || !panel || !frame) return;
+
+    btn.addEventListener('click', () => {
+      const willOpen = panel.classList.contains('hidden');
+      if (willOpen && !frame.getAttribute('src')) {
+        frame.setAttribute('src', frame.dataset.src || '');   // โหลดครั้งเดียว
+      }
+      panel.classList.toggle('hidden', !willOpen);
+      btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      btn.textContent = willOpen ? '📍 ซ่อนแผนที่' : '📍 แผนที่ร้าน';
+      if (willOpen) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  } catch (e) { console.warn('setupMapToggle:', e); }
+}
+
+// ดาวกดให้คะแนน — เขียนค่าลง #scoreInput ที่โค้ดส่งข้อมูลอ่านอยู่เหมือนเดิม
+function setupStarPicker() {
+  try {
+    const wrap = document.getElementById('starPick');
+    const input = document.getElementById('scoreInput');
+    const txt = document.getElementById('starText');
+    if (!wrap || !input) return;
+
+    const stars = Array.from(wrap.querySelectorAll('.sp'));
+    const words = ['', 'ต้องปรับปรุง', 'พอใช้', 'ดี', 'ดีมาก', 'ดีเยี่ยม'];
+
+    const paint = (v) => {
+      stars.forEach(s => {
+        const on = Number(s.dataset.v) <= v;
+        s.textContent = on ? '★' : '☆';
+        s.classList.toggle('on', on);
+        s.setAttribute('aria-checked', Number(s.dataset.v) === v ? 'true' : 'false');
+      });
+      if (txt) txt.textContent = v ? `${v} ดาว — ${words[v]}` : 'แตะดาวเพื่อให้คะแนน';
+    };
+
+    stars.forEach(s => s.addEventListener('click', () => {
+      input.value = s.dataset.v;
+      paint(Number(s.dataset.v));
+    }));
+    paint(0);
+  } catch (e) { console.warn('setupStarPicker:', e); }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   
   const loading = document.getElementById('loadingOverlay');
@@ -21,7 +77,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('userView').classList.remove('hidden');
     loading.classList.add('hidden');
     document.getElementById('loadingOverlay').classList.add('hidden');
-    
+
+    // ── ปุ่มแผนที่ ───────────────────────────────────────────────────────
+    // ผูกตรงนี้ (ก่อน fetch ตรวจแอดมิน) เพื่อให้ปุ่มใช้ได้ทันทีที่หน้าโผล่
+    // ไม่ต้องรอเซิร์ฟเวอร์ตอบ · iframe ยังไม่มี src จนกดปุ่มครั้งแรก
+    setupMapToggle();
+    setupStarPicker();
+
 
     // ✅ ส่งข้อมูล LINE ก่อน
     

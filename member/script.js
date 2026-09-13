@@ -231,9 +231,13 @@ function generateQRCode(text, userInfo) {
     size: 200
   });
 
-  //document.getElementById('qrUserInfo').innerText = `${userInfo.name} - ${userInfo.brand} ${userInfo.model} (${userInfo.year})`;
-  document.getElementById('qrUserInfo').innerText = `ชื่อ: ${userInfo.name} (แจ้งรุ่นรถกับพนักงานได้เลยค่ะ)`
-  document.getElementById('closeQRBtn').addEventListener('click', closeQRSection);
+  // ชื่อเป็นบรรทัดเด่น คำอธิบายเป็นบรรทัดเล็กใต้ลงไป (อ่านง่ายกว่าต่อกันบรรทัดเดียว)
+  document.getElementById('qrUserInfo').innerHTML =
+    `<span class="qr-name">${esc(userInfo.name)}</span>` +
+    `<span class="qr-hint">แจ้งรุ่นรถกับพนักงานได้เลยค่ะ</span>`;
+  // ใช้ onclick ไม่ใช่ addEventListener เพราะฟังก์ชันนี้ถูกเรียกทุกครั้งที่เปิด QR
+  // ถ้าใช้ addEventListener ตัวฟังจะซ้อนกันเรื่อย ๆ แล้วยิง delete_token หลายรอบ
+  document.getElementById('closeQRBtn').onclick = closeQRSection;
 }
 
     function closeQRSection() {
@@ -244,12 +248,18 @@ function generateQRCode(text, userInfo) {
     }
 
 
+    // แสดงเป็น นาที:วินาที อ่านง่ายกว่าเลขวินาทีดิบ (ของเดิมขึ้น 287 แล้วนับลง)
+    function fmtCountdown(sec) {
+      const s = Math.max(0, sec);
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }
+
     function startQRCountdown() {
       let count = 300;
-      document.getElementById("qrCountdown").textContent = count;
+      document.getElementById("qrCountdown").textContent = fmtCountdown(count);
       qrInterval = setInterval(() => {
         count--;
-        document.getElementById("qrCountdown").textContent = count;
+        document.getElementById("qrCountdown").textContent = fmtCountdown(count);
         if (count <= 0) {
           clearInterval(qrInterval);
           deleteQRToken();

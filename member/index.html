@@ -39,14 +39,19 @@
     <p class="notice">❕ หากต้องการแก้ไขข้อมูล กรุณาทักแชทหรือแจ้ง Admin</p>
   </div>
   
-  <!-- ✅ Section แสดง QR -->
+  <!-- ✅ Section แสดง QR
+       ⚠️ .qr-popup ต้องคง position:fixed ของ style.css ไว้ ห้าม theme.css ทับเป็น relative
+          (ถ้าทับ ป๊อปอัปจะไหลไปอยู่ท้ายหน้า เคยพลาดมาแล้ว 13/9/2569) -->
   <div id="qrSection" class="qr-popup hidden">
     <div class="qr-popup-inner">
-      <p><b>QR ยืนยันตัวตน</b></p>
+      <p class="qr-head">ยื่นให้พนักงานสแกน</p>
       <canvas id="qrCanvas"></canvas>
       <p id="qrUserInfo"></p>
-      <p>หมดอายุใน <span id="qrCountdown">600</span> วินาที</p>
-      <button class="btn" id="closeQRBtn">❌</button>
+      <div class="qr-timer">
+        <span class="qr-timer-lbl">หมดอายุใน</span>
+        <span class="qrcount" id="qrCountdown">5:00</span>
+      </div>
+      <button class="btn outline" id="closeQRBtn">ปิด</button>
     </div>
   </div>
 
