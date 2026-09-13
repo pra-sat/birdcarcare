@@ -122,41 +122,55 @@ class QRScanner {
     const priceInputEl = document.getElementById('priceInput');
     const priceValue = parseFloat(priceInputEl.value || '0');
     
-    if (!name || priceValue <= 0) {
-      Swal.showValidationMessage('กรุณากรอกชื่อบริการและราคาถูกต้อง');
+    // แยกข้อความให้ตรงกับว่าขาดอะไร ของเดิมรวมเป็นประโยคเดียวจึงไม่รู้ว่าขาดช่องไหน
+    if (!name) {
+      Swal.showValidationMessage('ยังไม่ได้เลือกบริการ');
       return;
     }
-    
+    if (priceValue <= 0) {
+      Swal.showValidationMessage(this.isRedeeming
+        ? 'กรุณากรอกจำนวนแต้มที่จะใช้'
+        : 'กรุณากรอกราคาให้ถูกต้อง');
+      return;
+    }
+
     let price = priceValue;
     let point = Math.floor(priceValue * this.pointPerBaht);
-    let label = `ราคา: ${price} บาท | แต้มที่ได้: ${point}`;
-    
+    let label = `ราคา: ${price} บาท · ลูกค้าได้แต้ม: +${point}`;
+
     if (this.isRedeeming) {
       if (price > availablePoint) {
-        Swal.showValidationMessage('แต้มของลูกค้าไม่เพียงพอ');
+        Swal.showValidationMessage(`แต้มลูกค้าไม่พอ (มี ${availablePoint} จะใช้ ${priceValue})`);
         return;
       }
       price = -price;
       point = -priceValue;
-      label = `ราคา: ${Math.abs(price)} | แต้มที่ใช้: ${Math.abs(point)}`;
+      // ⚠️ ในโหมดแลกแต้ม ตัวเลขที่กรอกคือ "จำนวนแต้ม" ไม่ใช่บาท
+      //    ของเดิมเขียนว่า "ราคา: 40" ซึ่งอ่านแล้วเข้าใจว่าเก็บเงิน 40 บาท
+      //    ทั้งที่ลูกค้าไม่ได้จ่ายเงินเลย จึงเขียนให้ชัดว่าใช้แต้มกี่แต้มและจ่ายเงินเท่าไหร่
+      label = `ใช้แต้ม: ${Math.abs(point)} แต้ม · ลูกค้าจ่ายเงิน: 0 บาท`;
     }
 
   
+    // เพิ่มทะเบียนเข้าไปด้วย ช่วยให้แอดมินยันกับรถที่จอดอยู่หน้าร้านได้ก่อนกดยืนยัน
+    const plateLine = String(selectedVehicle.Plate || '').trim();
+
     const confirmHtml = `
-      <p>ชื่อ: ${esc(this.foundUser.Name)}</p>
-      <p>รถ: ${esc(selectedVehicle.Brand)} ${esc(selectedVehicle.Model)} (${esc(selectedVehicle.Year)})</p>
+      <p>ลูกค้า: ${esc(this.foundUser.Name)}</p>
+      <p>รถ: ${esc(selectedVehicle.Brand)} ${esc(selectedVehicle.Model)} (${esc(selectedVehicle.Year)})${
+        plateLine ? ' · ' + esc(plateLine) : ''}</p>
       <p>บริการ: ${esc(name)}</p>
       <p>${esc(label)}</p>
       <p>หมายเหตุ: ${esc(note || '-')}</p>
     `;
-  
+
     const confirm = await Swal.fire({
-      title: 'ยืนยันข้อมูลก่อนส่ง?',
+      title: 'ตรวจข้อมูลก่อนบันทึก',
       html: confirmHtml,
       icon: 'question',
       showCancelButton: true,
-      confirmButtonText: '✅ ยืนยัน',
-      cancelButtonText: '❌ ยกเลิก'
+      confirmButtonText: '✅ ยืนยัน บันทึกเลย',
+      cancelButtonText: 'กลับไปแก้'
     });
   
     if (!confirm.isConfirmed) return;
@@ -439,12 +453,13 @@ class QRScanner {
       return;
     }
 
+    // ไม่โชว์ราคาบนปุ่มแล้ว (13 ก.ย. 2569 ตามที่แจ้ง)
+    // เพราะมีช่องพิมพ์ราคาอยู่แล้ว และราคาจริงตั้งตามงานหน้าร้านเป็นครั้ง ๆ ไป
+    // ราคาในชีตอาจไม่ตรงกับที่คิดจริง ถ้าโชว์ไว้จะทำให้เข้าใจผิดว่าเป็นราคาที่ต้องเก็บ
     const chips = list.map(s => {
-      const price = parseFloat(s.price) || 0;
       const on = String(s.name || '') === chosen ? ' is-on' : '';
-      return `<button type="button" class="svc-chip${on}" data-name="${esc(s.name)}" data-price="${price}">`
+      return `<button type="button" class="svc-chip${on}" data-name="${esc(s.name)}">`
         + esc(s.name)
-        + (price > 0 ? `<span class="svc-price">${price}฿</span>` : '')
         + `</button>`;
     }).join('');
 
@@ -559,7 +574,7 @@ class QRScanner {
       ? platePretty(head.value, tail.value) : (head.value + ' ' + tail.value).trim();
 
     if (!check.ok || !plate) {
-      warn.textContent = '⚠️ ' + (check.warn || 'กรอกทะเบียนให้ครบก่อนนะ');
+      warn.textContent = '⚠️ ' + (check.warn || 'กรุณากรอกทะเบียนให้ครบ');
       warn.hidden = false;
       return;
     }
@@ -633,7 +648,9 @@ class QRScanner {
     ).join('');
 
     Swal.fire({
-      title: 'ข้อมูลลูกค้า',
+      // ชื่อหน้าเดิมคือ "ข้อมูลลูกค้า" แต่หน้านี้ทำทั้งเลือกรถ เลือกบริการ และบันทึก
+      // จึงเปลี่ยนให้ตรงกับงานที่ทำจริง
+      title: 'บันทึกบริการ',
       html: `
         <div class="cust-head">
           <div class="row"><span class="lbl">ลูกค้า</span><span class="val">${esc(this.foundUser.Name)}</span></div>
@@ -688,7 +705,10 @@ class QRScanner {
           if (this.isRedeeming) {
             const remain = this.currentPoint - p;
             if (remain < 0) {
-              pointInfo.textContent = `แต้มของคุณไม่พอใช้บริการนี้ค่ะ ❌`;
+              // ⚠️ ข้อความนี้แอดมินเป็นคนอ่าน ไม่ใช่ลูกค้า
+              //    ของเดิมเขียนว่า "แต้มของคุณไม่พอใช้บริการนี้ค่ะ" ซึ่งเขียนถึงลูกค้า
+              //    ทั้งที่ลูกค้าไม่เห็นหน้านี้เลย จึงเปลี่ยนให้พูดกับแอดมินตรง ๆ
+              pointInfo.textContent = `❌ แต้มลูกค้าไม่พอ (มี ${this.currentPoint} จะใช้ ${p})`;
               pointInfo.style.color = 'red';
               Swal.getConfirmButton().disabled = true;
             } else {
@@ -801,7 +821,6 @@ class QRScanner {
         const svcChips = document.getElementById('svcChips');
 
         this.svcFilter = '';
-        this.svcAutoPrice = null;   // ราคาที่ "ระบบเติมให้" ครั้งล่าสุด
         this.renderServiceChips();
 
         // พิมพ์ = กรองรายการ (ค่าที่เลือกไว้คือค่าในช่องเสมอ)
@@ -816,28 +835,13 @@ class QRScanner {
           if (!chip) return;
 
           const name = chip.dataset.name || '';
-          const price = parseFloat(chip.dataset.price) || 0;
           const isSame = serviceInput.value.trim() === name;
 
-          if (isSame) {
-            // แตะซ้ำที่ตัวเดิม = ยกเลิก กลับไปเลือกใหม่ได้
-            serviceInput.value = '';
-            // คืนช่องราคาให้ว่างเฉพาะกรณีที่เลขนั้นระบบเติมให้เอง
-            if (this.svcAutoPrice !== null && priceInput.value === String(this.svcAutoPrice)) {
-              priceInput.value = '';
-            }
-            this.svcAutoPrice = null;
-          } else {
-            serviceInput.value = name;
-            // เติมราคาให้เมื่อช่องยังว่าง หรือเลขเดิมเป็นเลขที่ระบบเติมให้
-            // (ถ้าแอดมินพิมพ์ราคาเองไว้ จะไม่เขียนทับเด็ดขาด)
-            const canFill = !priceInput.value ||
-              (this.svcAutoPrice !== null && priceInput.value === String(this.svcAutoPrice));
-            if (price > 0 && !this.isRedeeming && canFill) {
-              priceInput.value = price;
-              this.svcAutoPrice = price;
-            }
-          }
+          // เลิกเติมราคาให้อัตโนมัติ (13 ก.ย. 2569)
+          // เมื่อไม่โชว์ราคาบนปุ่มแล้ว การแอบเติมเลขลงช่องราคาจะยิ่งชวนสับสน
+          // เพราะแอดมินจะไม่รู้ว่าเลขนั้นมาจากไหน · ปุ่มมีหน้าที่เลือกชื่อบริการอย่างเดียว
+          // ราคาพิมพ์เองทุกครั้ง ชัดเจนและไม่มีทางบันทึกราคาผิดจากราคาเก่าในชีต
+          serviceInput.value = isSame ? '' : name;   // แตะซ้ำที่ตัวเดิม = ยกเลิก
 
           // ล้างคำค้นเสมอ เพื่อให้รายการเต็มยังอยู่ เปลี่ยนใจได้ทันที
           this.svcFilter = '';
