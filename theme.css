@@ -88,6 +88,99 @@ h1, h2, h3, h2.title { font-family: var(--bc-disp) !important; font-weight: 500 
   color: var(--bc-ink) !important;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   การ์ดรถในหน้าสมาชิก — โครงเดียวกับตัวจำลองที่อนุมัติไว้
+   ทุกกฎในบล็อกนี้ผูกไว้กับ #memberInfo เท่านั้น ชื่อคลาสสั้น ๆ อย่าง
+   .row .val .pts จึงไม่มีทางไปชนกับหน้าอื่นหรือ CSS เดิมของหน้าใด
+   (ตรวจแล้วว่าไฟล์ style.css ทั้ง 6 ไฟล์ไม่มีชื่อคลาสชุดนี้เลย)
+   ═══════════════════════════════════════════════════════════════════════ */
+#memberInfo .row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+}
+#memberInfo .lbl { font-size: 12.5px; color: var(--bc-ink2); font-weight: 400; }
+#memberInfo .val { font-size: 15px; font-weight: 600; color: var(--bc-ink); text-align: right; }
+#memberInfo .val.small { font-size: 13.5px; }
+#memberInfo .val.is-soon { color: #B5760E; }
+#memberInfo .val.is-late { color: var(--bc-rose); }
+
+/* การ์ดชื่อ–เบอร์โทร ต้องล้างค่า font-size:20px ของ .card เดิมในหน้าสมาชิก */
+#memberInfo .card.bc-prof {
+  font-size: 15px;
+  padding: 13px 15px;
+  background: linear-gradient(160deg, #F7FBFE, #EDF6FC) !important;
+  border-color: #CFE6F4 !important;
+}
+#memberInfo .card.bc-prof .row + .row { margin-top: 4px; }
+
+/* กรอบรวม: รถ + แต้ม อยู่ในกล่องเดียว เพื่อให้แยกรถแต่ละคันออกจากกันได้ชัด */
+#memberInfo .vunit {
+  border-radius: 18px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  background: var(--bc-foam);
+  border: 1px solid #CFE6F4;
+  box-shadow: 0 5px 16px -10px rgba(10, 79, 122, .35);
+  text-align: left;
+}
+#memberInfo .uhead { padding: 14px 15px 12px; display: flex; gap: 11px; align-items: flex-start; }
+#memberInfo .uname { min-width: 0; flex: 1; }
+#memberInfo .ubrand {
+  font-size: 11.5px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--bc-water);
+}
+#memberInfo .umodel {
+  font-family: var(--bc-disp); font-weight: 500; font-size: 1.5rem; line-height: 1.18;
+  color: var(--bc-deep); margin-top: 2px; word-break: break-word;
+}
+#memberInfo .uyear { font-size: 12.5px; color: var(--bc-ink2); margin-top: 3px; }
+#memberInfo .uyear:empty { display: none; }
+
+#memberInfo .upts {
+  background: linear-gradient(160deg, #F4FAFE, #E7F4FC);
+  border-top: 1px solid #DCEDF8;
+  padding: 12px 15px 11px;
+}
+#memberInfo .updrow { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+#memberInfo .pts { display: flex; align-items: baseline; gap: 7px; }
+#memberInfo .pts b {
+  font-family: var(--bc-disp); font-weight: 600; font-size: 2.15rem; line-height: 1;
+  color: var(--bc-waterD); font-variant-numeric: tabular-nums;
+}
+#memberInfo .pts span { font-size: 13px; color: var(--bc-ink2); }
+
+#memberInfo .pill {
+  display: inline-block; flex: 0 0 auto;
+  font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  background: var(--bc-mint); color: #fff; white-space: nowrap;
+}
+#memberInfo .pill.warn { background: var(--bc-sun); }
+#memberInfo .pill.grey { background: #E4EEF3; color: var(--bc-ink2); }
+
+#memberInfo .udet { padding: 10px 15px 13px; }
+#memberInfo .udet .row + .row { margin-top: 3px; }
+
+/* ตัวเล็กสุด — ข้อมูลที่ลูกค้าไม่ต้องโฟกัส (จำนวนครั้ง / แต้มที่หมดอายุไปแล้ว) */
+#memberInfo .subline { font-size: 10.5px; color: #9BB0BA; line-height: 1.5; margin-top: 7px; }
+#memberInfo .subline b { color: #7B96A3; font-weight: 600; }
+
+/* ปุ่มของหน้าสมาชิก — QR คือการกระทำหลักของหน้านี้ ให้เด่นที่สุด
+   ใช้ #id จึงชนะกฎปุ่มสีฟ้าด้านล่างเสมอ และมีเฉพาะหน้าสมาชิกหน้าเดียว */
+#qrBtn, #toggleHistory { display: block; width: 100%; margin: 6px 0 !important; }
+#qrBtn {
+  background: var(--bc-sun) !important;
+  background-color: var(--bc-sun) !important;
+  box-shadow: 0 3px 0 #C6821A !important;
+  font-size: 16px;
+  padding: 12px 16px;
+}
+#qrBtn:hover { background-color: #E29A20 !important; }
+
+#memberInfo .bc-expnote {
+  font-size: 11.5px; line-height: 1.65; color: var(--bc-ink2);
+  background: #F4FAFE; border: 1px dashed #C9E2F1; border-radius: 12px;
+  padding: 9px 12px; margin: 0 0 12px; text-align: left;
+}
+
 /* ── ปุ่ม ────────────────────────────────────────────────────────────── */
 .btn, button {
   font-family: var(--bc-body) !important;

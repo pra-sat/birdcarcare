@@ -35,6 +35,108 @@ function formatPhone(phone) {
   return digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  ตัวช่วยของการ์ดรถ (เพิ่ม 13 ก.ย. 2569)
+//  ทุกฟังก์ชันในบล็อกนี้อ่านข้อมูลที่ handleMemberGet ส่งมาอยู่แล้วทั้งหมด
+//  ไม่มีการเรียก API ใหม่ และไม่ต้องแก้ Apps Script
+// ═══════════════════════════════════════════════════════════════════════════
+
+// กันข้อมูลในชีตที่เผลอมีเครื่องหมาย < > & ทำให้หน้าเว็บเพี้ยนหรือถูกฝังสคริปต์
+function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// แปลงวันที่รูปแบบ d/M/yyyy ที่ Apps Script ส่งมา เป็น Date
+// คืน null ถ้าอ่านไม่ออก ปลายทางต้องเช็ค null ทุกที่
+function parseThaiDate(s) {
+  const m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// เหลืออีกกี่วันจะถึงวันหมดอายุ (ติดลบ = เลยมาแล้ว) · null ถ้าไม่มีวันที่
+function daysLeft(dateStr) {
+  const exp = parseThaiDate(dateStr);
+  if (!exp) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((exp - today) / 86400000);
+}
+
+// ประวัติของรถคันนี้
+// ⚠️ Service_History เก็บแค่ ยี่ห้อ + รุ่น (ไม่มีปี ไม่มี VehicleID)
+//    จึงเทียบได้แค่ 2 ช่องนี้ เหมือนที่ feedback.gs ใช้อยู่
+//    ถ้าลูกค้ามีรถ ยี่ห้อ+รุ่น ซ้ำกัน 2 คัน จะแยกไม่ออก → ผู้เรียกต้องไม่แสดงตัวเลข
+function historyOf(vehicle, history) {
+  if (!Array.isArray(history)) return [];
+  const b = String(vehicle.brand || '').trim().toLowerCase();
+  const m = String(vehicle.model || '').trim().toLowerCase();
+  return history.filter(r =>
+    String(r.brand || '').trim().toLowerCase() === b &&
+    String(r.model || '').trim().toLowerCase() === m
+  );
+}
+
+// สร้างการ์ดรถ 1 คัน — รถกับแต้มอยู่กรอบเดียวกัน เพื่อให้แยกคันได้ง่ายเวลามีหลายคัน
+// countable = false เมื่อมีรถ ยี่ห้อ+รุ่น ซ้ำกัน จะซ่อนจำนวนครั้งไว้ ดีกว่าโชว์เลขผิด
+function vehicleCardHtml(vehicle, history, countable) {
+  const left = daysLeft(vehicle.expirationDate);
+  const point = parseInt(vehicle.point || 0) || 0;
+  const expired = parseInt(vehicle.expiredPoints || 0) || 0;
+
+  let pill = '';
+  let expClass = '';
+  if (left === null)      pill = '';
+  else if (left < 0)      { pill = '<span class="pill grey">แต้มหมดอายุแล้ว</span>'; expClass = ' is-late'; }
+  else if (left === 0)    { pill = '<span class="pill warn">วันนี้วันสุดท้าย</span>'; expClass = ' is-soon'; }
+  else if (left <= 30)    { pill = `<span class="pill warn">เหลือ ${left} วัน</span>`; expClass = ' is-soon'; }
+  else                    pill = '<span class="pill">ใช้ได้</span>';
+
+  // วันใช้บริการล่าสุด
+  // ⚠️ ต้องหาค่ามากสุดเอง ห้ามใช้แถวแรกหรือแถวท้าย เพราะโค้ดส่วนแสดงประวัติ
+  //    เรียก history.sort() ซึ่งสลับลำดับ array ก้อนเดียวกันนี้ทิ้ง
+  const rows = historyOf(vehicle, history);
+  let lastDate = '';
+  let lastTime = -Infinity;
+  rows.forEach(r => {
+    const d = parseThaiDate(r.date);
+    if (d && d.getTime() > lastTime) {
+      lastTime = d.getTime();
+      lastDate = String(r.date || '').split(',')[0].trim();
+    }
+  });
+
+  const bits = [];
+  if (countable && rows.length) bits.push(`ใช้บริการมาแล้ว <b>${rows.length} ครั้ง</b>`);
+  if (expired > 0) bits.push(`หมดอายุไปแล้ว <b>${expired} แต้ม</b>`);
+
+  return `
+    <div class="vunit">
+      <div class="uhead">
+        <div class="uname">
+          <div class="ubrand">${esc(vehicle.brand || '-')}</div>
+          <div class="umodel">${esc(vehicle.model || '-')}</div>
+          <div class="uyear">${vehicle.year ? 'ปี ' + esc(vehicle.year) : ''}</div>
+        </div>
+      </div>
+      <div class="upts">
+        <div class="updrow">
+          <div class="pts"><b>${point}</b><span>แต้ม</span></div>
+          ${pill}
+        </div>
+      </div>
+      <div class="udet">
+        <div class="row"><span class="lbl">แต้มใช้ได้ถึง</span><span class="val small${expClass}">${esc(vehicle.expirationDate || '-')}</span></div>
+        ${lastDate ? `<div class="row"><span class="lbl">ใช้บริการล่าสุด</span><span class="val small">${esc(lastDate)}</span></div>` : ''}
+        ${bits.length ? `<div class="subline">${bits.join(' · ')}</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
 // แก้ไขฟังก์ชัน toBangkokISOString ให้ชัดเจน
 function toBangkokISOString(date) {
   const bangkokOffset = 7 * 60; // GMT+07:00 ในหน่วยนาที
@@ -246,23 +348,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-        // แสดงข้อมูลส่วนตัวสมาชิกด้านบน
-    const userInfoHtml = `
-      <div class="card">
-        <p><b>ชื่อ:</b> ${data.name || "-"}</p>
-        <p><b>เบอร์โทร:</b> ${formatPhone(data.vehicles[0]?.phone || "-")}</p>
+    // ── ข้อมูลส่วนตัว + การ์ดรถแต่ละคัน ────────────────────────────────
+    // เขียนทีเดียวจบ (ของเดิมใช้ innerHTML += ซึ่งทำให้เบราว์เซอร์
+    // พาร์สและวาดใหม่ 2 รอบโดยไม่จำเป็น)
+    const profileHtml = `
+      <div class="card bc-prof">
+        <div class="row"><span class="lbl">ชื่อ</span><span class="val">${esc(data.name || "-")}</span></div>
+        <div class="row"><span class="lbl">เบอร์โทร</span><span class="val">${esc(formatPhone(String(data.vehicles[0]?.phone || "-")))}</span></div>
       </div>
     `;
-    memberInfoEl.innerHTML = userInfoHtml;
 
-    memberInfoEl.innerHTML += data.vehicles.map(vehicle => `
-      <div class="card">
-        <p><b>รถ:</b> ${vehicle.brand} ${vehicle.model} (${vehicle.year})</p>
-        <p><b>แต้มสะสม:</b> ${vehicle.point} แต้ม</p>
-        <p><b>แต้มหมดอายุ:</b> ${vehicle.expirationDate || '-'}</p>
-      </div>
-    `).join('');
-    
+    // เช็คว่ามีรถ ยี่ห้อ+รุ่น ซ้ำกันไหม ถ้าซ้ำจะนับจำนวนครั้งแยกคันไม่ได้
+    const keyOf = v => `${String(v.brand || '').trim().toLowerCase()}|${String(v.model || '').trim().toLowerCase()}`;
+    const keys = data.vehicles.map(keyOf);
+    const noDupModel = keys.length === new Set(keys).size;
+
+    // หมายเหตุอายุแต้ม — ตามที่แจ้งลูกค้าไว้ตอนสมัครสมาชิก
+    const expNoteHtml = `
+      <p class="bc-expnote">❕ แต้มมีอายุ 3 เดือนนับจากวันใช้บริการครั้งล่าสุด
+      หากเลยกำหนดจะถูกหักเดือนละ 10 แต้ม · มาใช้บริการเมื่อไหร่ วันหมดอายุจะถูกนับใหม่ทันที</p>
+    `;
+
+    memberInfoEl.innerHTML = profileHtml
+      + data.vehicles.map(v => vehicleCardHtml(v, data.serviceHistory, noDupModel)).join('')
+      + expNoteHtml;
+
 
 /*
     memberInfoEl.innerHTML = `

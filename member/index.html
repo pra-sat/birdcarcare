@@ -23,9 +23,10 @@
 
     <div id="memberInfo" class="card-list"></div>
 
-    <!-- แถบกดดูประวัติ -->
+    <!-- ปุ่มหลักขึ้นก่อน (สลับลำดับ 13 ก.ย. 2569 ให้ตรงกับตัวจำลองที่อนุมัติ)
+         ทั้งสองปุ่มผูกด้วย id/onclick จึงสลับที่ได้โดยไม่กระทบสคริปต์ -->
+    <button class="btn" id="qrBtn" onclick="showQRSection()">📱 แสดง QR รับแต้ม</button>
     <button class="btn history-toggle" id="toggleHistory">▼ ดูประวัติการใช้บริการ</button>
-    <button class="btn" id="qrBtn" onclick="showQRSection()">แสดง QR Code</button>
 
     <!-- พื้นที่แสดงประวัติ -->
     <div id="historySection" class="card hidden">
