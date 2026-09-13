@@ -113,6 +113,16 @@ function vehicleCardHtml(vehicle, history, countable) {
   if (countable && rows.length) bits.push(`ใช้บริการมาแล้ว <b>${rows.length} ครั้ง</b>`);
   if (expired > 0) bits.push(`หมดอายุไปแล้ว <b>${expired} แต้ม</b>`);
 
+  // ป้ายทะเบียน — เลขบรรทัดบน จังหวัดบรรทัดล่าง เหมือนป้ายจริง
+  // ว่างได้ (Apps Script รุ่นก่อน 13 ก.ย. 2569 ยังไม่ส่งฟิลด์นี้มา) จะไม่ขึ้นกรอบเปล่า
+  // ใช้ plateHtml() จาก ../plate_data.js เพื่อให้หน้าสมาชิกกับหน้าแอดมินวาดป้ายเหมือนกัน
+  // ถ้าไฟล์นั้นโหลดไม่ขึ้น ค่อยวาดเองแบบเดียวกันเป็นทางถอย
+  const plate = String(vehicle.plate || '').trim();
+  const plateBadge = !plate ? ''
+    : (typeof plateHtml === 'function'
+        ? plateHtml(plate, vehicle.province, false)
+        : `<span class="plate"><span class="num">${esc(plate)}</span><span class="prov">${esc(vehicle.province || '—')}</span></span>`);
+
   return `
     <div class="vunit">
       <div class="uhead">
@@ -121,6 +131,7 @@ function vehicleCardHtml(vehicle, history, countable) {
           <div class="umodel">${esc(vehicle.model || '-')}</div>
           <div class="uyear">${vehicle.year ? 'ปี ' + esc(vehicle.year) : ''}</div>
         </div>
+        ${plateBadge}
       </div>
       <div class="upts">
         <div class="updrow">
@@ -223,13 +234,84 @@ async function showQRSection() {
 }
 
     
+// ═══════════════════════════════════════════════════════════════════════════
+//  QR ลายเซ็นของร้าน (13 ก.ย. 2569)
+//
+//  เปลี่ยน 3 อย่างจากของเดิม
+//    1. โมดูลเป็นสีน้ำเงินเข้มของร้าน (#0A4F7A) ไม่ใช่ดำ
+//    2. ยกระดับการกู้คืนข้อผิดพลาดเป็น H (กู้ได้ถึง 30%) จากค่าปริยาย L (7%)
+//    3. วางตรา "BC" ตรงกลาง
+//
+//  🔬 ทดสอบแล้วก่อนใช้ (13 ก.ย. 2569)
+//     สร้าง QR จาก token 20 ตัวแบบเดียวกับระบบ 40 ครั้งต่อกรณี
+//     แล้วถอดรหัสด้วยตัวถอด jsQR จริง ผลที่ได้:
+//       ระดับ H  อ่านออก 100% เมื่อตรากลางกว้างไม่เกิน 34% ของความกว้าง QR
+//       ระดับ Q  พังที่ 34%
+//       ระดับ M  พังที่ 26%
+//     ของเราใช้ระดับ H + ตรากว้าง 22%  ->  เหลือระยะเผื่อ 12 จุด
+//
+//  ⚠️ ห้ามขยายตราให้ใหญ่กว่า LOGO_FRAC นี้ และห้ามลดระดับจาก 'H'
+//     ถ้าจะแก้ ต้องรันทดสอบถอดรหัสใหม่ก่อนเสมอ ไม่งั้นเสี่ยงสแกนไม่ติดหน้าร้าน
+// ═══════════════════════════════════════════════════════════════════════════
+const QR_DARK = '#0A4F7A';   // --bc-deep
+const QR_SIZE = 220;
+const QR_PAD  = 8;           // ขอบเงียบ (quiet zone)
+const LOGO_FRAC = 0.22;      // ความกว้างตรา เทียบความกว้าง QR (เพดานที่ทดสอบไว้ 0.34)
+
+function drawShopMark(canvas) {
+  try {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const W = canvas.width;                    // QRious ตั้ง width = size
+    // คิดสัดส่วนจาก "ความกว้างตัวโค้ด" ไม่ใช่ความกว้างผ้าใบ
+    // เพราะที่ทดสอบไว้วัดเทียบตัวโค้ด (ไม่รวมขอบเงียบ)
+    const qrW = Math.max(1, W - QR_PAD * 2);
+    const side = Math.round(qrW * LOGO_FRAC);
+    const x = Math.round((W - side) / 2);
+    const y = Math.round((W - side) / 2);
+    const r = Math.round(side * 0.26);
+
+    // กรอบขาวรองพื้น เว้นขอบขาวรอบตราให้กล้องแยกออกจากโมดูลได้ชัด
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + side, y, x + side, y + side, r);
+    ctx.arcTo(x + side, y + side, x, y + side, r);
+    ctx.arcTo(x, y + side, x, y, r);
+    ctx.arcTo(x, y, x + side, y, r);
+    ctx.closePath();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, side * 0.055);
+    ctx.strokeStyle = QR_DARK;
+    ctx.stroke();
+
+    // ตัวอักษร BC — ใช้ฟอนต์ระบบ ไม่พึ่ง Mitr ที่อาจโหลดไม่ทันตอนวาด
+    ctx.fillStyle = QR_DARK;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 ' + Math.round(side * 0.42) + 'px system-ui, -apple-system, Arial, sans-serif';
+    ctx.fillText('BC', x + side / 2, y + side / 2 + side * 0.02);
+    ctx.restore();
+  } catch (e) {
+    // วาดตราไม่ได้ก็ไม่เป็นไร QR ที่อ่านได้ยังอยู่ครบ
+    console.warn('drawShopMark:', e);
+  }
+}
+
 function generateQRCode(text, userInfo) {
   const canvas = document.getElementById("qrCanvas");
   const qr = new QRious({
     element: canvas,
     value: text,
-    size: 200
+    size: QR_SIZE,
+    level: 'H',              // ⚠️ ห้ามลดระดับ — ตรากลางต้องพึ่งการกู้คืนข้อผิดพลาด
+    foreground: QR_DARK,
+    background: '#FFFFFF',
+    padding: QR_PAD          // ขอบเงียบ ต้องมี ไม่งั้นกล้องจับขอบโค้ดไม่เจอ
   });
+  drawShopMark(canvas);
 
   // ชื่อเป็นบรรทัดเด่น คำอธิบายเป็นบรรทัดเล็กใต้ลงไป (อ่านง่ายกว่าต่อกันบรรทัดเดียว)
   document.getElementById('qrUserInfo').innerHTML =

@@ -307,30 +307,36 @@ class QRScanner {
       .finally(() => { this._loadingServices = false; });
   }
 
-  // วาดปุ่มบริการให้แตะเลือก · กรองตามคำที่พิมพ์ในช่องค้นหา
-  // แตะแล้วเติมชื่อบริการลงช่อง และถ้าบริการนั้นมีราคาตั้งไว้ จะเติมราคาให้
-  // เฉพาะเมื่อช่องราคายังว่าง (กันการเขียนทับตัวเลขที่แอดมินพิมพ์เอง)
-  renderServiceChips(filter) {
+  // วาดปุ่มบริการให้แตะเลือก
+  //
+  // กรองจาก this.svcFilter (คำที่แอดมินพิมพ์) ไม่ใช่จากค่าในช่อง
+  // เพราะถ้ากรองจากค่าในช่อง พอแตะเลือกไปแล้วรายการจะเหลือปุ่มเดียว
+  // แล้วเปลี่ยนใจเลือกบริการอื่นไม่ได้ ต้องลบข้อความในช่องเองก่อน
+  // (แอดมินแจ้งมา 13 ก.ย. 2569) จึงแยกคำค้นออกจากค่าที่เลือกไว้
+  //
+  // ตัวที่เลือกอยู่จะติดสี · แตะซ้ำที่ตัวเดิมเพื่อยกเลิกได้
+  renderServiceChips() {
     const box = document.getElementById('svcChips');
     if (!box) return;
-
-    const q = String(filter || '').trim().toLowerCase();
-    const list = (this.serviceList || []).filter(s =>
-      !q || String(s.name || '').toLowerCase().includes(q)
-    );
 
     if (!this.serviceList || !this.serviceList.length) {
       box.innerHTML = '<span class="svc-empty">กำลังโหลดรายการบริการ… พิมพ์ชื่อบริการเองได้เลย</span>';
       return;
     }
+
+    const nameEl = document.getElementById('serviceName');
+    const chosen = nameEl ? nameEl.value.trim() : '';
+    const q = String(this.svcFilter || '').trim().toLowerCase();
+    const list = this.serviceList.filter(s =>
+      !q || String(s.name || '').toLowerCase().includes(q)
+    );
+
     if (!list.length) {
       box.innerHTML = '<span class="svc-empty">ไม่พบบริการนี้ในรายการ — พิมพ์เองได้เลย</span>';
       return;
     }
 
-    // ตัวที่ตรงกับช่องพอดีจะติดสี ให้แอดมินเห็นว่าเลือกอันไหนอยู่
-    const chosen = String(filter || '').trim();
-    box.innerHTML = list.map(s => {
+    const chips = list.map(s => {
       const price = parseFloat(s.price) || 0;
       const on = String(s.name || '') === chosen ? ' is-on' : '';
       return `<button type="button" class="svc-chip${on}" data-name="${esc(s.name)}" data-price="${price}">`
@@ -338,11 +344,148 @@ class QRScanner {
         + (price > 0 ? `<span class="svc-price">${price}฿</span>` : '')
         + `</button>`;
     }).join('');
+
+    const hint = chosen
+      ? '<div class="svc-note">แตะปุ่มอื่นเพื่อเปลี่ยนบริการ · แตะปุ่มเดิมซ้ำเพื่อยกเลิก</div>'
+      : '';
+    box.innerHTML = chips + hint;
+  }
+
+  // ── การ์ดเลือกรถ ────────────────────────────────────────────────────────
+  // ของเดิมเป็น <select> บรรทัดเดียว อ่านไม่ครบและกดยากบนมือถือ
+  // การ์ดโชว์ รุ่น / ยี่ห้อ · ปี · ทะเบียน / แต้ม ครบในที่เดียว
+  renderVehiclePicks() {
+    const box = document.getElementById('vpickList');
+    const sel = document.getElementById('vehicleSelect');
+    if (!box || !sel) return;
+
+    const idx = Number(sel.value) || 0;
+    box.innerHTML = (this.foundUser.vehicles || []).map((v, i) => {
+      const plate = String(v.Plate || '').trim();
+      const moto = String(v.Category || '') === 'Motorcycle';
+      const sub = [esc(v.Brand || '-'), esc(v.Year || '-'),
+                   plate ? esc(plate) : '<i class="vp-nop">ยังไม่มีทะเบียน</i>'].join(' · ');
+      return `<button type="button" class="vpick" data-idx="${i}" aria-pressed="${i === idx}">
+        <span class="tick">✓</span>
+        <span class="vp-l">
+          <span class="vp-m">${esc(v.Model || '-')}${moto ? ' <span class="vp-moto">🛵</span>' : ''}</span>
+          <span class="vp-s">${sub}</span>
+        </span>
+        <span class="vp-p"><span class="vp-n">${parseInt(v.point || 0) || 0}</span><span class="vp-u">แต้ม</span></span>
+      </button>`;
+    }).join('');
+  }
+
+  // ── ช่องเติมทะเบียนของรถคันที่เลือกอยู่ ──────────────────────────────────
+  // โผล่เฉพาะรถที่ยังไม่มีทะเบียน · กรอกแล้วบันทึกได้จากในหน้านี้เลย
+  // ไม่เปิดป๊อปอัปซ้อน เพราะ SweetAlert เปิดได้ทีละอัน จะทำให้ฟอร์มที่กรอกไว้หาย
+  renderPlateBox() {
+    const box = document.getElementById('plateBox');
+    const sel = document.getElementById('vehicleSelect');
+    if (!box || !sel) return;
+
+    const i = Number(sel.value) || 0;
+    const v = (this.foundUser.vehicles || [])[i] || {};
+    const plate = String(v.Plate || '').trim();
+
+    if (plate) {
+      box.innerHTML = `<div class="plate-have">
+        ${typeof plateHtml === 'function' ? plateHtml(plate, v.Province, false) : esc(plate)}
+        <button type="button" class="plate-edit" id="plateEditBtn">แก้ทะเบียน</button>
+      </div>`;
+      return;
+    }
+
+    if (this.plateFormOpen) {
+      const provOpts = (typeof plateProvinceOptions === 'function')
+        ? plateProvinceOptions(v.Province || '') : '<option value="">—</option>';
+      box.innerHTML = `<div class="plate-form">
+        <div class="plate-form-hd">เพิ่มทะเบียนรถ <span>— ถามลูกค้าแล้วกรอกได้เลย</span></div>
+        <div class="pl-grid">
+          <div>
+            <input type="text" id="apHead" class="pl-in" placeholder="1กร" autocomplete="off" maxlength="7">
+            <div class="pl-eg">หมวด เช่น <b>1กร</b></div>
+          </div>
+          <div>
+            <input type="text" id="apTail" class="pl-in" placeholder="1723" inputmode="numeric" autocomplete="off" maxlength="4">
+            <div class="pl-eg">เลขท้าย เช่น <b>1723</b></div>
+          </div>
+        </div>
+        <select id="apProv" class="pl-in pl-prov">${provOpts}</select>
+        <div class="pl-preview" id="apPreview" hidden></div>
+        <div class="pl-warn" id="apWarn" hidden></div>
+        <div class="plate-acts">
+          <button type="button" class="plate-save" id="apSave">💾 บันทึกทะเบียน</button>
+          <button type="button" class="plate-skip" id="apSkip">ข้ามไปก่อน</button>
+        </div>
+      </div>`;
+    } else {
+      box.innerHTML = `<button type="button" class="plate-add" id="plateAddBtn">
+        ➕ รถคันนี้ยังไม่มีทะเบียน — เพิ่มเลย
+      </button>`;
+    }
+  }
+
+  // ส่งทะเบียนไปเก็บที่ชีต (action=set_plate ใน plate.gs)
+  async savePlate(btn) {
+    const sel = document.getElementById('vehicleSelect');
+    const i = Number(sel.value) || 0;
+    const v = (this.foundUser.vehicles || [])[i];
+    if (!v) return;
+
+    const head = document.getElementById('apHead');
+    const tail = document.getElementById('apTail');
+    const prov = document.getElementById('apProv');
+    const warn = document.getElementById('apWarn');
+
+    const check = (typeof plateValidate === 'function')
+      ? plateValidate(head.value, tail.value) : { ok: true, warn: '' };
+    const plate = (typeof platePretty === 'function')
+      ? platePretty(head.value, tail.value) : (head.value + ' ' + tail.value).trim();
+
+    if (!check.ok || !plate) {
+      warn.textContent = '⚠️ ' + (check.warn || 'กรอกทะเบียนให้ครบก่อนนะ');
+      warn.hidden = false;
+      return;
+    }
+
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = '⏳ กำลังบันทึก...';
+
+    try {
+      const res = await fetch(`${GAS_ENDPOINT}?action=set_plate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'set_plate',
+          userId: this.foundUser.UserID,
+          brand: v.Brand, model: v.Model, year: v.Year,
+          plate, province: prov ? prov.value : '',
+          admin: this.adminName
+        })
+      });
+      const out = await res.json();
+      if (out.status !== 'success') throw new Error(out.message || 'บันทึกไม่สำเร็จ');
+
+      // อัปเดตในหน่วยความจำด้วย เพื่อให้การ์ดกับบรรทัดสรุปเปลี่ยนทันที
+      v.Plate = out.plate || plate;
+      v.Province = out.province || (prov ? prov.value : '');
+      this.plateFormOpen = false;
+      this.renderVehiclePicks();
+      this.renderPlateBox();
+    } catch (err) {
+      warn.textContent = '⚠️ ' + err.message;
+      warn.hidden = false;
+      btn.disabled = false;
+      btn.textContent = label;
+    }
   }
 
   showCustomerPopup() {
     this.isRedeeming = false;
     this.currentPoint = 0;
+    this.plateFormOpen = false;
   
     const vehicleOptions = this.foundUser.vehicles.map((v, i) =>
       `<option value="${i}">${esc(v.Brand)} ${esc(v.Model)} (${esc(v.Year)}) - ${esc(v.point)} แต้ม</option>`
@@ -351,9 +494,21 @@ class QRScanner {
     Swal.fire({
       title: 'ข้อมูลลูกค้า',
       html: `
-        <p>ชื่อ: ${esc(this.foundUser.Name)}</p>
-        <p>เบอร์: ${esc(this.foundUser.Phone)}</p>
-        <p>รถ: <select id="vehicleSelect" class="swal2-input">${vehicleOptions}</select></p>
+        <div class="cust-head">
+          <div class="row"><span class="lbl">ลูกค้า</span><span class="val">${esc(this.foundUser.Name)}</span></div>
+          <div class="row"><span class="lbl">เบอร์</span><span class="val">${esc(this.foundUser.Phone)}</span></div>
+        </div>
+
+        <div class="fld">
+          <label class="fld-lbl">เลือกรถที่มาวันนี้${this.foundUser.vehicles.length > 1
+            ? ` <span class="fld-sub">— มี ${this.foundUser.vehicles.length} คันในระบบ</span>` : ''}</label>
+          <div class="vpick-list" id="vpickList"></div>
+          <!-- ⚠️ select ตัวนี้ถูกซ่อนไว้ ห้ามลบ
+               onServiceSave() กับ updateCurrentPoint() อ่านค่าจาก #vehicleSelect
+               การ์ดด้านบนเป็นแค่หน้าตา กดแล้วมาเขียนค่าลง select ตัวนี้ -->
+          <select id="vehicleSelect" hidden>${vehicleOptions}</select>
+          <div class="plate-box" id="plateBox"></div>
+        </div>
 
         <div class="fld">
           <label class="fld-lbl" for="serviceName">บริการ</label>
@@ -412,6 +567,71 @@ class QRScanner {
   
         vehicleSelect.addEventListener('change', updateCurrentPoint);
         priceInput.addEventListener('input', updatePointDisplay);
+
+        // ── การ์ดเลือกรถ + ช่องเติมทะเบียน ─────────────────────────────
+        const vpickList = document.getElementById('vpickList');
+        const plateBox = document.getElementById('plateBox');
+        this.renderVehiclePicks();
+        this.renderPlateBox();
+
+        vpickList.addEventListener('click', (ev) => {
+          const card = ev.target.closest('.vpick');
+          if (!card) return;
+          vehicleSelect.value = card.dataset.idx;
+          this.plateFormOpen = false;      // เปลี่ยนคันแล้วปิดฟอร์มทะเบียนที่ค้างไว้
+          this.renderVehiclePicks();
+          this.renderPlateBox();
+          updateCurrentPoint();            // อัปเดตแต้มของคันที่เลือกใหม่
+        });
+
+        // ปุ่มในกล่องทะเบียนถูกวาดใหม่เรื่อย ๆ จึงฟังที่กล่องแม่ตัวเดียว
+        plateBox.addEventListener('click', (ev) => {
+          const t = ev.target.closest('button');
+          if (!t) return;
+
+          if (t.id === 'plateAddBtn' || t.id === 'plateEditBtn') {
+            this.plateFormOpen = true;
+            this.renderPlateBox();
+            const h = document.getElementById('apHead');
+            if (h) h.focus();
+          } else if (t.id === 'apSkip') {
+            this.plateFormOpen = false;
+            this.renderPlateBox();
+          } else if (t.id === 'apSave') {
+            this.savePlate(t);
+          }
+        });
+
+        // ตัวอย่างป้ายที่อัปเดตตามที่พิมพ์ (ฟังที่กล่องแม่เหมือนกัน)
+        const paintPlatePreview = () => {
+          const head = document.getElementById('apHead');
+          const tail = document.getElementById('apTail');
+          const prov = document.getElementById('apProv');
+          const prev = document.getElementById('apPreview');
+          if (!head || !prev || typeof platePretty !== 'function') return;
+          const plate = platePretty(head.value, tail.value);
+          if (plate) {
+            prev.innerHTML = plateHtml(plate, prov ? prov.value : '', true);
+            prev.hidden = false;
+          } else {
+            prev.innerHTML = '';
+            prev.hidden = true;
+          }
+        };
+        plateBox.addEventListener('input', (ev) => {
+          if (ev.target.id === 'apTail') {
+            const c = ev.target.value.replace(/\D/g, '').slice(0, 4);
+            if (ev.target.value !== c) ev.target.value = c;
+          }
+          if (ev.target.id === 'apHead') {
+            const c = ev.target.value.replace(/\s+/g, '');
+            if (ev.target.value !== c) ev.target.value = c;
+          }
+          paintPlatePreview();
+        });
+        plateBox.addEventListener('change', (ev) => {
+          if (ev.target.id === 'apProv') paintPlatePreview();
+        });
   
         // แถบเลือกวิธีชำระ — เห็นทั้ง 2 ทางเลือกพร้อมกัน และรู้ว่าตอนนี้อยู่โหมดไหน
         // ของเดิมเป็นปุ่มเดียวที่กดสลับไปมา ซึ่งชวนสับสนว่ากดแล้วบันทึกเลยหรือเปล่า
@@ -429,21 +649,48 @@ class QRScanner {
         const serviceInput = document.getElementById('serviceName');
         const svcChips = document.getElementById('svcChips');
 
-        this.renderServiceChips('');
-        serviceInput.addEventListener('input', () => this.renderServiceChips(serviceInput.value));
+        this.svcFilter = '';
+        this.svcAutoPrice = null;   // ราคาที่ "ระบบเติมให้" ครั้งล่าสุด
+        this.renderServiceChips();
 
-        // ใช้ตัวฟังตัวเดียวที่กล่องแม่ เพราะปุ่มถูกวาดใหม่ทุกครั้งที่พิมพ์
+        // พิมพ์ = กรองรายการ (ค่าที่เลือกไว้คือค่าในช่องเสมอ)
+        serviceInput.addEventListener('input', () => {
+          this.svcFilter = serviceInput.value;
+          this.renderServiceChips();
+        });
+
+        // ใช้ตัวฟังตัวเดียวที่กล่องแม่ เพราะปุ่มถูกวาดใหม่ทุกครั้ง
         svcChips.addEventListener('click', (ev) => {
           const chip = ev.target.closest('.svc-chip');
           if (!chip) return;
-          serviceInput.value = chip.dataset.name || '';
 
-          // เติมราคาให้เฉพาะตอนช่องราคายังว่าง และไม่ใช่โหมดแลกแต้ม
-          const p = parseFloat(chip.dataset.price) || 0;
-          if (p > 0 && !this.isRedeeming && !priceInput.value) {
-            priceInput.value = p;
+          const name = chip.dataset.name || '';
+          const price = parseFloat(chip.dataset.price) || 0;
+          const isSame = serviceInput.value.trim() === name;
+
+          if (isSame) {
+            // แตะซ้ำที่ตัวเดิม = ยกเลิก กลับไปเลือกใหม่ได้
+            serviceInput.value = '';
+            // คืนช่องราคาให้ว่างเฉพาะกรณีที่เลขนั้นระบบเติมให้เอง
+            if (this.svcAutoPrice !== null && priceInput.value === String(this.svcAutoPrice)) {
+              priceInput.value = '';
+            }
+            this.svcAutoPrice = null;
+          } else {
+            serviceInput.value = name;
+            // เติมราคาให้เมื่อช่องยังว่าง หรือเลขเดิมเป็นเลขที่ระบบเติมให้
+            // (ถ้าแอดมินพิมพ์ราคาเองไว้ จะไม่เขียนทับเด็ดขาด)
+            const canFill = !priceInput.value ||
+              (this.svcAutoPrice !== null && priceInput.value === String(this.svcAutoPrice));
+            if (price > 0 && !this.isRedeeming && canFill) {
+              priceInput.value = price;
+              this.svcAutoPrice = price;
+            }
           }
-          this.renderServiceChips(serviceInput.value);
+
+          // ล้างคำค้นเสมอ เพื่อให้รายการเต็มยังอยู่ เปลี่ยนใจได้ทันที
+          this.svcFilter = '';
+          this.renderServiceChips();
           updatePointDisplay();
         });
 

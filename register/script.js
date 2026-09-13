@@ -362,6 +362,87 @@ function setupCarPicker(els) {
   setType(false);   // เริ่มที่รถยนต์
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  ช่องทะเบียนรถ (เพิ่ม 13 ก.ย. 2569) — ไม่บังคับกรอก
+//  ใช้ตัวช่วยจาก ../plate_data.js  (platePretty / plateValidate / plateHtml)
+//  ถ้าไฟล์นั้นโหลดไม่ขึ้น ทั้งบล็อกนี้จะเงียบไปเอง ฟอร์มสมัครยังใช้ได้ปกติ
+// ═══════════════════════════════════════════════════════════════════════════
+function setupPlateFields() {
+  try {
+    if (typeof plateProvinceOptions !== 'function') {
+      console.warn('plate_data.js ไม่ได้โหลด — ซ่อนช่องทะเบียนไว้');
+      const g = document.getElementById('plateGroup');
+      if (g) g.hidden = true;
+      return;
+    }
+
+    const head = document.getElementById('plateHead');
+    const tail = document.getElementById('plateTail');
+    const prov = document.getElementById('plateProvince');
+    const prev = document.getElementById('platePreview');
+    const warn = document.getElementById('plateWarn');
+    if (!head || !tail || !prov) return;
+
+    prov.innerHTML = plateProvinceOptions('');
+
+    // เลขท้ายรับแต่ตัวเลข · หมวดตัดช่องว่างออก
+    tail.addEventListener('input', () => {
+      const clean = tail.value.replace(/\D/g, '').slice(0, 4);
+      if (tail.value !== clean) tail.value = clean;
+      paint();
+    });
+    head.addEventListener('input', () => {
+      const clean = head.value.replace(/\s+/g, '');
+      if (head.value !== clean) head.value = clean;
+      paint();
+    });
+    prov.addEventListener('change', paint);
+
+    function paint() {
+      const plate = platePretty(head.value, tail.value);
+      const v = plateValidate(head.value, tail.value);
+
+      // แสดงตัวอย่างป้ายตามที่พิมพ์ (สีเทา = ยังไม่บันทึก)
+      if (plate) {
+        prev.innerHTML = plateHtml(plate, prov.value, true) +
+          '<div class="pl-eg">ตัวอย่างที่จะบันทึก</div>';
+        prev.hidden = false;
+      } else {
+        prev.innerHTML = '';
+        prev.hidden = true;
+      }
+
+      if (v.warn) { warn.textContent = (v.ok ? 'ℹ️ ' : '⚠️ ') + v.warn; warn.hidden = false; }
+      else { warn.textContent = ''; warn.hidden = true; }
+    }
+
+    // form.reset() ล้างช่องกรอกให้ แต่ไม่ล้างตัวอย่างป้ายกับข้อความเตือน
+    window.resetPlateFields = () => { head.value = ''; tail.value = ''; prov.value = ''; paint(); };
+
+    paint();
+  } catch (e) {
+    console.warn('setupPlateFields:', e);
+  }
+}
+
+// อ่านค่าทะเบียนที่กรอกไว้ ออกมาเป็นรูปแบบที่จะส่งไปเก็บ
+// คืน null ถ้ากรอกมาไม่ครบจนใช้ไม่ได้ (ผู้เรียกต้องหยุดแล้วเตือน)
+// คืน { plate:'', province:'' } ถ้าไม่ได้กรอกเลย (ปล่อยผ่านได้ ไม่บังคับ)
+function readPlateFields() {
+  const head = document.getElementById('plateHead');
+  const tail = document.getElementById('plateTail');
+  const prov = document.getElementById('plateProvince');
+  if (!head || !tail || typeof plateValidate !== 'function') return { plate: '', province: '' };
+
+  const v = plateValidate(head.value, tail.value);
+  if (!v.ok) return null;
+
+  return {
+    plate: platePretty(head.value, tail.value),
+    province: prov ? prov.value.trim() : ''
+  };
+}
+
 function validatePhone(phoneInput) {
     let phoneRaw = phoneInput.value.replace(/\D/g, '');
     if (/^0[689]/.test(phoneRaw)) {
@@ -420,6 +501,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // โค้ดส่งข้อมูลด้านล่างไม่ถูกแตะเลย ยังอ่านจาก 4 ช่องนี้เหมือนเดิม
     setupCarPicker({ brand, model, year, category });
 
+    // ── ช่องทะเบียนรถ (ไม่บังคับ) ───────────────────────────────────────
+    setupPlateFields();
+
 
         const form = document.getElementById('registrationForm');
     if (!form) {
@@ -472,15 +556,27 @@ form.addEventListener('submit', async event => {
         return;
     }
 
-    const payload = { 
-        userId, 
-        phone, 
-        name: name.trim(), 
-        brand: brand.trim(), 
-        model: model.trim(), 
-        year: year.trim(), 
-        category, 
+    // ทะเบียนรถ — ไม่บังคับ แต่ถ้ากรอกมาครึ่ง ๆ ให้หยุดก่อน
+    // readPlateFields() คืน null เมื่อกรอกมาแล้วใช้ไม่ได้จริง
+    const plateData = readPlateFields();
+    if (plateData === null) {
+        Swal.fire('ทะเบียนรถยังไม่ครบ', 'กรอกให้ครบทั้งหมวดและเลขท้าย หรือลบออกให้ว่างทั้งคู่ก็ได้ (ไม่บังคับ)', 'warning');
+        return;
+    }
+
+    const payload = {
+        userId,
+        phone,
+        name: name.trim(),
+        brand: brand.trim(),
+        model: model.trim(),
+        year: year.trim(),
+        category,
         channel,
+        // เพิ่ม 13 ก.ย. 2569 — Apps Script รุ่นเก่าที่ยังไม่รู้จัก 2 ช่องนี้จะเมินไปเอง
+        // จึง push หน้าเว็บก่อน deploy GAS ได้ ไม่พัง
+        plate: plateData.plate,
+        province: plateData.province,
         "name-line": profile.displayName,
         statusMessage: profile.statusMessage || "",
         pictureUrl: profile.pictureUrl || ""
@@ -492,7 +588,10 @@ form.addEventListener('submit', async event => {
             เบอร์โทร: ${escHtml(payload.phone)}<br>
             ยี่ห้อ: ${escHtml(payload.brand)}<br>
             รุ่น: ${escHtml(payload.model)}<br>
-            ปี: ${escHtml(payload.year)}`,
+            ปี: ${escHtml(payload.year)}<br>
+            ทะเบียน: ${payload.plate
+              ? escHtml(payload.plate) + (payload.province ? ' ' + escHtml(payload.province) : '')
+              : '<i>ยังไม่กรอก</i>'}`,
         icon: 'info',
         showCancelButton: true,
         confirmButtonText: 'ยืนยันส่งข้อมูล',
@@ -595,6 +694,7 @@ form.addEventListener('submit', async event => {
     finally {
             form.reset();
             if (typeof window.resetCarPicker === 'function') window.resetCarPicker();
+            if (typeof window.resetPlateFields === 'function') window.resetPlateFields();
             // ป้องกันกรณี userId หายระหว่าง session
             if (userId) {
                 const userIdInput = document.getElementById('userId');

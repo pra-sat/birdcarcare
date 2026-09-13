@@ -44,6 +44,27 @@
 
             <div id="carPicker" class="car-picker"></div>
 
+            <!-- ── ทะเบียนรถ (ไม่บังคับ) ────────────────────────────────
+                 เก็บลงคอลัมน์ R/S ของ Customer_Master ผ่าน plate.gs
+                 ถ้าเว้นว่าง ระบบก็สมัครให้ปกติ แอดมินเติมให้ทีหลังได้    -->
+            <div class="form-group" id="plateGroup">
+              <label>ทะเบียนรถ <span class="pl-opt">— ไม่บังคับ กรอกทีหลังได้</span></label>
+              <div class="pl-grid">
+                <div>
+                  <input type="text" id="plateHead" class="pl-in" placeholder="1กร" autocomplete="off" maxlength="7">
+                  <div class="pl-eg">หมวด เช่น <b>1กร</b> · <b>ขค</b></div>
+                </div>
+                <div>
+                  <input type="text" id="plateTail" class="pl-in" placeholder="1723" inputmode="numeric" autocomplete="off" maxlength="4">
+                  <div class="pl-eg">เลขท้าย เช่น <b>1723</b></div>
+                </div>
+              </div>
+              <select id="plateProvince" class="pl-in pl-prov"></select>
+              <div class="pl-eg">จังหวัดดูจากตัวหนังสือแถวล่างของป้าย</div>
+              <div class="pl-preview" id="platePreview" hidden></div>
+              <div class="pl-warn" id="plateWarn" hidden></div>
+            </div>
+
             <input type="hidden" id="brand" name="brand">
             <input type="hidden" id="model" name="model">
             <input type="hidden" id="year"  name="year">
@@ -55,6 +76,7 @@
         </form>
     </div>
     <script src="all_car_model.js" onerror="alert('ไม่สามารถโหลดข้อมูลยี่ห้อรถได้ กรุณาลองใหม่หรือติดต่อ Admin')"></script>
+    <script src="../plate_data.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

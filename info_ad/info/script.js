@@ -57,6 +57,89 @@ function setupStarPicker() {
   } catch (e) { console.warn('setupStarPicker:', e); }
 }
 
+// ── ปุ่มเปิด/ปิดฟอร์มข้อเสนอแนะ และปุ่มส่ง ─────────────────────────────────
+// ต้องผูกให้ได้ทันทีที่หน้าโผล่ ห้ามรอ fetch ไป Apps Script
+// ctx = { userId, name, statusMessage, pictureUrl } จาก liff.getProfile()
+function setupFeedback(ctx) {
+  const panel = document.getElementById('feedbackPanel');
+  const openBtn = document.getElementById('openFeedbackBtn');
+  const closeBtn = document.getElementById('closeLiffBtn');
+  const btn = document.getElementById('submitFeedbackBtn');
+  const scoreInput = document.getElementById('scoreInput');
+  const feedbackInput = document.getElementById('feedbackInput');
+  if (!panel || !openBtn || !btn) {
+    console.error('setupFeedback: หา element ไม่เจอ');
+    return;
+  }
+
+  // กดปุ่มเดิมซ้ำเพื่อปิดฟอร์มได้ด้วย
+  openBtn.addEventListener('click', () => {
+    const willOpen = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !willOpen);
+    openBtn.textContent = willOpen ? '✕ ปิดฟอร์มข้อเสนอแนะ' : '✍️ ส่งข้อเสนอแนะ';
+    if (willOpen) {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (feedbackInput) setTimeout(() => feedbackInput.focus(), 320);
+    }
+  });
+
+  if (closeBtn) closeBtn.addEventListener('click', () => liff.closeWindow());
+
+  btn.addEventListener('click', async () => {
+    const score = scoreInput ? scoreInput.value.trim() : '';
+    const feedback = feedbackInput ? feedbackInput.value.trim() : '';
+
+    // เช็คก่อนปิดปุ่ม ไม่งั้นถ้าข้อมูลไม่ครบปุ่มจะค้างเป็น "กำลังส่ง"
+    if (!feedback) {
+      Swal.fire({ icon: 'warning', title: 'กรุณาพิมพ์ข้อเสนอแนะ' });
+      if (feedbackInput) feedbackInput.focus();
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ กำลังส่ง...';
+
+    const payload = {
+      action: 'feedback_none',
+      userId: ctx.userId,
+      name: ctx.name,
+      statusMessage: ctx.statusMessage,
+      pictureUrl: ctx.pictureUrl,
+      phone: "'0",
+      score,
+      feedback
+    };
+
+    try {
+      const res = await fetch(`${SHEET_API}?action=feedback_none`, {
+        redirect: 'follow',
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await res.json();
+      if (['success', 'feedback_saved', 'entry_updated'].includes(result.status)) {
+        Swal.fire({
+          icon: 'success',
+          title: '✅ ขอบคุณสำหรับข้อเสนอแนะ',
+          confirmButtonText: 'ปิดหน้าต่าง'
+        }).then(() => {
+          if (scoreInput) scoreInput.value = '';
+          if (feedbackInput) feedbackInput.value = '';
+          liff.closeWindow();
+        });
+      } else {
+        throw new Error(result.message || 'ไม่สามารถส่งข้อมูลได้');
+      }
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: '❌ เกิดข้อผิดพลาด', text: err.message });
+      btn.disabled = false;
+      btn.textContent = '✅ ส่งข้อเสนอแนะ';
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   
   const loading = document.getElementById('loadingOverlay');
@@ -78,119 +161,75 @@ document.addEventListener('DOMContentLoaded', async () => {
     loading.classList.add('hidden');
     document.getElementById('loadingOverlay').classList.add('hidden');
 
-    // ── ปุ่มแผนที่ ───────────────────────────────────────────────────────
-    // ผูกตรงนี้ (ก่อน fetch ตรวจแอดมิน) เพื่อให้ปุ่มใช้ได้ทันทีที่หน้าโผล่
-    // ไม่ต้องรอเซิร์ฟเวอร์ตอบ · iframe ยังไม่มี src จนกดปุ่มครั้งแรก
+    // ── ผูกปุ่มทั้งหมดตรงนี้ ก่อนยิง fetch ไป Apps Script ─────────────────
+    // 🔴 บั๊กที่แก้ 13 ก.ย. 2569:
+    //    ของเดิมผูกตัวฟังปุ่ม "ส่งข้อเสนอแนะ" ไว้ข้างล่าง หลัง await fetch 2 ครั้ง
+    //    (feedback_none แล้ว check_admin · timeout 10 วินาทีต่อครั้ง)
+    //    ระหว่างนั้นหน้าเว็บโผล่แล้วแต่ปุ่มยังไม่มีตัวฟัง กดไปก็ไม่มีอะไรเกิดขึ้น
+    //    ข้อมูลที่ตัวฟังต้องใช้มีแค่ profile ซึ่งได้มาแล้วตรงนี้ จึงย้ายขึ้นมาผูกก่อน
     setupMapToggle();
     setupStarPicker();
+    setupFeedback({ userId, name, statusMessage, pictureUrl });
 
 
-    // ✅ ส่งข้อมูล LINE ก่อน
-    
-    const controller1 = new AbortController();
-    const timeoutId1 = setTimeout(() => controller1.abort(), 10000); // timeout 10 วินาที
-    
-    const sendLineRes = await fetch(`${SHEET_API}?action=feedback_none`, {
-      redirect: "follow",
-      method: 'POST',
-      signal: controller1.signal,
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        userId, name, statusMessage, pictureUrl,
-        phone: "'0", score: "", feedback: ""
-      })
-    });
-    clearTimeout(timeoutId1);
-    await sendLineRes.json();
-    console.log("✅ ส่งข้อมูล LINE:", sendLineRes);
-
-    // ✅ ตรวจสอบว่าเป็นแอดมินหรือไม่
-        
-    const controller2 = new AbortController();
-    const timeoutId2 = setTimeout(() => controller2.abort(), 10000); // timeout 10 วินาที
-    
-    const checkRes = await fetch(`${SHEET_API}?action=check_admin`, {
-      redirect: "follow",
-      method: 'POST',
-      signal: controller2.signal,
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ userId, name, statusMessage, pictureUrl })
-    });
-    
-    clearTimeout(timeoutId2);    
-    const checkResult = await checkRes.json();
-
-    console.log("✅ ตรวจสอบว่าเป็นแอดมินหรือไม่:", checkResult);
-      
-    if (checkResult.isAdmin) {
-      window.location.href = '../main_admin/index.html';
-    } else {
-    
-      const scoreInput = document.getElementById('scoreInput');
-      const feedbackInput = document.getElementById('feedbackInput');
-      const btn = document.getElementById('submitFeedbackBtn');
-
-      document.getElementById('openFeedbackBtn').addEventListener('click', () => {
-        document.getElementById('feedbackPanel').classList.remove('hidden');
-      });
-
-      document.getElementById('closeLiffBtn').addEventListener('click', () => {
-        liff.closeWindow();
-      });
-
-      document.getElementById('submitFeedbackBtn').addEventListener('click', async () => {
-        btn.disabled = true;
-        btn.textContent = "⏳ กำลังส่ง...";
-
-        const score = scoreInput.value.trim();
-        const feedback = feedbackInput.value.trim();
-        const phone = "'0";
-
-        if (!feedback) {
-          Swal.fire({ icon: 'warning', title: 'กรุณาพิมพ์ข้อเสนอแนะ' });
-          btn.disabled = false;
-          btn.textContent = "✅ ส่งข้อเสนอแนะ";
-          return;
-        }
-
-        const payload = {
-          action: "feedback_none",
+    // ── บันทึกว่ามีคนเข้ามาดู (ไม่ใช่เรื่องคอขาดบาดตาย) ──────────────────
+    // 🔴 แก้ 13 ก.ย. 2569: ของเดิมถ้า fetch นี้ timeout จะตกไปเข้า catch ก้อนนอก
+    //    แล้วสั่ง liff.closeWindow() — หน้าเว็บของลูกค้าปิดตัวเองไปเลยทั้งที่
+    //    ยังไม่ได้ทำอะไร ทั้งที่การบันทึกยอดเข้าดูไม่เกี่ยวกับการส่งข้อเสนอแนะ
+    //    จึงดักไว้ในนี้เอง ล้มเหลวก็แค่เขียน log ไม่รบกวนลูกค้า
+    try {
+      const c1 = new AbortController();
+      const t1 = setTimeout(() => c1.abort(), 10000);
+      const res1 = await fetch(`${SHEET_API}?action=feedback_none`, {
+        redirect: "follow",
+        method: 'POST',
+        signal: c1.signal,
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
           userId, name, statusMessage, pictureUrl,
-          phone, score, feedback
-        };
-
-        try {
-          const res = await fetch(`${SHEET_API}?action=feedback_none`, {
-            redirect: "follow",
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify(payload)
-          });
-
-          const result = await res.json();
-          if (["success", "feedback_saved", "entry_updated"].includes(result.status)) {
-            Swal.fire({
-              icon: 'success',
-              title: '✅ ขอบคุณสำหรับข้อเสนอแนะ',
-              confirmButtonText: 'ปิดหน้าต่าง',
-            }).then(() => {
-              scoreInput.value = "";
-              feedbackInput.value = "";
-              liff.closeWindow();
-            });
-          } else {
-            throw new Error(result.message || "ไม่สามารถส่งข้อมูลได้");
-          }
-        } catch (err) {
-          Swal.fire({ icon: 'error', title: '❌ เกิดข้อผิดพลาด', text: err.message });
-          btn.disabled = false;
-          btn.textContent = "✅ ส่งข้อเสนอแนะ";
-        }
+          phone: "'0", score: "", feedback: ""
+        })
       });
+      clearTimeout(t1);
+      await res1.json();
+      console.log("✅ ส่งข้อมูล LINE แล้ว");
+    } catch (e) {
+      console.warn("⚠️ บันทึกข้อมูล LINE ไม่สำเร็จ (ข้ามไป):", e.message);
     }
+
+    // ── ตรวจว่าเป็นแอดมินไหม ถ้าใช่ให้เด้งไปหน้าแอดมิน ──────────────────
+    // ล้มเหลวก็ปล่อยให้เห็นหน้าลูกค้าไปก่อน ดีกว่าปิดหน้าต่างทิ้ง
+    // (ตัวฟังปุ่มข้อเสนอแนะผูกไว้ข้างบนแล้ว ไม่ได้อยู่ในนี้)
+    try {
+      const c2 = new AbortController();
+      const t2 = setTimeout(() => c2.abort(), 10000);
+      const res2 = await fetch(`${SHEET_API}?action=check_admin`, {
+        redirect: "follow",
+        method: 'POST',
+        signal: c2.signal,
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ userId, name, statusMessage, pictureUrl })
+      });
+      clearTimeout(t2);
+      const checkResult = await res2.json();
+      console.log("✅ ตรวจสอบแอดมิน:", checkResult);
+      if (checkResult.isAdmin) {
+        window.location.href = '../main_admin/index.html';
+      }
+    } catch (e) {
+      console.warn("⚠️ ตรวจสอบแอดมินไม่สำเร็จ (แสดงหน้าลูกค้าต่อ):", e.message);
+    }
+
   } catch (err) {
+    // เหลือแต่ความผิดพลาดของ LIFF เองเท่านั้น (init / getProfile)
+    // กรณีนั้นทำอะไรต่อไม่ได้จริง ๆ จึงปิดหน้าต่าง
     console.error('❌ LIFF Init Error:', err);
-    await liff.closeWindow();
+    Swal.fire({
+      icon: 'error',
+      title: '❗️เปิดหน้านี้ไม่สำเร็จ',
+      text: 'กรุณาลองใหม่อีกครั้ง หรือแจ้ง Admin',
+      confirmButtonText: 'ปิด'
+    }).then(() => liff.closeWindow());
   } finally {
     loading.classList.add('hidden');
   }

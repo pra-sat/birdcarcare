@@ -262,6 +262,140 @@ h1, h2, h3, h2.title { font-family: var(--bc-disp) !important; font-weight: 500 
 /* .swal2-input ของ SweetAlert มี margin ซ้ายขวาเอง ในกรอบ .fld ไม่ต้องการ */
 .swal2-popup .fld .swal2-input { width: 100%; margin: 0 !important; box-sizing: border-box; }
 .swal2-popup .fld .pay-seg { margin: 0; }
+.swal2-popup .fld-sub { font-weight: 400; color: #9BB0BA; }
+
+/* หัวข้อมูลลูกค้าในป๊อปอัป */
+.swal2-popup .cust-head {
+  text-align: left;
+  background: linear-gradient(160deg, #F7FBFE, #EDF6FC);
+  border: 1px solid #CFE6F4;
+  border-radius: 13px;
+  padding: 11px 13px;
+}
+.swal2-popup .cust-head .row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+}
+.swal2-popup .cust-head .row + .row { margin-top: 4px; }
+.swal2-popup .cust-head .lbl { font-size: 12.5px; color: var(--bc-ink2); }
+.swal2-popup .cust-head .val { font-size: 14.5px; font-weight: 600; text-align: right; }
+
+/* ── การ์ดเลือกรถของลูกค้า (แทน dropdown เดิม) ─────────────────────────
+   ⚠️ .vpick เป็น <button> จึงต้องเขียน .vpick-list button.vpick (0,2,1)
+      ให้ชนะกฎปุ่มสีฟ้า button:not(.swal2-close):not(.swal2-cancel) */
+.vpick-list { display: block; }
+.vpick-list button.vpick {
+  display: flex; align-items: center; gap: 11px;
+  width: 100% !important; text-align: left;
+  background: var(--bc-foam) !important;
+  background-color: var(--bc-foam) !important;
+  color: var(--bc-ink) !important;
+  border: 1.5px solid var(--bc-line) !important;
+  border-radius: 14px !important;
+  padding: 11px 12px !important;
+  margin: 0 0 8px !important;
+  box-shadow: none !important;
+  font-family: var(--bc-body) !important;
+  font-weight: 400;
+  cursor: pointer;
+}
+.vpick-list button.vpick[aria-pressed="true"] {
+  border-color: var(--bc-water) !important;
+  background-color: #F4FAFE !important;
+  box-shadow: 0 0 0 3px rgba(11, 127, 199, .13) !important;
+}
+.vpick-list button.vpick:active { transform: scale(.985); }
+.vpick .tick {
+  width: 22px; height: 22px; flex: 0 0 auto;
+  border-radius: 50%; border: 2px solid #D2E2EA;
+  display: grid; place-items: center;
+  font-size: 12px; color: transparent;
+}
+.vpick[aria-pressed="true"] .tick {
+  background: var(--bc-water); border-color: var(--bc-water); color: #fff;
+}
+.vpick .vp-l { flex: 1; min-width: 0; }
+.vpick .vp-m {
+  display: block;
+  font-family: var(--bc-disp); font-weight: 500; font-size: 15.5px; line-height: 1.25;
+  color: var(--bc-deep);
+}
+.vpick .vp-moto { font-size: 13px; }
+.vpick .vp-s { display: block; font-size: 12px; color: var(--bc-ink2); margin-top: 2px; }
+.vpick .vp-nop { color: #C08A2E; font-style: normal; }
+.vpick .vp-p { text-align: right; flex: 0 0 auto; }
+.vpick .vp-n {
+  display: block;
+  font-family: var(--bc-disp); font-weight: 500; font-size: 1.15rem; line-height: 1.1;
+  color: var(--bc-waterD); font-variant-numeric: tabular-nums;
+}
+.vpick .vp-u { display: block; font-size: 10.5px; color: var(--bc-ink2); }
+
+/* ── กล่องทะเบียนของรถคันที่เลือก ────────────────────────────────────── */
+.plate-box { margin-top: 9px; text-align: left; }
+.plate-box .plate-have { display: flex; align-items: center; gap: 10px; }
+.plate-box button.plate-add {
+  width: 100% !important; text-align: left;
+  padding: 10px 12px !important;
+  font-family: var(--bc-body) !important;
+  font-size: 13px; font-weight: 600;
+  background: #FFF6E6 !important;
+  background-color: #FFF6E6 !important;
+  color: #96601A !important;
+  border: 1px dashed #F0DBB0 !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.plate-box button.plate-edit {
+  width: auto !important;
+  padding: 6px 10px !important;
+  font-family: var(--bc-body) !important;
+  font-size: 12px; font-weight: 600;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--bc-waterD) !important;
+  border: 1px solid #BFDDF0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.plate-form {
+  background: #F6FBFE;
+  border: 1px solid #CFE6F4;
+  border-radius: 14px;
+  padding: 12px;
+}
+.plate-form-hd {
+  font-size: 13px; font-weight: 600; color: var(--bc-deep); margin-bottom: 9px;
+}
+.plate-form-hd span { font-weight: 400; font-size: 11.5px; color: var(--bc-ink2); }
+.plate-acts { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; margin-top: 11px; }
+.plate-acts button.plate-save {
+  width: 100% !important;
+  padding: 11px 6px !important;
+  font-family: var(--bc-body) !important;
+  font-size: 14px; font-weight: 600;
+  background: var(--bc-water) !important;
+  background-color: var(--bc-water) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 11px !important;
+  box-shadow: 0 2px 0 var(--bc-waterD) !important;
+  cursor: pointer;
+}
+.plate-acts button.plate-skip {
+  width: 100% !important;
+  padding: 11px 6px !important;
+  font-family: var(--bc-body) !important;
+  font-size: 14px; font-weight: 600;
+  background: var(--bc-foam) !important;
+  background-color: var(--bc-foam) !important;
+  color: var(--bc-ink2) !important;
+  border: 1.5px solid #BFDDF0 !important;
+  border-radius: 11px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
 
 .svc-chips {
   display: flex; flex-wrap: wrap; gap: 6px;
@@ -294,6 +428,8 @@ h1, h2, h3, h2.title { font-family: var(--bc-disp) !important; font-weight: 500 
 .svc-chips .svc-price { font-size: 11.5px; opacity: .75; font-variant-numeric: tabular-nums; }
 .svc-chips button.svc-chip.is-on .svc-price { opacity: .9; }
 .svc-chips .svc-empty { font-size: 12.5px; color: var(--bc-ink2); padding: 3px 2px; }
+/* บรรทัดบอกวิธีเปลี่ยน/ยกเลิกบริการ — ต้องกินเต็มแถวใต้ชิป ไม่ใช่ไปต่อท้ายชิป */
+.svc-chips .svc-note { flex: 0 0 100%; font-size: 11px; color: #9BB0BA; margin-top: 2px; }
 
 /* ── แถบเลือกวิธีชำระ (หน้าบันทึกบริการของแอดมิน) ────────────────────
    ⚠️ ตัวเลือกต้องชนะกฎ button:not(.swal2-close):not(.swal2-cancel) ด้านบน
@@ -375,6 +511,62 @@ tbody tr:hover { background-color: #F6FBFE !important; }
 .loading-overlay { background: rgba(232, 244, 251, .88) !important; }
 .loading-box { color: var(--bc-deep) !important; }
 .spinner { border: 5px solid #C9E2F1 !important; border-top: 5px solid var(--bc-water) !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ป้ายทะเบียนไทย — ใช้ร่วมกันหน้าสมาชิก / หน้าสมัคร / หน้าแอดมิน
+   เลขอยู่บรรทัดบน จังหวัดอยู่บรรทัดล่างเต็มความกว้าง เหมือนป้ายจริง
+   ⚠️ .num กับ .prov ต้องเป็น display:block
+      ของเดิมเป็น <span> ถ้าไม่สั่ง block มันจะไหลไปอยู่บรรทัดเดียวกัน
+      (เคยพลาดมาแล้ว — ผู้ใช้แจ้งว่า "ทะเบียนยังบรรทัดเดียวอยู่นะ")
+   ═══════════════════════════════════════════════════════════════════════ */
+.plate {
+  display: inline-block;
+  flex: 0 0 auto;
+  text-align: center;
+  background: #fff;
+  border: 2px solid #1B2B33;
+  border-radius: 7px;
+  padding: 4px 8px 3px;
+  box-shadow: 0 2px 5px rgba(10, 79, 122, .14);
+  max-width: 100%;
+}
+.plate .num {
+  display: block;
+  font-family: var(--bc-disp); font-weight: 500; font-size: 17px; line-height: 1.1;
+  color: #1B2B33; letter-spacing: .4px; white-space: nowrap;
+}
+.plate .prov {
+  display: block;
+  font-family: var(--bc-body); font-size: 10px; font-weight: 500; line-height: 1.25;
+  color: #1B2B33; white-space: nowrap;
+}
+/* ตัวอย่างที่ยังไม่บันทึก — เทาไว้ให้รู้ว่ายังไม่ใช่ของจริง */
+.plate.is-dim { border-color: #9FB4BE; box-shadow: none; }
+.plate.is-dim .num, .plate.is-dim .prov { color: #9FB4BE; }
+
+/* ── ช่องกรอกทะเบียน (ใช้ทั้งหน้าสมัครและหน้าแอดมิน) ─────────────────── */
+.pl-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 9px; }
+input.pl-in, select.pl-in {
+  width: 100%; box-sizing: border-box;
+  padding: 10px 12px;
+  font-family: var(--bc-body) !important;
+  font-size: 15px;
+  background: #FBFDFE !important;
+  color: var(--bc-ink) !important;
+  border: 1.5px solid var(--bc-line) !important;
+  border-radius: 11px !important;
+}
+select.pl-prov { margin-top: 9px; }
+.pl-eg { font-size: 11px; color: #9BB0BA; line-height: 1.5; margin-top: 4px; }
+.pl-eg b { color: #7B96A3; font-weight: 600; }
+.pl-opt { font-weight: 400; font-size: 11.5px; color: #9BB0BA; }
+.pl-warn { font-size: 11.5px; color: #B5760E; line-height: 1.55; margin-top: 7px; }
+.pl-preview {
+  display: grid; place-items: center;
+  padding: 12px; margin-top: 11px;
+  background: #F6FBFE; border: 1px dashed #CFE6F4; border-radius: 14px;
+}
+.pl-preview .pl-eg { margin-top: 7px; }
 
 /* ═══════════════════════════════════════════════════════════════════════
    หน้าสมัครสมาชิก — ตัวช่วยเลือกรถทีละขั้น (คลาสขึ้นต้น pk- / veh-)
