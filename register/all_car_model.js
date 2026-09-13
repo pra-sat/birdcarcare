@@ -784,7 +784,25 @@ const carData = {
   "Benelli": { th: ["เบเนลลี่", "benelli"], moto: true, models: { "TNT": { th: ["ทีเอ็นที"], category: "Motorcycle" }, "Leoncino": { th: ["ลีออนชิโน่"], category: "Motorcycle" } } },
   "KTM": { th: ["เคทีเอ็ม", "ktm"], moto: true, models: { "Duke": { th: ["ดุ๊ก", "duke"], category: "Motorcycle" }, "RC": { th: ["อาร์ซี"], category: "Motorcycle" } } },
   "Zeeho": { th: ["ซีโฮ่", "zeeho"], moto: true, models: { "AE8": { th: ["เออี8"], category: "Motorcycle", ev: true }, "AE6": { th: ["เออี6"], category: "Motorcycle", ev: true } } },
-  "Deco": { th: ["เดโค", "deco"], moto: true, models: { "Espresso": { th: ["เอสเพรสโซ่"], category: "Motorcycle", ev: true } } }
+  "Deco": { th: ["เดโค", "deco"], moto: true, models: { "Espresso": { th: ["เอสเพรสโซ่"], category: "Motorcycle", ev: true } } },
+
+  // ─────────────────────────────────────────────────────────────────────
+  // ยี่ห้อหายาก — ยกมาจากไฟล์เดิมเพื่อไม่ให้ลูกค้าที่ขับรถพวกนี้ลงทะเบียนไม่ได้
+  // ─────────────────────────────────────────────────────────────────────
+  "Jeep": { th: ["จี๊ป", "jeep"], models: { "Wrangler": { th: ["แรงเลอร์", "wrangler"], category: "SUV" }, "Grand Cherokee": { th: ["เชโรกี", "cherokee"], category: "SUV" }, "Compass": { th: ["คอมพาส"], category: "SUV" } } },
+  "Chrysler": { th: ["ไครสเลอร์", "chrysler"], models: { "300C": { th: ["300c"], category: "Sedan" }, "Voyager": { th: ["วอยเอเจอร์"], category: "MPV" } } },
+  "Proton": { th: ["โปรตอน", "proton"], models: { "Saga": { th: ["ซาก้า"], category: "Sedan" }, "Exora": { th: ["เอ็กซ์โซร่า"], category: "MPV" } } },
+  "Tata": { th: ["ทาทา", "tata"], models: { "Xenon": { th: ["ซีนอน", "xenon"], category: "Pickup" }, "Super Ace": { th: ["ซุปเปอร์เอซ"], category: "Truck" } } },
+  "Mitsuoka": { th: ["มิตซึโอกะ", "mitsuoka"], models: { "Buddy": { th: ["บั๊ดดี้"], category: "SUV" }, "Viewt": { th: ["วิวท์"], category: "Sedan" } } },
+  "Aston Martin": { th: ["แอสตันมาร์ติน", "aston martin"], models: { "DB11": { th: ["ดีบี11"], category: "Coupe" }, "DBX": { th: ["ดีบีเอ็กซ์"], category: "SUV" }, "Vantage": { th: ["แวนเทจ"], category: "Coupe" } } },
+  "McLaren": { th: ["แมคลาเรน", "mclaren"], models: { "720S": { th: ["720s"], category: "Coupe" }, "Artura": { th: ["อาร์ทูร่า"], category: "Coupe" }, "GT": { th: ["จีที"], category: "Coupe" } } },
+
+  "Aprilia": { th: ["อาพริเลีย", "aprilia"], moto: true, models: { "RS 660": { th: ["อาร์เอส660"], category: "Motorcycle" }, "SR GT": { th: ["เอสอาร์จีที"], category: "Motorcycle" } } },
+  "Husqvarna": { th: ["ฮุสควาน่า", "husqvarna"], moto: true, models: { "Svartpilen": { th: ["สวาร์ทพิลเลน"], category: "Motorcycle" }, "Vitpilen": { th: ["วิทพิลเลน"], category: "Motorcycle" } } },
+  "Indian": { th: ["อินเดียน", "indian"], moto: true, models: { "Scout": { th: ["สเกาท์"], category: "Motorcycle" }, "Chief": { th: ["ชีฟ"], category: "Motorcycle" } } },
+  "Keeway": { th: ["คีย์เวย์", "keeway"], moto: true, models: { "K-Light": { th: ["เคไลท์"], category: "Motorcycle" }, "V302C": { th: ["วี302"], category: "Motorcycle" } } },
+  "Moto Guzzi": { th: ["โมโต กุซซี่", "moto guzzi"], moto: true, models: { "V7": { th: ["วี7"], category: "Motorcycle" }, "V85 TT": { th: ["วี85"], category: "Motorcycle" } } },
+  "Stallions": { th: ["สตอลเลี่ยน", "stallions"], moto: true, models: { "Centaur": { th: ["เซนทอร์"], category: "Motorcycle" }, "Rapid": { th: ["ราปิด"], category: "Motorcycle" } } }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
