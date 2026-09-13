@@ -971,12 +971,15 @@ class AdminManager {
       };
     }
 
-    // ปุ่มตรวจความปลอดภัย — เห็นเฉพาะแอดมิน ใช้ก่อนเปิดโหมดบังคับใน security.gs
+    // ปุ่มตรวจความปลอดภัย — เห็นเฉพาะแอดมิน ใช้ตอนมีปัญหาหรืออยากตรวจเอง
     const secBtn = document.getElementById('secTestBtn');
     if (secBtn) {
       secBtn.classList.remove('hidden');
       secBtn.addEventListener('click', () => this.runSecuritySelfTest(secBtn));
     }
+
+    // ตรวจเซสชันเงียบ ๆ เบื้องหลัง — ไม่ await เพื่อไม่ให้หน้าเปิดช้าลงแม้แต่นิดเดียว
+    this.verifySessionQuietly();
     if (level >= 3) document.querySelector('[data-menu="stats"]')?.classList.remove("hidden");
     if (level >= 5) document.querySelector('[data-menu="settings"]')?.classList.remove("hidden");
   }
@@ -1001,6 +1004,64 @@ class AdminManager {
       console.log("📘 บันทึก Admin Log:", result);
     } catch (err) {
       console.warn("❌ บันทึก Log ไม่สำเร็จ:", err);
+    }
+  }
+
+  // ── ตรวจเซสชันเงียบ ๆ ตอนเปิดหน้า ────────────────────────────────────────
+  //
+  // ทำไมไม่ทำเป็นหน้าบังคับให้กดปุ่มก่อนเข้า:
+  //   ตอนนี้เปิดโหมดบังคับ ID token ไปแล้ว ทุกครั้งที่บันทึกงานระบบตรวจอยู่แล้ว
+  //   การบังคับกดก่อนเข้าจึงไม่ได้เพิ่มความปลอดภัยเลย แต่ทำให้เข้าหน้าช้าลง
+  //   และยิงไปถาม LINE เพิ่มทุกครั้งที่เปิดหน้า
+  //
+  // สิ่งที่มีประโยชน์จริงคือ "รู้ก่อนที่ลูกค้าจะมายืนรอ"
+  //   จึงตรวจเบื้องหลังแบบไม่ await -> หน้าเปิดเร็วเท่าเดิมเป๊ะ ไม่รอผลอะไรเลย
+  //   ผ่านแล้วจดไว้ใน localStorage ของเครื่องนั้น วันนั้นจะไม่ยิงซ้ำอีก
+  //   (ตอบคำถาม "ตรวจแล้วไม่ขึ้นอีก" — ใช่ และไม่กินเน็ตซ้ำด้วย)
+  async verifySessionQuietly() {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const key = 'bcSecOk_' + this.userId + '_' + today;
+
+      // เคยผ่านแล้ววันนี้ -> ไม่ต้องยิงอะไรเลย
+      try { if (localStorage.getItem(key)) return; } catch (e) { /* โหมดส่วนตัวอ่านไม่ได้ ไม่เป็นไร */ }
+
+      const res = await fetch(`${GAS_ENDPOINT}?action=security_selftest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'security_selftest',
+          adminUserId: this.userId,
+          idToken: this.token
+        })
+      });
+      const r = await res.json();
+
+      if (r.ok) {
+        try { localStorage.setItem(key, '1'); } catch (e) {}
+        return;
+      }
+
+      // ไม่ผ่าน — เตือนตอนนี้ ดีกว่าไปเจอตอนลูกค้ายืนรออยู่หน้าร้าน
+      const failed = (r.checks || []).filter(c => !c.pass);
+      const relog = await Swal.fire({
+        icon: 'warning',
+        title: '🔐 เซสชันยังไม่พร้อม',
+        html: `<div style="text-align:left;font-size:13.5px">
+                 ${failed.map(c => `<div style="margin:5px 0">❌ <b>${esc(c.name)}</b><br>
+                   <span style="font-size:12px;color:#5A7986">${esc(c.detail || '')}</span></div>`).join('')}
+               </div>
+               <p style="font-size:12.5px;margin-top:10px;color:#5A7986">
+                 บันทึกงานตอนนี้อาจไม่ผ่าน แนะนำให้เข้าสู่ระบบใหม่ก่อนเริ่มงาน</p>`,
+        showCancelButton: true,
+        confirmButtonText: 'เข้าสู่ระบบใหม่',
+        cancelButtonText: 'ใช้งานต่อ'
+      });
+      if (relog.isConfirmed) { try { liff.login(); } catch (e) { location.reload(); } }
+
+    } catch (err) {
+      // ตรวจไม่ได้ก็ไม่เป็นไร ไม่ควรรบกวนการทำงาน
+      console.warn('ตรวจเซสชันเบื้องหลังไม่สำเร็จ (ข้ามไป):', err);
     }
   }
 
@@ -1046,10 +1107,17 @@ class AdminManager {
         icon: r.ok ? 'success' : 'warning',
         title: r.ok ? '✅ ผ่านครบทุกข้อ' : '⚠️ ยังไม่ผ่านครบ',
         html: rows + `<p style="font-size:12.5px;margin-top:12px;color:#5A7986">${esc(r.message || '')}</p>` +
-              (r.ok ? `<p style="font-size:12px;color:#12A594">บันทึกผลไว้ในชีต Security_Log แล้ว<br>
-                       เจ้าของร้านรันฟังก์ชัน showSecurityStatus เพื่อดูว่าครบทุกคนหรือยังได้เลย</p>` : ''),
+              (r.ok ? `<p style="font-size:12px;color:#12A594">เครื่องนี้ยืนยันตัวตนกับ LINE ได้ปกติ<br>
+                       บันทึกผลไว้ในชีต Security_Log แล้ว</p>` : ''),
         confirmButtonText: 'ปิด'
       });
+
+      // ผ่านแล้วจดไว้ วันนี้จะไม่ตรวจเบื้องหลังซ้ำอีก
+      if (r.ok) {
+        try {
+          localStorage.setItem('bcSecOk_' + this.userId + '_' + new Date().toISOString().slice(0, 10), '1');
+        } catch (e) {}
+      }
     } catch (err) {
       Swal.fire('❌ ตรวจไม่สำเร็จ', 'เช็คสัญญาณเน็ตแล้วลองใหม่', 'error');
     } finally {
