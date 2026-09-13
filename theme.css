@@ -1,0 +1,250 @@
+@import url('https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Sarabun:wght@400;500;600;700&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   theme.css — ธีมฟ้า–ขาว Bird CarCare
+   ปรับปรุง 13 ก.ย. 2569
+
+   วิธีใช้: ใส่ <link> ไฟล์นี้ "หลัง" style.css ของแต่ละหน้า
+            <link rel="stylesheet" href="../theme.css">
+
+   ⚠️ ไฟล์นี้ไม่ได้แก้ style.css เดิมเลยแม้แต่บรรทัดเดียว เป็นชั้นทับสีอย่างเดียว
+      คลาสทุกตัวที่ JavaScript สร้างขึ้นยังอยู่ครบเหมือนเดิม
+      ไม่ชอบเมื่อไหร่ ลบบรรทัด <link> ออก กลับเป็นของเดิมทันที
+
+   ครอบคลุมกฎที่กำหนดสีในไฟล์เดิมครบทั้ง 6 ไฟล์:
+   member · register · info · main_admin · settings · settings/services
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bc-sky1:  #EAF6FC;
+  --bc-sky2:  #C3E2F5;
+  --bc-foam:  #FFFFFF;
+  --bc-water: #0B7FC7;
+  --bc-waterD:#0A5E96;
+  --bc-deep:  #0A4F7A;
+  --bc-ink:   #14313E;
+  --bc-ink2:  #5A7986;
+  --bc-line:  #DCE9F0;
+  --bc-mint:  #12A594;
+  --bc-sun:   #F5A524;
+  --bc-rose:  #D64545;
+
+  --bc-disp: "Mitr", "Noto Sans Thai", system-ui, sans-serif;
+  --bc-body: "Sarabun", "Noto Sans Thai", system-ui, -apple-system, sans-serif;
+}
+
+/* ── พื้นหลัง ────────────────────────────────────────────────────────────
+   วางพื้นไว้ที่ html เพื่อให้ canvas ฟองสบู่ (z-index 0) อยู่เหนือพื้นได้
+   body จึงต้องโปร่ง ไม่งั้นจะบังฟองไว้                                  */
+html {
+  background: linear-gradient(178deg, var(--bc-sky1) 0%, var(--bc-sky2) 100%) fixed !important;
+  min-height: 100%;
+}
+body {
+  background: transparent !important;
+  color: var(--bc-ink) !important;
+  font-family: var(--bc-body) !important;
+  min-height: 100vh;
+  height: auto !important;          /* register/style.css ตั้ง height:100vh ทำให้เนื้อหาล้นถูกตัด */
+}
+
+/* canvas ฟองสบู่ที่ theme.js สร้างขึ้น */
+#bcBubbles {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none; display: block;
+}
+
+/* เนื้อหาต้องลอยเหนือฟอง */
+.container, .qr-popup, .loading-overlay, .popup, .scan-popup { position: relative; z-index: 1; }
+.qr-popup, .loading-overlay, .popup, .scan-popup { z-index: 9999; }
+
+h1, h2, h3, h2.title { font-family: var(--bc-disp) !important; font-weight: 500 !important; }
+
+/* ── กล่องหลัก ───────────────────────────────────────────────────────── */
+.container {
+  background: var(--bc-foam) !important;
+  background-color: var(--bc-foam) !important;
+  border: 1px solid var(--bc-line);
+  border-radius: 18px !important;
+  box-shadow: 0 8px 26px -14px rgba(10, 79, 122, .34) !important;
+  color: var(--bc-ink);
+}
+
+/* ── การ์ด ───────────────────────────────────────────────────────────── */
+.card, .history-card, .service-card, .section {
+  background: var(--bc-foam) !important;
+  background-color: var(--bc-foam) !important;
+  border: 1px solid var(--bc-line) !important;
+  border-radius: 14px !important;
+  color: var(--bc-ink);
+}
+.profile, .profile-box {
+  background: linear-gradient(160deg, #F4FAFE, #EAF5FC);
+  border: 1px solid #CFE6F4;
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: var(--bc-ink) !important;
+}
+
+/* ── ปุ่ม ────────────────────────────────────────────────────────────── */
+.btn, button {
+  font-family: var(--bc-body) !important;
+  font-weight: 600;
+  border-radius: 12px !important;
+  transition: transform .11s ease, box-shadow .11s ease, background-color .15s ease;
+}
+.btn, .btn:link, .btn:visited, button:not(.swal2-close):not(.swal2-cancel) {
+  background: var(--bc-water) !important;
+  background-color: var(--bc-water) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 3px 0 var(--bc-waterD);
+}
+.btn:hover, button:hover { background-color: var(--bc-waterD) !important; }
+.btn:active, button:active { transform: translateY(3px); box-shadow: 0 0 0 var(--bc-waterD); }
+.btn:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(11, 127, 199, .45) !important;
+  outline-offset: 2px;
+}
+
+/* ปุ่มรอง */
+.btn.outline, .btn-secondary, .btn.close, .history-toggle {
+  background: var(--bc-foam) !important;
+  background-color: var(--bc-foam) !important;
+  color: var(--bc-waterD) !important;
+  border: 1.5px solid #BFDDF0 !important;
+  box-shadow: none !important;
+}
+.btn.outline:hover, .btn-secondary:hover, .btn.close:hover, .history-toggle:hover {
+  background-color: #F2FAFE !important;
+}
+/* ปุ่มอันตราย */
+.btn.danger, .btn-delete {
+  background: var(--bc-rose) !important;
+  background-color: var(--bc-rose) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 0 #A93636 !important;
+}
+.btn.danger:hover { background-color: #B83A3A !important; }
+.btn-delete { background: transparent !important; color: var(--bc-rose) !important; box-shadow: none !important; }
+/* ปุ่มแลกแต้ม */
+.redeem-active {
+  background: var(--bc-sun) !important;
+  background-color: var(--bc-sun) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 0 #C6821A !important;
+}
+.btn.disabled, .btn:disabled, button:disabled { opacity: .45 !important; box-shadow: none !important; }
+
+/* ── ช่องกรอก ────────────────────────────────────────────────────────── */
+input[type="text"], input[type="tel"], input[type="number"], input[list],
+select, textarea, .feedback-text, .input-field, .swal2-input {
+  font-family: var(--bc-body) !important;
+  background: #FBFDFE !important;
+  background-color: #FBFDFE !important;
+  color: var(--bc-ink) !important;
+  border: 1.5px solid var(--bc-line) !important;
+  border-radius: 11px !important;
+}
+input:focus, select:focus, textarea:focus, .swal2-input:focus {
+  border-color: var(--bc-water) !important;
+  box-shadow: 0 0 0 3px rgba(11, 127, 199, .14) !important;
+}
+::placeholder { color: #9BB0BA !important; }
+label { color: var(--bc-ink2); font-weight: 600; }
+
+/* ── ตารางประวัติ ────────────────────────────────────────────────────── */
+table { background: var(--bc-foam) !important; border-radius: 12px !important; }
+thead { background-color: #EAF5FC !important; color: var(--bc-deep) !important; }
+.history-table th, thead th { color: var(--bc-deep) !important; font-weight: 600; }
+td, th { border-bottom: 1px solid var(--bc-line) !important; }
+tbody tr:hover { background-color: #F6FBFE !important; }
+
+/* ── ดาว ─────────────────────────────────────────────────────────────── */
+.star { color: #D3E0E7 !important; }
+.star.filled { color: var(--bc-sun) !important; }
+
+/* ── ข้อความรอง ──────────────────────────────────────────────────────── */
+.notice, .status-label, footer { color: var(--bc-ink2) !important; }
+
+/* ── หน้ากากโหลด ─────────────────────────────────────────────────────── */
+.loading-overlay { background: rgba(232, 244, 251, .88) !important; }
+.loading-box { color: var(--bc-deep) !important; }
+.spinner { border: 5px solid #C9E2F1 !important; border-top: 5px solid var(--bc-water) !important; }
+
+/* ── QR ──────────────────────────────────────────────────────────────── */
+.qr-popup { background: rgba(10, 40, 55, .72) !important; }
+.qr-popup-inner {
+  background: var(--bc-foam) !important;
+  color: var(--bc-ink) !important;
+  border-radius: 20px !important;
+  border: 1px solid var(--bc-line);
+}
+
+/* ── SweetAlert ──────────────────────────────────────────────────────── */
+.swal2-popup { font-family: var(--bc-body) !important; border-radius: 18px !important; }
+.swal2-title { font-family: var(--bc-disp) !important; color: var(--bc-deep) !important; }
+.swal2-confirm { background: var(--bc-water) !important; box-shadow: 0 3px 0 var(--bc-waterD) !important; }
+.swal2-cancel { background: #E7EFF3 !important; color: var(--bc-ink2) !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ส่วนสแกน QR — ของเดิมไม่มี CSS เลย
+   HTML ใช้คลาส .scan-section / .camera-box / .input-field / .scan-controls
+   แต่ style.css มีแต่ .scan-popup ของเก่าที่เลิกใช้แล้ว
+   ═══════════════════════════════════════════════════════════════════════ */
+.scan-section {
+  margin-top: 16px;
+  background: var(--bc-foam);
+  border: 1px solid var(--bc-line);
+  border-radius: 18px;
+  padding: 14px;
+  text-align: left;
+}
+.scan-section h3 {
+  margin: 0 0 11px;
+  font-size: 16px;
+  color: var(--bc-deep);
+  text-align: center;
+}
+
+/* จองพื้นที่กล้องไว้ล่วงหน้า จอจะได้ไม่กระตุกตอนกล้องขึ้น */
+#reader, .camera-box {
+  width: 100% !important;
+  aspect-ratio: 1 / 1;
+  max-height: none !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #0E2A35 !important;
+  background-color: #0E2A35 !important;
+  position: relative;
+  display: block;
+}
+#reader::after {
+  content: "กำลังเปิดกล้องหลัง…";
+  position: absolute; inset: 0; z-index: 0;
+  display: grid; place-items: center;
+  color: rgba(255, 255, 255, .8);
+  font-size: 13px; font-family: var(--bc-body);
+}
+#reader video, #reader canvas, #reader img {
+  position: relative; z-index: 1;
+  width: 100% !important; height: 100% !important;
+  object-fit: cover; display: block;
+}
+#reader > div { border: none !important; }
+
+.scan-section .input-field { width: 100%; margin-top: 12px; padding: 11px 12px; }
+.scan-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 11px; }
+.scan-controls .btn { margin: 0 !important; }
+
+/* ── เมนูปุ่ม ───────────────────────────────────────────────────────── */
+.admin-buttons, .menu-buttons, .button-group { gap: 10px; }
+.admin-buttons .btn, .menu-buttons .btn { white-space: normal !important; }
+
+/* ── ตารางประวัติบนจอแคบ ────────────────────────────────────────────── */
+.history-section-wrapper { -webkit-overflow-scrolling: touch; }
+
+@media (prefers-reduced-motion: reduce) {
+  #bcBubbles { display: none !important; }
+  .btn, button { transition: none !important; }
+}

@@ -7,6 +7,18 @@ document.addEventListener('DOMContentLoaded', () => {
   adminManager.init();
 });
 
+// แปลงอักขระพิเศษก่อนเอาไปต่อเข้า HTML
+// ชื่อลูกค้าเป็นข้อความที่ลูกค้าพิมพ์เองตอนสมัคร ถ้าพิมพ์เป็นแท็ก HTML มาแล้วเราต่อตรง ๆ
+// มันจะไปทำงานในหน้าจอของแอดมิน ซึ่งเป็นหน้าที่มีสิทธิ์บันทึกบริการ
+function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 //------------------------------ QRScanner ------------------------------
 class QRScanner {
   constructor() {
@@ -128,11 +140,11 @@ class QRScanner {
 
   
     const confirmHtml = `
-      <p>ชื่อ: ${this.foundUser.Name}</p>
-      <p>รถ: ${selectedVehicle.Brand} ${selectedVehicle.Model} (${selectedVehicle.Year})</p>
-      <p>บริการ: ${name}</p>
-      <p>${label}</p>
-      <p>หมายเหตุ: ${note || '-'}</p>
+      <p>ชื่อ: ${esc(this.foundUser.Name)}</p>
+      <p>รถ: ${esc(selectedVehicle.Brand)} ${esc(selectedVehicle.Model)} (${esc(selectedVehicle.Year)})</p>
+      <p>บริการ: ${esc(name)}</p>
+      <p>${esc(label)}</p>
+      <p>หมายเหตุ: ${esc(note || '-')}</p>
     `;
   
     const confirm = await Swal.fire({
@@ -177,7 +189,7 @@ class QRScanner {
   
     if (result.success) {
       this.logAction('บันทึกบริการ', `✅ ${name} (${price} บาท)`);
-      Swal.fire('✅ บันทึกสำเร็จ', `บริการ: ${name}<br>แต้ม: ${point}`, 'success').then(() => liff.closeWindow());
+      Swal.fire('✅ บันทึกสำเร็จ', `บริการ: ${esc(name)}<br>แต้ม: ${esc(point)}`, 'success').then(() => liff.closeWindow());
     } else {
       this.logAction('บันทึกบริการ', `❌ ล้มเหลว: ${name}, เหตุ: ${result.message}`);
       Swal.fire('❌ บันทึกไม่สำเร็จ', result.message || '', 'error');
@@ -186,21 +198,43 @@ class QRScanner {
 
 
 
+  // เปิดกล้อง "หลัง" เป็นค่าเริ่มต้น
+  // ของเดิมใช้ cameras[0].id ซึ่งคือกล้องตัวแรกที่เครื่องคืนมา มือถือส่วนใหญ่คืนกล้องหน้าก่อน
+  // พนักงานจึงต้องกดสลับกล้องทุกครั้ง วันละหลายสิบครั้ง
+  //
+  // ไล่ 3 ชั้น ถ้าชั้นแรกไม่ได้ค่อยตกไปชั้นถัดไป ชั้นสุดท้ายคือพฤติกรรมเดิม จึงไม่มีทางแย่ลงกว่าเดิม
   async startCamera() {
+    const cfg = { fps: 10, qrbox: 250 };
+    const onOk = text => this.onScanSuccess(text);
+
     try {
       if (!this.html5QrCode) this.html5QrCode = new Html5Qrcode('reader');
       if (this.html5QrCode._isScanning) await this.html5QrCode.stop();
 
+      // ชั้น 1 — ขอกล้องหลังตรง ๆ จากเบราว์เซอร์
+      // แม่นที่สุดเพราะไม่ขึ้นกับชื่อกล้องหรือภาษาของเครื่อง
+      try {
+        await this.html5QrCode.start({ facingMode: { exact: "environment" } }, cfg, onOk);
+        this.cameraList = await Html5Qrcode.getCameras().catch(() => []);
+        this.currentCameraIndex = 0;
+        return;
+      } catch (errExact) {
+        // เครื่องนี้ไม่มีกล้องหลัง (เช่นคอมพิวเตอร์) หรือไม่รองรับ exact -> ลองชั้นถัดไป
+      }
+
       const cameras = await Html5Qrcode.getCameras();
       if (!cameras.length) throw new Error('ไม่พบกล้อง');
-
       this.cameraList = cameras;
-      const camId = cameras[0].id;
-      await this.html5QrCode.start(
-        camId,
-        { fps: 10, qrbox: 250 },
-        text => this.onScanSuccess(text)
-      );
+
+      // ชั้น 2 — หาจากชื่อกล้องที่มีคำว่า back / rear / environment / หลัง
+      const back = cameras.find(c => /back|rear|environment|หลัง/i.test(c.label || ''));
+
+      // ชั้น 3 — ไม่เจอจริง ๆ ค่อยใช้ตัวแรกเหมือนโค้ดเดิม
+      const camId = back ? back.id : cameras[0].id;
+      this.currentCameraIndex = Math.max(0, cameras.findIndex(c => c.id === camId));
+
+      await this.html5QrCode.start(camId, cfg, onOk);
+
     } catch (err) {
       Swal.fire('❌ เปิดกล้องไม่สำเร็จ', err.message || '', 'error');
     }
@@ -288,14 +322,14 @@ class QRScanner {
     this.currentPoint = 0;
   
     const vehicleOptions = this.foundUser.vehicles.map((v, i) =>
-      `<option value="${i}">${v.Brand} ${v.Model} (${v.Year}) - ${v.point} แต้ม</option>`
+      `<option value="${i}">${esc(v.Brand)} ${esc(v.Model)} (${esc(v.Year)}) - ${esc(v.point)} แต้ม</option>`
     ).join('');
-  
+
     Swal.fire({
       title: 'ข้อมูลลูกค้า',
       html: `
-        <p>ชื่อ: ${this.foundUser.Name}</p>
-        <p>เบอร์: ${this.foundUser.Phone}</p>
+        <p>ชื่อ: ${esc(this.foundUser.Name)}</p>
+        <p>เบอร์: ${esc(this.foundUser.Phone)}</p>
         <p>รถ: <select id="vehicleSelect" class="swal2-input">${vehicleOptions}</select></p>
         <input list="serviceOptions" id="serviceName" placeholder="ชื่อบริการ" class="swal2-input">
         <input type="number" id="priceInput" placeholder="ราคา" class="swal2-input">
@@ -505,6 +539,22 @@ class AdminManager {
 
 const scannerInstance = new QRScanner();
 window.scanner = scannerInstance;
+
+// ปุ่มออกจากระบบใน index.html เรียก onclick="logout()" ซึ่งต้องเป็นฟังก์ชัน global
+// แต่ของเดิมประกาศ logout() ไว้เป็นเมธอดของคลาส AdminManager เท่านั้น
+// กดแล้วจึงได้ Uncaught ReferenceError: logout is not defined แบบเงียบ ๆ
+window.logout = function () {
+  try {
+    if (typeof liff !== 'undefined' && liff.logout) liff.logout();
+  } catch (err) {
+    console.warn('liff.logout ผิดพลาด:', err);
+  }
+  try {
+    if (typeof liff !== 'undefined' && liff.closeWindow) liff.closeWindow();
+  } catch (err) {
+    console.warn('liff.closeWindow ผิดพลาด:', err);
+  }
+};
 
 document.getElementById('scanBtn')?.addEventListener('click', async () => {
   if (window.scanner?.openScanPopup) {
