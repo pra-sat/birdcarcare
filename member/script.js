@@ -95,22 +95,36 @@ function vehicleCardHtml(vehicle, history, countable) {
   else if (left <= 30)    { pill = `<span class="pill warn">เหลือ ${left} วัน</span>`; expClass = ' is-soon'; }
   else                    pill = '<span class="pill">ใช้ได้</span>';
 
-  // วันใช้บริการล่าสุด
-  // ⚠️ ต้องหาค่ามากสุดเอง ห้ามใช้แถวแรกหรือแถวท้าย เพราะโค้ดส่วนแสดงประวัติ
-  //    เรียก history.sort() ซึ่งสลับลำดับ array ก้อนเดียวกันนี้ทิ้ง
-  const rows = historyOf(vehicle, history);
-  let lastDate = '';
-  let lastTime = -Infinity;
-  rows.forEach(r => {
-    const d = parseThaiDate(r.date);
-    if (d && d.getTime() > lastTime) {
-      lastTime = d.getTime();
-      lastDate = String(r.date || '').split(',')[0].trim();
+  // วันใช้บริการล่าสุด + จำนวนครั้ง
+  //
+  // ตั้งแต่ 14 ก.ย. 2569 Apps Script ส่ง lastService กับ visits มาให้เลย
+  // (lastService มาจากคอลัมน์ N ของ Customer_Master · visits นับมาจากฝั่งเซิร์ฟเวอร์)
+  // หน้านี้จึงไม่ต้องรอประวัติทั้งก้อนมาก่อนอีกแล้ว
+  //
+  // ถ้ายังไม่ได้ deploy Apps Script ตัวใหม่ จะไม่มี 2 ฟิลด์นี้ และ history จะยังส่งมา
+  // จึงคำนวณแบบเดิมเป็นทางถอย เพื่อไม่ให้การ์ดว่างในช่วงที่ยังไม่ได้ deploy
+  let lastDate = String(vehicle.lastService || '').trim();
+  let visits = Number.isFinite(vehicle.visits) ? vehicle.visits : null;
+
+  if (!lastDate || visits === null) {
+    // ⚠️ ต้องหาค่ามากสุดเอง ห้ามใช้แถวแรกหรือแถวท้าย เพราะโค้ดส่วนแสดงประวัติ
+    //    เรียก history.sort() ซึ่งสลับลำดับ array ก้อนเดียวกันนี้ทิ้ง
+    const rows = historyOf(vehicle, history);
+    if (visits === null) visits = rows.length;
+    if (!lastDate) {
+      let lastTime = -Infinity;
+      rows.forEach(r => {
+        const d = parseThaiDate(r.date);
+        if (d && d.getTime() > lastTime) {
+          lastTime = d.getTime();
+          lastDate = String(r.date || '').split(',')[0].trim();
+        }
+      });
     }
-  });
+  }
 
   const bits = [];
-  if (countable && rows.length) bits.push(`ใช้บริการมาแล้ว <b>${rows.length} ครั้ง</b>`);
+  if (countable && visits) bits.push(`ใช้บริการมาแล้ว <b>${visits} ครั้ง</b>`);
   if (expired > 0) bits.push(`หมดอายุไปแล้ว <b>${expired} แต้ม</b>`);
 
   // ป้ายทะเบียน — เลขบรรทัดบน จังหวัดบรรทัดล่าง เหมือนป้ายจริง
@@ -201,8 +215,10 @@ async function showQRSection() {
   try {
     const token = generateToken();
     window.qrToken = token;
-    const latestDateStr = memberData?.serviceHistory?.[0]?.date;
-    const createdAt = (latestDateStr ? toBangkokISOString(parseCustomDate(latestDateStr)) : new Date().toISOString());
+    // createdAt: ฝั่ง Apps Script ไม่ได้ใช้ค่านี้เลย (token.gs ใช้ new Date() ของตัวเอง
+    // เป็นเวลาสร้าง QR เสมอ ซึ่งถูกแล้ว) ส่งเวลาปัจจุบันไปเฉย ๆ เพื่อไม่ให้รูปแบบ
+    // ข้อมูลที่ส่งเปลี่ยน · ของเดิมดึงวันที่จากประวัติ ทำให้หน้านี้ต้องรอโหลดประวัติก่อน
+    const createdAt = new Date().toISOString();
     const payload = {
       action: "create_token",
       token,
@@ -379,29 +395,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const profile = await liff.getProfile();
-    await silentlyUpdateLineProfile(profile);
 
-    async function silentlyUpdateLineProfile(profile) {
-          try {
-            const payload = {
-              action: 'update_line_profile',
-              userId: profile.userId,
-              nameLine: profile.displayName,
-              statusMessage: profile.statusMessage || "",
-              pictureUrl: profile.pictureUrl || ""
-            };
-        
-            const res = await fetch(GAS_ENDPOINT + '?action=update_line_profile', {
-              method: 'POST',
-              headers: { "Content-Type": "text/plain;charset=utf-8" },
-              body: JSON.stringify(payload)
-            });
-        
-            const data = await res.json();
-            console.log("✅ LINE Profile อัปเดตอัตโนมัติ:", data);
-          } catch (err) {
-            console.warn("⚠️ อัปเดตโปรไฟล์ LINE ล้มเหลว:", err);
-          }
+    // ยิงแล้วไม่รอผล (14 ก.ย. 2569)
+    // ของเดิมใช้ await ทำให้ต้องรอ Apps Script ครบ 1 รอบก่อน แล้วค่อยไปขอแต้ม
+    // = รอเรียงกัน 2 รอบกว่าลูกค้าจะเห็นแต้ม ทั้งที่งานนี้ลูกค้าไม่ได้อะไรเลย
+    // เป็นแค่การจดชื่อ/รูปโปรไฟล์ LINE ล่าสุดไว้ในชีต
+    //
+    // ยิงพร้อมกับ action=member ได้ ไม่ชนกัน เพราะเขียนคนละคอลัมน์
+    // (อันนี้เขียน C/D/E = ชื่อไลน์ สเตตัส รูป · หน้านี้แสดงชื่อจริงจากคอลัมน์ F)
+    silentlyUpdateLineProfile(profile);
+
+    function silentlyUpdateLineProfile(profile) {
+          const payload = {
+            action: 'update_line_profile',
+            userId: profile.userId,
+            nameLine: profile.displayName,
+            statusMessage: profile.statusMessage || "",
+            pictureUrl: profile.pictureUrl || ""
+          };
+
+          fetch(GAS_ENDPOINT + '?action=update_line_profile', {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+          })
+            .then(res => res.json())
+            .then(data => console.log("✅ LINE Profile อัปเดตอัตโนมัติ:", data))
+            .catch(err => console.warn("⚠️ อัปเดตโปรไฟล์ LINE ล้มเหลว:", err));
         }
 
     const userId = profile.userId;
@@ -476,23 +496,104 @@ document.addEventListener('DOMContentLoaded', async () => {
       <p> แต้มหมดอายุ : ${data.expirationDate && data.expirationDate.trim() ? data.expirationDate : '-'}</p>
     `;
 */
-    toggleBtn.disabled = true;
-    historySection.innerHTML = '<p>⏳ กำลังโหลดประวัติ...</p>';
+    // ── ประวัติการใช้บริการ ────────────────────────────────────────────
+    // โหลดตอนกดปุ่มเท่านั้น ไม่โหลดตั้งแต่เปิดหน้า
+    // ลูกค้าส่วนใหญ่เปิดมาดูแค่แต้ม การรอประวัติทั้งก้อน (ชีต 1,100+ แถว)
+    // ทำให้กว่าจะเห็นแต้มช้าโดยไม่จำเป็น
+    historySection.innerHTML = '';
+    historySection.classList.add('hidden');
     toggleBtn.disabled = false;
+    toggleBtn.classList.remove('disabled');
+    toggleBtn.textContent = '▼ ดูประวัติการใช้บริการ';
+    bindHistoryToggle();
 
-    if (!toggleBtn.classList.contains('bound')) {
-      toggleBtn.addEventListener('click', () => {
-        historySection.classList.toggle('hidden');
-        toggleBtn.textContent = historySection.classList.contains('hidden')
-          ? '▼ ดูประวัติการใช้บริการ'
-          : '▲ ซ่อนประวัติการใช้บริการ';
-      });
-      toggleBtn.classList.add('bound');
+    // ถ้ายังไม่ได้ deploy Apps Script ตัวใหม่ ประวัติจะติดมากับ action=member เหมือนเดิม
+    // ใช้ของที่ได้มาแล้วเลย จะได้ไม่ต้องยิงซ้ำ
+    if (Array.isArray(data.serviceHistory)) {
+      historyCache = data.serviceHistory;
     }
 
-    const history = Array.isArray(data.serviceHistory) ? data.serviceHistory : [];
+    hideLoadingOverlay();
 
-    history.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+  } catch (error) {
+    console.error('Error in DOMContentLoaded:', error);
+    hideLoadingOverlay();
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ประวัติการใช้บริการ — โหลดตอนกดดู (14 ก.ย. 2569)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let historyCache = null;      // เก็บไว้หลังโหลดครั้งแรก กดปิด/เปิดซ้ำจะไม่ยิงใหม่
+let historyLoading = false;   // กันกดรัว ๆ แล้วยิงซ้อนกัน
+
+function bindHistoryToggle() {
+  if (toggleBtn.classList.contains('bound')) return;
+  toggleBtn.classList.add('bound');
+
+  toggleBtn.addEventListener('click', async () => {
+    // กำลังเปิดอยู่ -> ปิด
+    if (!historySection.classList.contains('hidden')) {
+      historySection.classList.add('hidden');
+      toggleBtn.textContent = '▼ ดูประวัติการใช้บริการ';
+      return;
+    }
+
+    if (historyLoading) return;
+
+    // โหลดแล้ว -> เปิดให้ดูเลย
+    if (historyCache) {
+      historySection.classList.remove('hidden');
+      toggleBtn.textContent = '▲ ซ่อนประวัติการใช้บริการ';
+      renderHistory(historyCache);
+      return;
+    }
+
+    // ครั้งแรก -> ไปเอาประวัติมาก่อน
+    historyLoading = true;
+    toggleBtn.disabled = true;
+    const originalText = toggleBtn.textContent;
+    toggleBtn.textContent = '⏳ กำลังโหลดประวัติ...';
+    historySection.innerHTML = '<p>⏳ กำลังโหลดประวัติ...</p>';
+    historySection.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`${GAS_ENDPOINT}?action=member_history&userId=${encodeURIComponent(currentUserId)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && data.status === 'error') throw new Error(data.message || 'โหลดประวัติไม่สำเร็จ');
+
+      historyCache = Array.isArray(data.serviceHistory) ? data.serviceHistory : [];
+      toggleBtn.textContent = '▲ ซ่อนประวัติการใช้บริการ';
+      renderHistory(historyCache);
+
+    } catch (err) {
+      console.error('❌ โหลดประวัติไม่สำเร็จ:', err);
+      // ไม่เก็บ cache ไว้ จะได้กดลองใหม่ได้
+      historySection.classList.add('hidden');
+      historySection.innerHTML = '';
+      toggleBtn.textContent = originalText;
+      Swal.fire({
+        icon: 'error',
+        title: '❌ โหลดประวัติไม่สำเร็จ',
+        text: 'กรุณาลองกดใหม่อีกครั้ง',
+        confirmButtonText: 'ปิด'
+      });
+    } finally {
+      historyLoading = false;
+      toggleBtn.disabled = false;
+    }
+  });
+}
+
+function renderHistory(historyRows) {
+  // ⚠️ คัดลอกออกมาก่อน sort — ของเดิม sort ทับ array ก้อนเดิม
+  //    ซึ่งเป็นก้อนเดียวกับที่การ์ดรถใช้หาวันใช้บริการล่าสุด
+  const history = historyRows.slice();
+
+  history.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
 
     if (history.length === 0) {
       historySection.innerHTML = '<p>-</p>';
@@ -620,11 +721,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    hideLoadingOverlay();
-    toggleBtn.disabled = false;
-    toggleBtn.classList.remove("disabled");
-    
     // ⭐ Event listeners for Rating/Feedback interactions
+    // ผูกทุกครั้งที่วาดประวัติใหม่ — ปุ่มเหล่านี้ถูกสร้างใหม่พร้อม innerHTML ด้านบน
+    // จึงไม่มีตัวเก่าค้างให้ผูกซ้ำ
     const feedbackButtons = document.querySelectorAll('.feedback-btn');
     feedbackButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -834,9 +933,5 @@ submitButtons.forEach(btn => {
     }
   });
 });
-// Add the missing closing braces for the try and document.addEventListener blocks
-  } catch (error) {
-    console.error('Error in DOMContentLoaded:', error);
-    hideLoadingOverlay();
-  } // Close the try block
-}); // Close the document.addEventListener
+
+} // จบ renderHistory

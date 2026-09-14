@@ -531,13 +531,52 @@ class QRScanner {
     // <datalist id="serviceOptions"> ซ้อนกัน 2 อัน id ชนกัน
     // ตอนนี้เลิกใช้ datalist แล้ว เก็บแต่รายการไว้ใน this.serviceList
     // แล้ววาดเป็นปุ่มให้แตะเลือกใน showCustomerPopup()
+    //
+    // 14 ก.ย. 2569 — จำรายการบริการไว้ในเครื่อง
+    // รายการบริการแทบไม่เปลี่ยน แต่ของเดิมไปถามใหม่ทุกครั้งที่เปิดหน้า
+    // แอดมินจึงเจอ "กำลังโหลดรายการบริการ…" ทุกครั้งที่สแกนลูกค้าคนแรกของวัน
+    // ตอนนี้ขึ้นปุ่มจากของที่จำไว้ทันที แล้วค่อยไปถามของใหม่เบื้องหลัง
+    // ถ้าได้ของใหม่ที่ไม่เหมือนเดิม ค่อยวาดปุ่มใหม่ให้
+    if (!this.serviceList || !this.serviceList.length) {
+      const cached = this.readServiceCache();
+      if (cached) this.serviceList = cached;
+    }
+
     if (this._loadingServices) return;
     this._loadingServices = true;
     fetch(`${GAS_ENDPOINT}?action=service_list`)
       .then(res => res.json())
-      .then(data => { this.serviceList = Array.isArray(data) ? data : []; })
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        if (!list.length) return;              // ถามไม่ได้ผล -> ใช้ของเดิมต่อไป
+        const changed = JSON.stringify(list) !== JSON.stringify(this.serviceList);
+        this.serviceList = list;
+        this.writeServiceCache(list);
+        // วาดใหม่เฉพาะตอนรายการเปลี่ยนจริง และหน้าเลือกบริการเปิดค้างอยู่
+        // (ถ้าวาดทุกครั้ง ปุ่มที่แอดมินเพิ่งแตะเลือกไว้จะกะพริบโดยไม่จำเป็น)
+        if (changed && document.getElementById('svcChips')) this.renderServiceChips();
+      })
       .catch(err => console.warn('โหลดรายการบริการไม่สำเร็จ:', err))
       .finally(() => { this._loadingServices = false; });
+  }
+
+  // ── จำรายการบริการไว้ 24 ชม. ─────────────────────────────────────────────
+  // เก็บแยกจากของแอดมิน (bcAdmin_*) เพราะไม่ใช่ข้อมูลส่วนตัวและไม่ผูกกับคน
+  readServiceCache() {
+    try {
+      const raw = localStorage.getItem('bcServices');
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (!c || !Array.isArray(c.list) || !c.list.length) return null;
+      if (Date.now() - (c.at || 0) > 24 * 60 * 60 * 1000) return null;
+      return c.list;
+    } catch (e) { return null; }
+  }
+
+  writeServiceCache(list) {
+    try {
+      localStorage.setItem('bcServices', JSON.stringify({ list, at: Date.now() }));
+    } catch (e) { /* เครื่องปิด localStorage ก็ไม่เป็นไร แค่ช้าเหมือนเดิม */ }
   }
 
   // วาดปุ่มบริการให้แตะเลือก
