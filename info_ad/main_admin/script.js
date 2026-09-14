@@ -56,13 +56,24 @@ class QRScanner {
 
   async openScanPopup() {
     this.togglePopup(true);
-    if (!this.adminUserId) await this.init();
+
+    // 🔴 เรื่องความเร็ว (แก้ 14 ก.ย. 2569)
+    //    ของเดิมเช็ค `if (!this.adminUserId) await this.init()` ก่อน
+    //    แล้วค่อยไปอ่าน window.adminInfo ซึ่งสลับลำดับกัน
+    //    ผลคือกดปุ่มสแกนทีไร ต้องรอ this.init() ยิงถาม check_admin
+    //    ไป Apps Script อีกหนึ่งรอบเต็ม ๆ ก่อนกล้องจะเริ่มทำงาน
+    //    ทั้งที่ AdminManager เพิ่งถามไปแล้วและใส่ผลไว้ใน window.adminInfo ให้แล้ว
+    //    -> อ่านของที่มีอยู่ก่อน ถ้าครบก็เปิดกล้องได้เลย ไม่ต้องรอเน็ต
     const { userId, name, token } = window.adminInfo || {};
-    if (userId && name) {
+    if (userId) {
       this.adminUserId = userId;
-      this.adminName = name;
+      this.adminName = name || '-';
       this.token = token;
+    } else if (!this.adminUserId) {
+      // เข้าหน้านี้ตรง ๆ โดยไม่ผ่าน AdminManager (ไม่ควรเกิด แต่กันไว้)
+      await this.init();
     }
+
     this.startCamera();
     this.loadServices();
   }
@@ -951,11 +962,57 @@ class AdminManager {
     this.token = "N/A";
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  //  ทำให้เข้าหน้าแอดมินไวขึ้น (14 ก.ย. 2569)
+  //
+  //  ของเดิมกว่าหน้าจะโผล่ ต้องรอ Apps Script ถึง 3 ครั้ง
+  //    1. update_line_profile  } ยิงขนานกัน แต่ await ทั้งคู่
+  //    2. check_admin          }   จึงช้าเท่าตัวที่ช้ากว่า
+  //    3. log_admin            await ต่อท้ายอีก ก่อนจะ display:block
+  //  Apps Script ตอบช้าครั้งละ 1-5 วินาที รวมแล้วลูกค้ายืนรอจนไม่รอ
+  //
+  //  แก้ 3 อย่าง
+  //    ก. update_line_profile  ไม่ await แล้ว — หน้าจอไม่ได้ใช้ผลลัพธ์เลย
+  //    ข. log_admin            ไม่ await แล้ว — เป็นแค่ log ไม่ใช่ของที่ต้องรอ
+  //    ค. check_admin          จำผลไว้ใน localStorage ของเครื่องนั้น
+  //       เปิดครั้งถัดไปแสดงหน้าทันทีจากของที่จำไว้ (ไม่รอเน็ตเลย)
+  //       แล้วค่อยตรวจซ้ำเบื้องหลัง ถ้าสิทธิ์เปลี่ยนค่อยปิดหน้าต่าง
+  //
+  //  ⚠️ การแสดงหน้าจากของที่จำไว้ ไม่ได้ลดความปลอดภัยลงเลย
+  //     เพราะการ "เห็นหน้าจอ" ไม่ใช่ด่านกันอะไรอยู่แล้ว
+  //     ทุกคำสั่งที่เขียนข้อมูลถูกตรวจสิทธิ์ที่เซิร์ฟเวอร์ทุกครั้ง (security.gs)
+  //     คนที่ไม่ใช่แอดมินเห็นหน้าจอก็ทำอะไรไม่ได้ และจะโดนปิดหน้าต่างใน 2-3 วินาที
+  // ═══════════════════════════════════════════════════════════════════════
+
+  adminCacheKey() { return 'bcAdmin_' + this.userId; }
+
+  readAdminCache() {
+    try {
+      const raw = localStorage.getItem(this.adminCacheKey());
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      // เก็บไว้ 12 ชั่วโมง พอสำหรับ 1 กะการทำงาน
+      if (!c || !c.at || Date.now() - c.at > 12 * 60 * 60 * 1000) return null;
+      return c;
+    } catch (e) { return null; }
+  }
+
+  writeAdminCache(result) {
+    try {
+      localStorage.setItem(this.adminCacheKey(), JSON.stringify({
+        isAdmin: true, name: result.name, role: result.role, level: result.level, at: Date.now()
+      }));
+    } catch (e) { /* โหมดส่วนตัวเขียนไม่ได้ ไม่เป็นไร แค่ช้าเหมือนเดิม */ }
+  }
+
+  clearAdminCache() {
+    try { localStorage.removeItem(this.adminCacheKey()); } catch (e) {}
+  }
+
   async init() {
-    //await navigator.mediaDevices.getUserMedia({ video: true }).catch(() => {});
     try {
       Swal.fire({
-        title: 'กำลังโหลดข้อมูล...',
+        title: 'กำลังโหลด...',
         allowOutsideClick: false,
         allowEscapeKey: false,
         showConfirmButton: false,
@@ -975,10 +1032,19 @@ class AdminManager {
         this.token = await liff.getIDToken();
       }
 
-      await Promise.all([
-        this.updateLineProfile(profile),
-        this.checkAdmin()
-      ]);
+      // ── อัปเดตโปรไฟล์ LINE เบื้องหลัง ไม่ต้องรอ ──────────────────────
+      // หน้าจอไม่ได้ใช้ผลลัพธ์ของมันเลย เอาออกจากทางวิ่งหลักได้ทันที
+      this.updateLineProfile(profile);
+
+      // ── เคยเข้ามาแล้ว -> แสดงหน้าทันที ไม่รอเน็ต ────────────────────
+      const cached = this.readAdminCache();
+      if (cached) {
+        Swal.close();
+        this.applyAdmin(cached);
+        this.checkAdmin(true);        // ตรวจซ้ำเบื้องหลัง เผื่อสิทธิ์เปลี่ยน
+      } else {
+        await this.checkAdmin(false); // ครั้งแรกของเครื่องนี้ ต้องรอรอบเดียว
+      }
 
     } catch (err) {
       Swal.close();
@@ -1015,31 +1081,47 @@ class AdminManager {
     }
   }
 
-  async checkAdmin() {
-    const res = await fetch(`${GAS_ENDPOINT}?action=check_admin&userId=${this.userId}&name=${encodeURIComponent(this.name)}&statusMessage=${encodeURIComponent(this.statusMessage)}&pictureUrl=${encodeURIComponent(this.pictureUrl)}`);
-    const result = await res.json();
+  // ถามเซิร์ฟเวอร์ว่าเป็นแอดมินไหม
+  // background = true คือเรียกซ้ำเบื้องหลังหลังแสดงหน้าจากของที่จำไว้แล้ว
+  async checkAdmin(background) {
+    let result;
+    try {
+      const res = await fetch(`${GAS_ENDPOINT}?action=check_admin&userId=${this.userId}&name=${encodeURIComponent(this.name)}&statusMessage=${encodeURIComponent(this.statusMessage)}&pictureUrl=${encodeURIComponent(this.pictureUrl)}`);
+      result = await res.json();
+    } catch (err) {
+      // ตรวจเบื้องหลังแล้วเน็ตสะดุด -> เงียบไว้ หน้าที่แสดงอยู่ยังใช้ได้
+      // ถ้าสิทธิ์ถูกถอนจริง เซิร์ฟเวอร์จะบล็อกตอนกดบันทึกอยู่ดี
+      if (background) { console.warn('ตรวจสิทธิ์เบื้องหลังไม่สำเร็จ (ข้ามไป):', err); return; }
+      throw err;
+    }
 
-    Swal.close();
+    if (!background) Swal.close();
 
-    if (result.blacklisted) {
+    if (result.blacklisted || !result.isAdmin) {
+      // สิทธิ์ถูกถอนไปแล้ว -> ล้างของที่จำไว้ ไม่งั้นเปิดครั้งหน้าจะยังเห็นหน้าอยู่
+      this.clearAdminCache();
       return Swal.fire({
         icon: 'error',
-        title: '🚫 ถูกจำกัดสิทธิ์',
-        text: 'คุณไม่มีสิทธิ์เข้าใช้งานหน้านี้',
+        title: result.blacklisted ? '🚫 ถูกจำกัดสิทธิ์' : '❌ ไม่ใช่ผู้ดูแลระบบ',
+        text: result.blacklisted
+          ? 'คุณไม่มีสิทธิ์เข้าใช้งานหน้านี้'
+          : 'ระบบจำกัดเฉพาะผู้ที่ได้รับอนุญาต',
         confirmButtonText: 'ปิดหน้าต่าง'
       }).then(() => liff.closeWindow());
     }
 
-    if (!result.isAdmin) {
-      return Swal.fire({
-        icon: 'error',
-        title: '❌ ไม่ใช่ผู้ดูแลระบบ',
-        text: 'ระบบจำกัดเฉพาะผู้ที่ได้รับอนุญาต',
-        confirmButtonText: 'ปิดหน้าต่าง'
-      }).then(() => liff.closeWindow());
-    }
+    this.writeAdminCache(result);
 
-    await this.logAction(result.name, 'เข้าสู่ระบบ', 'มีการเข้าใช้งานหน้า admin');
+    // log การเข้าใช้งาน — ไม่ await เพราะเป็นแค่บันทึก ไม่ใช่ของที่หน้าจอต้องรอ
+    // ของเดิม await ตรงนี้ = รอ Apps Script อีกหนึ่งรอบเต็ม ๆ ก่อนหน้าจะโผล่
+    this.logAction(result.name, 'เข้าสู่ระบบ', 'มีการเข้าใช้งานหน้า admin');
+
+    // แสดงหน้าจากผลจริง (ถ้าแสดงจากของที่จำไว้ไปแล้ว จะอัปเดตให้ตรงของจริง)
+    this.applyAdmin(result);
+  }
+
+  // วาดหน้าจอตามสิทธิ์ — เรียกซ้ำได้ ไม่ผูกตัวฟังซ้ำ
+  applyAdmin(result) {
     document.body.style.display = 'block';
     document.getElementById('adminName').textContent = result.name || 'ไม่ทราบชื่อ';
     document.getElementById('adminLevel').textContent = result.level || '1';
@@ -1047,25 +1129,36 @@ class AdminManager {
 
     const level = parseInt(result.level || '1');
     if (level >= 1) document.querySelector('[data-menu="feedback"]')?.classList.remove("hidden");
-    if (level >= 2) document.getElementById('scanBtn')?.classList.remove("hidden");{
-      window.adminInfo = {
-        userId: this.userId,
-        name: this.name,
-        token: this.token
-      };
-    }
+    if (level >= 2) document.getElementById('scanBtn')?.classList.remove("hidden");
+    if (level >= 3) document.querySelector('[data-menu="stats"]')?.classList.remove("hidden");
+    if (level >= 5) document.querySelector('[data-menu="settings"]')?.classList.remove("hidden");
 
-    // ปุ่มตรวจความปลอดภัย — เห็นเฉพาะแอดมิน ใช้ตอนมีปัญหาหรืออยากตรวจเอง
+    // ใส่ชื่อจาก Admin_List (result.name) ไม่ใช่ชื่อ LINE
+    // เพราะชื่อนี้คือชื่อที่จะถูกบันทึกลงคอลัมน์ "แอดมิน" ใน Service_History
+    // ของเดิมใส่ชื่อ LINE ทำให้ข้อมูลไม่ตรงกับที่ showSecurityStatus แสดง
+    // และถ้าแอดมินเปลี่ยนชื่อ LINE ประวัติก็จะเรียกคนละชื่อกัน
+    window.adminInfo = {
+      userId: this.userId,
+      name: result.name || this.name,
+      token: this.token
+    };
+
+    // ปุ่มตรวจความปลอดภัย — ใช้ onclick ไม่ใช่ addEventListener
+    // เพราะฟังก์ชันนี้ถูกเรียก 2 รอบได้ (จากของที่จำไว้ แล้วจากผลจริง)
+    // ถ้าใช้ addEventListener ตัวฟังจะซ้อนกันแล้วยิงตรวจ 2 ครั้งต่อการกดหนึ่งที
     const secBtn = document.getElementById('secTestBtn');
     if (secBtn) {
       secBtn.classList.remove('hidden');
-      secBtn.addEventListener('click', () => this.runSecuritySelfTest(secBtn));
+      secBtn.onclick = () => this.runSecuritySelfTest(secBtn);
     }
 
-    // ตรวจเซสชันเงียบ ๆ เบื้องหลัง — ไม่ await เพื่อไม่ให้หน้าเปิดช้าลงแม้แต่นิดเดียว
-    this.verifySessionQuietly();
-    if (level >= 3) document.querySelector('[data-menu="stats"]')?.classList.remove("hidden");
-    if (level >= 5) document.querySelector('[data-menu="settings"]')?.classList.remove("hidden");
+    // ทำครั้งเดียวพอ ถึงจะวาดหน้าซ้ำก็ไม่ยิงซ้ำ
+    if (!this._afterReady) {
+      this._afterReady = true;
+      this.verifySessionQuietly();                 // ตรวจเซสชันเบื้องหลัง
+      // อุ่นรายการบริการไว้ล่วงหน้า พอกดสแกนแล้วปุ่มบริการจะขึ้นทันที
+      if (window.scanner?.loadServices) window.scanner.loadServices();
+    }
   }
 
   async logAction(name, action, detail) {
