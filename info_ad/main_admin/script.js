@@ -7,6 +7,43 @@ document.addEventListener('DOMContentLoaded', () => {
   adminManager.init();
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  โหลดไลบรารีสแกน QR ตอนที่ต้องใช้จริงเท่านั้น (14 ก.ย. 2569)
+//
+//  🔴 ต้นเหตุที่หน้าแอดมินเปิดค้างนาน
+//     ของเดิมโหลด html5-qrcode ไว้ใน <head> แบบ defer
+//     แต่ DOMContentLoaded "รอสคริปต์ defer ทุกตัวให้โหลดและรันเสร็จก่อน"
+//     ไลบรารีนี้หนัก 375 KB และเขียน URL เป็น unpkg.com/html5-qrcode
+//     ซึ่งไม่ระบุเวอร์ชัน unpkg จึงต้อง redirect ไปหาเวอร์ชันล่าสุดก่อนอีกรอบ
+//     โค้ดทั้งหมดเริ่มทำงานตอน DOMContentLoaded จึงถูกกักรอไฟล์นี้
+//     ทั้งที่ใช้เฉพาะตอนกดปุ่มสแกน
+//
+//  วิธีแก้: เอาออกจาก <head> แล้วโหลดตอนต้องใช้
+//    - ระบุเวอร์ชันชัดเจน ไม่ต้องเสียรอบ redirect หาเวอร์ชัน
+//    - อุ่นไว้เบื้องหลังหลังหน้าโผล่แล้ว (ดู applyAdmin) พอกดสแกนจึงพร้อมทันที
+//    - จำ Promise ไว้ เรียกซ้ำกี่ครั้งก็โหลดไฟล์เดียว
+// ═══════════════════════════════════════════════════════════════════════════
+const QR_LIB_URL = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+let qrLibPromise = null;
+
+function ensureQrLibrary() {
+  if (typeof Html5Qrcode !== 'undefined') return Promise.resolve(true);
+  if (qrLibPromise) return qrLibPromise;
+
+  qrLibPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = QR_LIB_URL;
+    s.async = true;
+    s.onload = () => resolve(true);
+    s.onerror = () => {
+      qrLibPromise = null;          // ให้ลองใหม่ได้ถ้าเน็ตสะดุดชั่วคราว
+      reject(new Error('โหลดไลบรารีสแกน QR ไม่สำเร็จ'));
+    };
+    document.head.appendChild(s);
+  });
+  return qrLibPromise;
+}
+
 // แปลงอักขระพิเศษก่อนเอาไปต่อเข้า HTML
 // ชื่อลูกค้าเป็นข้อความที่ลูกค้าพิมพ์เองตอนสมัคร ถ้าพิมพ์เป็นแท็ก HTML มาแล้วเราต่อตรง ๆ
 // มันจะไปทำงานในหน้าจอของแอดมิน ซึ่งเป็นหน้าที่มีสิทธิ์บันทึกบริการ
@@ -348,6 +385,16 @@ class QRScanner {
     const onOk = text => this.onScanSuccess(text);
 
     try {
+      // ไลบรารีไม่ได้ถูกโหลดมาตั้งแต่เปิดหน้าแล้ว (ดู ensureQrLibrary ด้านบนไฟล์)
+      // ปกติจะอุ่นไว้เสร็จตั้งแต่หน้าโผล่ บรรทัดนี้จึงผ่านทันที
+      // กรณีที่ยังโหลดไม่เสร็จ ค่อยรอตรงนี้ พร้อมบอกให้รู้ว่ากำลังเตรียมกล้อง
+      if (typeof Html5Qrcode === 'undefined') {
+        const box = document.getElementById('reader');
+        if (box) box.innerHTML = '<div class="cam-wait">กำลังเตรียมกล้อง…</div>';
+        await ensureQrLibrary();
+        if (box) box.innerHTML = '';
+      }
+
       if (!this.html5QrCode) this.html5QrCode = new Html5Qrcode('reader');
       if (this.html5QrCode._isScanning) await this.html5QrCode.stop();
 
@@ -1158,6 +1205,9 @@ class AdminManager {
       this.verifySessionQuietly();                 // ตรวจเซสชันเบื้องหลัง
       // อุ่นรายการบริการไว้ล่วงหน้า พอกดสแกนแล้วปุ่มบริการจะขึ้นทันที
       if (window.scanner?.loadServices) window.scanner.loadServices();
+      // อุ่นไลบรารีสแกน QR ไว้เบื้องหลังด้วย (375 KB)
+      // ทำหลังหน้าโผล่แล้ว จึงไม่หน่วงการเปิดหน้าเลย แต่พอกดสแกนก็พร้อมใช้ทันที
+      ensureQrLibrary().catch(() => { /* กดสแกนแล้วค่อยลองใหม่ได้ */ });
     }
   }
 

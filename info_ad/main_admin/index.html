@@ -11,7 +11,15 @@
   <script src="../../theme.js" defer></script>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://unpkg.com/html5-qrcode" defer></script>
+  <!-- 🔴 เอา html5-qrcode ออกจากตรงนี้แล้ว (14 ก.ย. 2569)
+       ต้นเหตุที่หน้าแอดมิน "ค้าง" ตอนเปิด:
+         DOMContentLoaded รอสคริปต์ defer ทุกตัวโหลดและรันให้เสร็จก่อน
+         ไลบรารีนี้หนัก 375 KB และเขียน URL แบบไม่ระบุเวอร์ชัน
+         unpkg จึงต้อง redirect ไปหา /html5-qrcode@2.3.8/... ก่อนอีกหนึ่งรอบ
+         โค้ดเริ่มทำงานตอน DOMContentLoaded ทุกอย่างจึงรอไฟล์นี้อยู่
+         ทั้งที่ใช้เฉพาะตอนกดปุ่มสแกนเท่านั้น
+       ตอนนี้โหลดตอนต้องใช้แทน (ดู ensureQrLibrary ใน script.js)
+       และอุ่นไว้เบื้องหลังหลังหน้าโผล่แล้ว พอกดสแกนจึงพร้อมใช้ทันที -->
   <script src="script.js" defer></script>
 </head>
 <body style="display:none;">
