@@ -213,6 +213,15 @@ body, h1, h2, h3, p, div, span, td, th, label, button, li { overflow-wrap: break
   padding: 9px 12px; margin: 0 0 12px; text-align: left;
 }
 
+/* แถบ "กำลังอัปเดตข้อมูลล่าสุด" — ขึ้นตอนโชว์ของที่จำไว้ในเครื่องก่อน
+   ต้องเห็นชัดพอที่ลูกค้าจะรู้ว่าแต้มที่เห็นอาจยังไม่ใช่ล่าสุด
+   แต่ไม่แรงจนน่าตกใจ เพราะปกติมันจะหายไปเองใน 1-2 วินาที */
+#memberInfo .bc-stale {
+  font-size: 12px; line-height: 1.5; color: #8A5A00;
+  background: #FFF8E6; border: 1px solid #F2DFA8; border-radius: 12px;
+  padding: 8px 12px; margin: 0 0 10px; text-align: center;
+}
+
 /* ── ปุ่ม ────────────────────────────────────────────────────────────── */
 .btn, button {
   font-family: var(--bc-body) !important;
@@ -1008,6 +1017,18 @@ body > .container > h2 { font-size: 1.28rem !important; margin: 0 0 10px !import
 /* ── เมนูปุ่ม ───────────────────────────────────────────────────────── */
 .admin-buttons, .menu-buttons, .button-group { gap: 10px; }
 .admin-buttons .btn, .menu-buttons .btn { white-space: normal !important; }
+
+/* ปุ่มที่เป็นลิงก์ (<a class="btn">) — ต้องสั่งเองทั้งหมด
+   เพราะ <a> ไม่ได้จัดกลางและมีขีดเส้นใต้มาตั้งแต่ต้น ต่างจาก <button>
+   ใช้กับปุ่ม "ดูข้อมูลร้าน" ในหน้าแอดมิน */
+.admin-buttons a.btn, .menu-buttons a.btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  text-decoration: none !important;
+  padding: 12px 16px;
+  line-height: 1.35;
+}
 
 /* ── ตารางประวัติบนจอแคบ ────────────────────────────────────────────── */
 .history-section-wrapper { -webkit-overflow-scrolling: touch; }

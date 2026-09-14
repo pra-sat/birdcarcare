@@ -200,43 +200,134 @@ function generateToken(length = 20) {
 // ✅ เพิ่มใน script.js — หลัง currentUserId ถูกกำหนดแล้ว qr code
 window.qrToken = null;
 let qrInterval = null;
-    
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  เตรียม QR ไว้ล่วงหน้า (14 ก.ย. 2569)
+//
+//  ลูกค้าไม่ได้กดแสดง QR ตอนเปิดหน้า แต่ไปกดตอนยืนจะจ่ายเงินที่หน้าร้าน
+//  ซึ่งเป็นจังหวะที่รอไม่ได้ที่สุด แล้วของเดิมต้องรอ Apps Script อีกรอบเต็ม ๆ
+//  ตรงนั้น (ยังไม่นับเน็ตช้า) ลูกค้ากับพนักงานเลยยืนรอกันหน้าเคาน์เตอร์
+//
+//  ตอนนี้ขอ token ไว้เงียบ ๆ ตั้งแต่ตอนเปิดหน้า พอกดปุ่มก็ขึ้น QR ทันที
+//  ไม่ต้องยิงเน็ตอะไรเลย
+//
+//  ⏰ เรื่องอายุ token — จุดที่พลาดง่ายที่สุดของวิธีนี้
+//     ฝั่งเซิร์ฟเวอร์ (verify_token.gs) ให้ token อายุ 10 นาที นับจากตอน "สร้าง"
+//     ไม่ใช่ตอนที่ลูกค้ากดดู ถ้าเตรียมไว้แล้วลูกค้าเปิดทิ้งไว้ 9 นาทีค่อยกด
+//     QR จะขึ้นสวย ๆ แต่พนักงานสแกนแล้วขึ้น "QR ไม่ถูกต้อง" ซึ่งแย่กว่าเดิมอีก
+//
+//     จึงใช้ของที่เตรียมไว้เฉพาะตอนที่อายุยังไม่เกิน QR_PREWARM_MAX_AGE
+//     ตั้งไว้ที่ 270 วิ = 600 (อายุจริง) - 300 (เวลานับถอยหลังที่โชว์) - 30 (เผื่อ)
+//     แปลว่า QR ที่ขึ้นจอจะหมดเวลาก่อนของจริงหมดอายุเสมอ ไม่มีทางสแกนแล้วพัง
+//     ถ้าเกินกว่านั้น ก็ไปขอใหม่แบบเดิม (ช้าเท่าเดิม แต่ไม่พลาด)
+//
+//     และทุกครั้งที่ลูกค้าสลับกลับมาที่หน้านี้ (เช่น ล็อกจอเดินไปเคาน์เตอร์
+//     แล้วปลดล็อก) จะเตรียมของใหม่ให้เบื้องหลังทันที กว่าจะกดก็ได้ของสดแล้ว
+// ═══════════════════════════════════════════════════════════════════════════
+const QR_SERVER_LIFE_SEC = 600;   // อายุจริงฝั่งเซิร์ฟเวอร์ (verify_token.gs)
+const QR_SHOW_SEC        = 300;   // เวลานับถอยหลังที่โชว์ให้ลูกค้าเห็น
+const QR_SAFETY_SEC      = 30;    // เผื่อเวลาเดินทาง/นาฬิกาคลาดกัน
+const QR_PREWARM_MAX_AGE = QR_SERVER_LIFE_SEC - QR_SHOW_SEC - QR_SAFETY_SEC;  // 270
+const QR_REWARM_AGE      = 180;   // กลับมาที่หน้านี้แล้วของเก่าเกินเท่านี้ ให้ขอใหม่
+
+let warmToken = null;      // { token, at }
+let warmPending = null;    // กันขอซ้อนกัน
+
+// ขอ token เตรียมไว้ — ยิงแล้วไม่รอ ไม่รบกวนหน้าจอ ถ้าพลาดก็เงียบ ๆ
+function prewarmQRToken() {
+  if (!currentUserId) return null;
+  if (warmPending) return warmPending;
+
+  const token = generateToken();
+  warmPending = createTokenOnServer(token)
+    .then(() => {
+      // ของเก่าที่ยังไม่ได้ใช้ ลบทิ้งด้วย ไม่งั้นค้างในชีตเปล่า ๆ
+      const old = warmToken;
+      warmToken = { token, at: Date.now() };
+      if (old && old.token !== token) deleteTokenOnServer(old.token);
+      return warmToken;
+    })
+    .catch(err => {
+      console.warn('⚠️ เตรียม QR ล่วงหน้าไม่สำเร็จ (ไม่เป็นไร เดี๋ยวขอตอนกด):', err);
+      return null;
+    })
+    .finally(() => { warmPending = null; });
+
+  return warmPending;
+}
+
+function warmTokenAgeSec() {
+  return warmToken ? (Date.now() - warmToken.at) / 1000 : Infinity;
+}
+
+function createTokenOnServer(token) {
+  // createdAt: ฝั่ง Apps Script ไม่ได้ใช้ค่านี้เลย (token.gs ใช้ new Date() ของตัวเอง
+  // เป็นเวลาสร้าง QR เสมอ ซึ่งถูกแล้ว) ส่งเวลาปัจจุบันไปเฉย ๆ เพื่อไม่ให้รูปแบบ
+  // ข้อมูลที่ส่งเปลี่ยน · ของเดิมดึงวันที่จากประวัติ ทำให้หน้านี้ต้องรอโหลดประวัติก่อน
+  return fetch(GAS_ENDPOINT + '?action=create_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: "create_token",
+      token,
+      userId: currentUserId,
+      createdAt: new Date().toISOString()
+    })
+  }).then(res => {
+    if (!res.ok) throw new Error("create_token failed");
+    return res.json();
+  }).then(result => {
+    if (result.status !== 'success') throw new Error(result.message || "QR สร้างไม่สำเร็จ");
+    return result;
+  });
+}
+
+function deleteTokenOnServer(token) {
+  if (!token) return;
+  fetch(GAS_ENDPOINT + '?action=delete_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: "delete_token", token })
+  }).catch(() => { /* ลบไม่สำเร็จก็ปล่อย เดี๋ยวหมดอายุเองอยู่แล้ว */ });
+}
+
 async function showQRSection() {
-  
+
   if (!document.getElementById('qrSection').classList.contains('hidden')) {
     return; // ถ้าแสดงอยู่แล้ว ไม่ต้องสร้างใหม่
   }
 
+  // ── มีของเตรียมไว้และยังสดอยู่ -> ขึ้นเลย ไม่แตะเน็ต ────────────────────
+  if (warmToken && warmTokenAgeSec() <= QR_PREWARM_MAX_AGE) {
+    const token = warmToken.token;
+    warmToken = null;                    // ใช้แล้วใช้ซ้ำไม่ได้
+    window.qrToken = token;
+    document.getElementById('qrSection').classList.remove('hidden');
+    generateQRCode(token, memberData);
+    startQRCountdown();
+    return;
+  }
+
+  // ── ไม่มีของ หรือของเก่าเกินไป -> ขอใหม่ (ทางเดิม) ─────────────────────
   const btn = document.getElementById("qrBtn");
   btn.disabled = true;
   const originalText = btn.innerHTML;
   btn.innerHTML = "⏳ กำลังสร้าง QR...";
 
   try {
-    const token = generateToken();
+    // ถ้ากำลังเตรียมอยู่พอดี รอตัวนั้นเลย จะได้ไม่ยิงซ้อนกัน 2 รอบ
+    const pending = warmPending ? await warmPending : null;
+
+    let token;
+    if (pending && (Date.now() - pending.at) / 1000 <= QR_PREWARM_MAX_AGE) {
+      token = pending.token;
+      warmToken = null;
+    } else {
+      token = generateToken();
+      await createTokenOnServer(token);
+    }
+
     window.qrToken = token;
-    // createdAt: ฝั่ง Apps Script ไม่ได้ใช้ค่านี้เลย (token.gs ใช้ new Date() ของตัวเอง
-    // เป็นเวลาสร้าง QR เสมอ ซึ่งถูกแล้ว) ส่งเวลาปัจจุบันไปเฉย ๆ เพื่อไม่ให้รูปแบบ
-    // ข้อมูลที่ส่งเปลี่ยน · ของเดิมดึงวันที่จากประวัติ ทำให้หน้านี้ต้องรอโหลดประวัติก่อน
-    const createdAt = new Date().toISOString();
-    const payload = {
-      action: "create_token",
-      token,
-      userId: currentUserId,
-      createdAt
-    };
-
-    const res = await fetch(GAS_ENDPOINT + '?action=create_token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) throw new Error("create_token failed");
-
-    const result = await res.json();
-    if (result.status !== 'success') throw new Error(result.message || "QR สร้างไม่สำเร็จ");
-
     document.getElementById('qrSection').classList.remove('hidden');
     generateQRCode(token, memberData);
     startQRCountdown();
@@ -343,6 +434,8 @@ function generateQRCode(text, userInfo) {
       document.getElementById('qrUserInfo').innerText = '';
       clearInterval(qrInterval);
       deleteQRToken();
+      // เตรียมของใหม่ไว้เลย เผื่อกดปิดพลาดแล้วกดเปิดใหม่ จะได้ไม่ต้องรออีก
+      prewarmQRToken();
     }
 
 
@@ -367,13 +460,10 @@ function generateQRCode(text, userInfo) {
     }
     
     
-    async function deleteQRToken() {
+    function deleteQRToken() {
       if (!window.qrToken) return;
-      await fetch(GAS_ENDPOINT + '?action=delete_token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: "delete_token", token: window.qrToken })
-      });
+      // ไม่ต้อง await — หน้าจอไม่ได้ใช้ผลลัพธ์ ของเดิมรอไว้เฉย ๆ
+      deleteTokenOnServer(window.qrToken);
       window.qrToken = null;
     }
 
@@ -428,10 +518,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log("✅ userId:", userId);
     currentUserId = userId;
 
-    const res = await fetch(`${GAS_ENDPOINT}?action=member&userId=${userId}`);
-    console.log("✅ response status:", res.status);
+    // ── เคยเปิดหน้านี้แล้ว -> ขึ้นแต้มให้เห็นทันที ไม่ต้องรอเน็ต ──────────
+    // แล้วค่อยไปถามของจริงเบื้องหลัง ได้มาเมื่อไหร่ก็อัปเดตทับให้
+    // (ดูเหตุผลและข้อควรระวังที่ readMemberCache)
+    const cached = readMemberCache(userId);
+    if (cached) {
+      renderMember(cached, true);
+      hideLoadingOverlay();
+    }
 
-    if (!res.ok) {
+    // เตรียม QR ไว้ล่วงหน้าตั้งแต่ตอนนี้ — ยิงพร้อมกับ action=member ไปเลย
+    // ไม่ต้องรอข้อมูลสมาชิกก่อน เพราะใช้แค่ userId
+    prewarmQRToken();
+
+    let res;
+    try {
+      res = await fetch(`${GAS_ENDPOINT}?action=member&userId=${userId}`);
+      console.log("✅ response status:", res.status);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      // มีของเก่าค้างจออยู่แล้ว -> ปล่อยให้ดูต่อไป ดีกว่าไล่ลูกค้าออกจากหน้า
+      // แต่ต้องบอกให้รู้ว่านี่ไม่ใช่ของสด เผื่อเพิ่งใช้บริการมาแล้วแต้มยังไม่ขึ้น
+      if (cached) {
+        console.warn('⚠️ ขอข้อมูลล่าสุดไม่สำเร็จ ใช้ของที่เก็บไว้:', err);
+        markStale('เชื่อมต่อไม่ได้ · กำลังแสดงข้อมูลที่บันทึกไว้');
+        return;
+      }
       hideLoadingOverlay();
       Swal.fire({
         icon: 'error',
@@ -445,9 +557,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const data = await res.json();
-    memberData = data;
 
     if (!data || !data.name) {
+      // ของเก่าบอกว่าเคยเป็นสมาชิก แต่ตอนนี้หาไม่เจอ -> ของเก่าใช้ไม่ได้แล้ว ลบทิ้ง
+      clearMemberCache(userId);
       hideLoadingOverlay();
       Swal.fire({
         icon: 'error',
@@ -460,65 +573,151 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // ── ข้อมูลส่วนตัว + การ์ดรถแต่ละคัน ────────────────────────────────
-    // เขียนทีเดียวจบ (ของเดิมใช้ innerHTML += ซึ่งทำให้เบราว์เซอร์
-    // พาร์สและวาดใหม่ 2 รอบโดยไม่จำเป็น)
-    const profileHtml = `
-      <div class="card bc-prof">
-        <div class="row"><span class="lbl">ชื่อ</span><span class="val">${esc(data.name || "-")}</span></div>
-        <div class="row"><span class="lbl">เบอร์โทร</span><span class="val">${esc(formatPhone(String(data.vehicles[0]?.phone || "-")))}</span></div>
-      </div>
-    `;
-
-    // เช็คว่ามีรถ ยี่ห้อ+รุ่น ซ้ำกันไหม ถ้าซ้ำจะนับจำนวนครั้งแยกคันไม่ได้
-    const keyOf = v => `${String(v.brand || '').trim().toLowerCase()}|${String(v.model || '').trim().toLowerCase()}`;
-    const keys = data.vehicles.map(keyOf);
-    const noDupModel = keys.length === new Set(keys).size;
-
-    // หมายเหตุอายุแต้ม — ตามที่แจ้งลูกค้าไว้ตอนสมัครสมาชิก
-    const expNoteHtml = `
-      <p class="bc-expnote">❕ แต้มมีอายุ 3 เดือนนับจากวันใช้บริการครั้งล่าสุด
-      หากเลยกำหนดจะถูกหักเดือนละ 10 แต้ม · มาใช้บริการเมื่อไหร่ วันหมดอายุจะถูกนับใหม่ทันที</p>
-    `;
-
-    memberInfoEl.innerHTML = profileHtml
-      + data.vehicles.map(v => vehicleCardHtml(v, data.serviceHistory, noDupModel)).join('')
-      + expNoteHtml;
-
-
-/*
-    memberInfoEl.innerHTML = `
-      <p><b> ชื่อ : ${data.name}</b></p>
-      <p> เบอร์โทร : ${formatPhone(data.phone)}</p>
-      <p> รถ : ${data.brand} ${data.model} (${data.year})</p>
-      <p> หมวดหมู่ : ${data.category}</p>
-      <p> แต้มสะสม : ${data.point} แต้ม</p>
-      <p> แต้มหมดอายุ : ${data.expirationDate && data.expirationDate.trim() ? data.expirationDate : '-'}</p>
-    `;
-*/
-    // ── ประวัติการใช้บริการ ────────────────────────────────────────────
-    // โหลดตอนกดปุ่มเท่านั้น ไม่โหลดตั้งแต่เปิดหน้า
-    // ลูกค้าส่วนใหญ่เปิดมาดูแค่แต้ม การรอประวัติทั้งก้อน (ชีต 1,100+ แถว)
-    // ทำให้กว่าจะเห็นแต้มช้าโดยไม่จำเป็น
-    historySection.innerHTML = '';
-    historySection.classList.add('hidden');
-    toggleBtn.disabled = false;
-    toggleBtn.classList.remove('disabled');
-    toggleBtn.textContent = '▼ ดูประวัติการใช้บริการ';
-    bindHistoryToggle();
-
-    // ถ้ายังไม่ได้ deploy Apps Script ตัวใหม่ ประวัติจะติดมากับ action=member เหมือนเดิม
-    // ใช้ของที่ได้มาแล้วเลย จะได้ไม่ต้องยิงซ้ำ
-    if (Array.isArray(data.serviceHistory)) {
-      historyCache = data.serviceHistory;
-    }
-
+    renderMember(data, false);
+    writeMemberCache(userId, data);
     hideLoadingOverlay();
 
   } catch (error) {
     console.error('Error in DOMContentLoaded:', error);
     hideLoadingOverlay();
   }
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  วาดหน้าสมาชิก
+// ═══════════════════════════════════════════════════════════════════════════
+function renderMember(data, isStale) {
+  memberData = data;
+
+  // ── ข้อมูลส่วนตัว + การ์ดรถแต่ละคัน ────────────────────────────────
+  // เขียนทีเดียวจบ (ของเดิมใช้ innerHTML += ซึ่งทำให้เบราว์เซอร์
+  // พาร์สและวาดใหม่ 2 รอบโดยไม่จำเป็น)
+  const profileHtml = `
+    <div class="card bc-prof">
+      <div class="row"><span class="lbl">ชื่อ</span><span class="val">${esc(data.name || "-")}</span></div>
+      <div class="row"><span class="lbl">เบอร์โทร</span><span class="val">${esc(formatPhone(String(data.vehicles[0]?.phone || "-")))}</span></div>
+    </div>
+  `;
+
+  // เช็คว่ามีรถ ยี่ห้อ+รุ่น ซ้ำกันไหม ถ้าซ้ำจะนับจำนวนครั้งแยกคันไม่ได้
+  const keyOf = v => `${String(v.brand || '').trim().toLowerCase()}|${String(v.model || '').trim().toLowerCase()}`;
+  const keys = data.vehicles.map(keyOf);
+  const noDupModel = keys.length === new Set(keys).size;
+
+  // หมายเหตุอายุแต้ม — ตามที่แจ้งลูกค้าไว้ตอนสมัครสมาชิก
+  const expNoteHtml = `
+    <p class="bc-expnote">❕ แต้มมีอายุ 3 เดือนนับจากวันใช้บริการครั้งล่าสุด
+    หากเลยกำหนดจะถูกหักเดือนละ 10 แต้ม · มาใช้บริการเมื่อไหร่ วันหมดอายุจะถูกนับใหม่ทันที</p>
+  `;
+
+  // แถบบอกว่ากำลังอัปเดต — ขึ้นเฉพาะตอนแสดงของเก่า
+  // ต้องมีเสมอ ไม่งั้นลูกค้าที่เพิ่งใช้บริการจะเห็นแต้มเก่าแล้วนึกว่าร้านไม่ได้ให้แต้ม
+  const staleHtml = isStale
+    ? '<p class="bc-stale" id="staleNote">⏳ กำลังอัปเดตข้อมูลล่าสุด...</p>'
+    : '';
+
+  memberInfoEl.innerHTML = staleHtml
+    + profileHtml
+    + data.vehicles.map(v => vehicleCardHtml(v, data.serviceHistory, noDupModel)).join('')
+    + expNoteHtml;
+
+  // ── ประวัติการใช้บริการ ────────────────────────────────────────────
+  // โหลดตอนกดปุ่มเท่านั้น ไม่โหลดตั้งแต่เปิดหน้า
+  // ลูกค้าส่วนใหญ่เปิดมาดูแค่แต้ม การรอประวัติทั้งก้อน (ชีต 1,100+ แถว)
+  // ทำให้กว่าจะเห็นแต้มช้าโดยไม่จำเป็น
+  if (historySection.classList.contains('hidden') || !historyCache) {
+    historySection.innerHTML = '';
+    historySection.classList.add('hidden');
+    toggleBtn.textContent = '▼ ดูประวัติการใช้บริการ';
+  }
+  toggleBtn.disabled = false;
+  toggleBtn.classList.remove('disabled');
+  bindHistoryToggle();
+
+  // ถ้ายังไม่ได้ deploy Apps Script ตัวใหม่ ประวัติจะติดมากับ action=member เหมือนเดิม
+  // ใช้ของที่ได้มาแล้วเลย จะได้ไม่ต้องยิงซ้ำ
+  if (Array.isArray(data.serviceHistory)) {
+    historyCache = data.serviceHistory;
+  }
+}
+
+function markStale(text) {
+  const el = document.getElementById('staleNote');
+  if (el) el.textContent = '⚠️ ' + text;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  จำข้อมูลสมาชิกไว้ในเครื่อง (14 ก.ย. 2569)
+//
+//  ลูกค้าเปิดหน้านี้ซ้ำ ๆ ทุกครั้งที่มาใช้บริการ ของที่เห็นก็ชุดเดิมเกือบทั้งหมด
+//  (ชื่อ เบอร์ รถ ทะเบียน) เปลี่ยนจริงแค่ตัวเลขแต้ม และเปลี่ยนตอนที่แอดมิน
+//  บันทึกบริการให้เท่านั้น จึงขึ้นของเก่าให้เห็นก่อนได้เลย แล้วค่อยอัปเดตทับ
+//
+//  ⚠️ ข้อควรระวัง ตัวเลขแต้มที่เห็นตอนแรกอาจยังไม่ใช่ล่าสุด
+//     จึงต้องขึ้นแถบ "กำลังอัปเดตข้อมูลล่าสุด..." คู่กันเสมอ
+//     และต้องอัปเดตทับทันทีที่ของจริงมาถึง ห้ามปล่อยให้ค้าง
+//
+//  เก็บ 7 วัน — เกินกว่านั้นถือว่านานพอที่จะไม่ควรเดาแล้ว รอของจริงดีกว่า
+//  แยกคีย์ตาม userId เผื่อเครื่องเดียวมีหลายคนใช้
+// ═══════════════════════════════════════════════════════════════════════════
+const MEMBER_CACHE_DAYS = 7;
+const memberCacheKey = userId => 'bcMember_' + userId;
+
+function readMemberCache(userId) {
+  try {
+    const raw = localStorage.getItem(memberCacheKey(userId));
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (!c || !c.at || !c.data || !c.data.name) return null;
+    if (!Array.isArray(c.data.vehicles) || !c.data.vehicles.length) return null;
+    if (Date.now() - c.at > MEMBER_CACHE_DAYS * 24 * 60 * 60 * 1000) return null;
+    return c.data;
+  } catch (e) { return null; }
+}
+
+function writeMemberCache(userId, data) {
+  try {
+    // ไม่เก็บประวัติลงไปด้วย — ก้อนใหญ่และมีข้อความที่ลูกค้าเขียนเอง
+    // เก็บแค่ที่ใช้วาดหน้าแรก
+    const slim = { userId: data.userId, name: data.name, vehicles: data.vehicles };
+    localStorage.setItem(memberCacheKey(userId), JSON.stringify({ at: Date.now(), data: slim }));
+  } catch (e) { /* เครื่องปิด localStorage ก็ไม่เป็นไร แค่ช้าเหมือนเดิม */ }
+}
+
+function clearMemberCache(userId) {
+  try { localStorage.removeItem(memberCacheKey(userId)); } catch (e) {}
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  กลับมาที่หน้านี้อีกครั้ง -> เตรียม QR ใหม่ + เช็คแต้มล่าสุด
+//
+//  ท่าที่ลูกค้าทำจริง: เปิดหน้านี้ดูแต้ม -> ล็อกจอ -> เดินไปเคาน์เตอร์ ->
+//  ปลดล็อก -> กดแสดง QR  ตรงจังหวะปลดล็อกนี่แหละที่เตรียมของใหม่ได้ทัน
+//  กว่านิ้วจะแตะปุ่มก็ได้ของสดแล้ว
+// ═══════════════════════════════════════════════════════════════════════════
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !currentUserId) return;
+
+  // QR ที่เตรียมไว้เก่าเกินไปแล้ว -> ขอใหม่เงียบ ๆ
+  if (warmTokenAgeSec() > QR_REWARM_AGE) prewarmQRToken();
+
+  // เช็คแต้มล่าสุดด้วย เผื่อแอดมินเพิ่งบันทึกบริการให้ระหว่างที่พับหน้าจอไว้
+  // ไม่ขึ้นหน้าจอโหลดคั่น ถ้าได้ของใหม่ค่อยอัปเดตทับเงียบ ๆ
+  if (document.getElementById('qrSection') &&
+      !document.getElementById('qrSection').classList.contains('hidden')) {
+    return;  // กำลังโชว์ QR อยู่ อย่าไปวาดทับ
+  }
+  fetch(`${GAS_ENDPOINT}?action=member&userId=${currentUserId}`)
+    .then(res => (res.ok ? res.json() : null))
+    .then(data => {
+      if (!data || !data.name) return;
+      renderMember(data, false);
+      writeMemberCache(currentUserId, data);
+    })
+    .catch(() => { /* เน็ตสะดุดก็ปล่อย ของที่เห็นอยู่ยังใช้ได้ */ });
 });
 
 
