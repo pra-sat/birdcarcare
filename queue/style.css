@@ -72,8 +72,10 @@
   text-align: center; margin: 0 0 11px;
 }
 
-.q-dow-note {
-  font-size: 12px; line-height: 1.5; color: #2E7048;
+.q-dow-note { font-size: 12px; line-height: 1.5; color: #2E7048; }
+/* เส้นคั่นมีเฉพาะตอนที่มีข้อความช่วงเวลาอยู่ข้างบนจริง ๆ
+   ถ้าส่วนบนถูกซ่อน (รูปแบบรายชั่วโมงยังไม่ผ่านการทดสอบ) จะเหลือเส้นลอย ๆ */
+.q-quiet-body:not(.hidden) + .q-dow-note {
   margin-top: 6px; padding-top: 6px; border-top: 1px dashed #C8E8D2;
 }
 .q-quiet-busy { color: var(--bc-ink2); font-size: 12px; }

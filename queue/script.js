@@ -118,22 +118,38 @@ function render(d) {
   // ── ช่วงที่คนน้อย ─────────────────────────────────────────────────────
   // 🔴 แสดงเฉพาะเมื่อ hourPatternReal เท่านั้น
   //    ถ้ารูปแบบยังไม่ต่างจากความบังเอิญ การแนะนำช่วงเวลาก็คือการเดา
-  if (d.hourPatternReal && d.quietHours && d.quietHours.length) {
+  const hasQuiet = d.hourPatternReal && d.quietHours && d.quietHours.length;
+  if (hasQuiet) {
     $('quietBody').innerHTML =
       `ช่วง <b>${joinHours(d.quietHours)}</b> ปกติคนน้อยที่สุด` +
       (d.busyHours && d.busyHours.length
         ? `<br><span class="q-quiet-busy">ช่วง ${joinHours(d.busyHours)} คนเยอะกว่าช่วงอื่น</span>` : '');
-    show($('quietCard'), true);
   }
+  show($('quietBody'), hasQuiet);
 
-  // ── วันในสัปดาห์ — พูดเฉพาะเมื่อผ่านการทดสอบแล้ว ───────────────────────
+  // ── วันหยุด / วันในสัปดาห์ — พูดเฉพาะเมื่อผ่านการทดสอบแล้ว ─────────────
+  //
+  // เรียงจากคำถามแคบไปกว้าง เพราะคำถามแคบตอบได้ด้วยข้อมูลน้อยกว่า
+  //   1. วันหยุด vs วันธรรมดา  (ผ่านแล้วด้วยข้อมูลปัจจุบัน)
+  //   2. ไล่ทีละวัน             (ยังไม่ผ่าน จะเริ่มพูดเองเมื่อข้อมูลพอ)
+  let note = '';
+  if (d.weekendReal && d.weekendPct) {
+    note = d.isWeekendNow
+      ? `วันหยุดคนเยอะกว่าวันธรรมดาประมาณ ${d.weekendPct}% · วันนี้เป็นวันหยุด`
+      : `เสาร์-อาทิตย์คนเยอะกว่าวันธรรมดาประมาณ ${d.weekendPct}%`;
+  }
   if (d.dowPatternReal && Array.isArray(d.dows) && d.dows.length) {
     const DOW = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
     const top = d.dows.slice().sort((a, b) => b.avg - a.avg);
-    $('dowNote').textContent =
-      `วัน${DOW[top[0].dow]}คนเยอะที่สุด · วัน${DOW[top[top.length - 1].dow]}เงียบที่สุด`;
-    show($('dowNote'), true);
+    note = `วัน${DOW[top[0].dow]}คนเยอะที่สุด · วัน${DOW[top[top.length - 1].dow]}เงียบที่สุด`;
   }
+  if (note) $('dowNote').textContent = note;
+  show($('dowNote'), !!note);
+
+  // การ์ดนี้โผล่เมื่อมีอย่างน้อยหนึ่งอย่างที่ผ่านการทดสอบแล้ว
+  // ทั้งสองส่วนเป็นอิสระต่อกัน ห้ามให้ส่วนหนึ่งบังอีกส่วน
+  show($('quietCard'), !!(hasQuiet || note));
+  $('quietHead').textContent = hasQuiet ? '🟢 ช่วงที่คนน้อย' : '🟢 ช่วงที่คนเยอะ-คนน้อย';
 
   // ── กราฟรายชั่วโมง ────────────────────────────────────────────────────
   if (d.hourPatternReal && Array.isArray(d.hours) && d.hours.length) {
