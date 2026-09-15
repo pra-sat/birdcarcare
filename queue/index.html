@@ -24,10 +24,27 @@
 
     <div class="q-hero">
       <h2>ตรวจสอบคิว</h2>
-      <p class="q-tag">Bird CarCare · เปิดทุกวัน <span id="openText">07:30 – 17:30</span></p>
+      <p class="q-tag">Bird CarCare</p>
     </div>
 
-    <!-- สถานะตอนนี้ -->
+    <!-- ══ แถบสถานะร้าน เปิด/ปิด ══════════════════════════════════════════
+         🔴 วาดทันทีจากนาฬิกาในเครื่อง ไม่ต้องรอเน็ตเลย
+            เครื่องรู้เวลาอยู่แล้ว และเวลาทำการเป็นค่าคงที่ (07:30–17:30)
+            ลูกค้าจึงเห็นสิ่งที่อยากรู้ที่สุดตั้งแต่วินาทีแรกที่หน้าเปิด
+            พอ Apps Script ตอบกลับมาค่อยยืนยันทับอีกที (เผื่อนาฬิกาเครื่องเพี้ยน)
+    -->
+    <div class="shop-state" id="shopState">
+      <div class="ss-main">
+        <span class="ss-dot"></span>
+        <span class="ss-title" id="ssTitle">เปิดอยู่</span>
+      </div>
+      <div class="ss-sub" id="ssSub">ทุกวัน 07:30 – 17:30</div>
+    </div>
+
+    <!-- บอกว่ากำลังอัปเดต — ขึ้นตอนวาดจากของที่จำไว้ในเครื่องก่อน -->
+    <p class="q-updating hidden" id="updating"></p>
+
+    <!-- สถานะคิวตอนนี้ -->
     <div class="q-card" id="statusCard">
       <div class="q-dot" id="statusDot">•</div>
       <div class="q-status-text">
@@ -65,7 +82,7 @@
     <button class="btn outline" id="refreshBtn" type="button">🔄 ดูอีกครั้ง</button>
     <!-- เขียนให้เหมือนหน้าข้อมูลร้านเป๊ะ ๆ (โชว์เบอร์เป็นข้อความ ไม่ใช่คำว่า "โทรถามร้าน")
          เพราะหน้านั้นกดแล้วโทรได้เลย ไม่ต้องกดยืนยันก่อน -->
-    <a class="btn" id="callBtn" href="tel:0867876441">📞 086-787-6441</a>
+    <a class="btn" id="callBtn" href="tel:0867876441">📞 โทรถามร้าน</a>
 
     <p class="q-note">
       ตัวเลขนี้ประเมินจากสถิติการให้บริการของร้าน <b>ไม่ใช่การนับรถจริงในขณะนี้</b>

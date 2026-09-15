@@ -20,6 +20,50 @@
 }
 .q-tag { font-size: 12.5px; color: var(--bc-ink2); margin: 0; }
 
+/* ══ แถบสถานะร้าน เปิด/ปิด ════════════════════════════════════════════
+   สิ่งที่ลูกค้าอยากรู้ที่สุดในหน้านี้ จึงให้เด่นที่สุด
+   ใช้สีน้ำเงินของร้านตอนเปิด (ไม่ใช่เขียว-แดงทั่วไป) ให้เข้าธีมเดียวกับทั้งระบบ
+   ตอนปิดใช้โทนหม่นของธีม ไม่ใช้สีแดง เพราะร้านปิดไม่ใช่เรื่องผิดปกติ
+   ⚠️ ไม่สื่อด้วยสีอย่างเดียว มีข้อความ "เปิดอยู่/ปิดแล้ว" กำกับเสมอ */
+.shop-state {
+  border-radius: 18px;
+  padding: 16px 18px;
+  margin-bottom: 11px;
+  text-align: left;
+  color: #fff;
+  background: linear-gradient(135deg, var(--bc-water) 0%, var(--bc-deep) 100%);
+  box-shadow: 0 4px 14px rgba(10, 79, 122, .22);
+}
+.shop-state.is-shut {
+  color: var(--bc-ink);
+  background: linear-gradient(135deg, #E7EFF4 0%, #D6E4EC 100%);
+  box-shadow: none;
+  border: 1px solid var(--bc-line);
+}
+
+.ss-main { display: flex; align-items: center; gap: 10px; }
+.ss-title {
+  font-family: var(--bc-disp); font-weight: 500;
+  font-size: 26px; line-height: 1.15; letter-spacing: .2px;
+}
+.ss-sub { font-size: 12.5px; line-height: 1.5; margin-top: 5px; opacity: .88; }
+
+/* จุดกะพริบตอนเปิด — บอกว่า "ตอนนี้จริง ๆ" ไม่ใช่ป้ายเวลาทำการนิ่ง ๆ */
+.ss-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #7FE3C4; flex: 0 0 auto;
+  box-shadow: 0 0 0 0 rgba(127, 227, 196, .75);
+  animation: ssPulse 2.1s ease-out infinite;
+}
+.shop-state.is-shut .ss-dot {
+  background: #A9BEC9; animation: none; box-shadow: none;
+}
+@keyframes ssPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(127, 227, 196, .65); }
+  70%  { box-shadow: 0 0 0 9px rgba(127, 227, 196, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(127, 227, 196, 0); }
+}
+
 /* ── การ์ดกลาง ───────────────────────────────────────────────────────── */
 .q-card {
   background: #fff;
@@ -120,6 +164,13 @@
   padding: 9px 12px; margin: 6px 0 0; text-align: left;
 }
 
+/* แถบบอกว่ากำลังอัปเดต — ขึ้นตอนโชว์ของที่จำไว้ในเครื่องก่อน */
+.q-updating {
+  font-size: 11.5px; color: var(--bc-ink2); text-align: center;
+  margin: 0 0 10px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .q-bar { transition: none; }
+  .ss-dot { animation: none; }
 }

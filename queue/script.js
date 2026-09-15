@@ -13,6 +13,73 @@ const $ = id => document.getElementById(id);
 const hh = h => String(h).padStart(2, '0') + ':00';
 const show = (el, yes) => { if (el) el.classList.toggle('hidden', !yes); };
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  สถานะร้าน เปิด/ปิด — คำนวณเองในเครื่อง ไม่ต้องรอเน็ต
+//
+//  เวลาทำการเป็นค่าคงที่ และเครื่องก็รู้เวลาอยู่แล้ว
+//  จึงวาดได้ตั้งแต่วินาทีแรกที่หน้าเปิด ไม่ต้องรอ Apps Script ตอบ (1–5 วินาที)
+//
+//  ⚠️ ห้ามใช้ getHours() ตรง ๆ เพราะได้เวลาตามเขตเวลาของ "เครื่อง"
+//     ลูกค้าที่ตั้งเครื่องเป็นเขตเวลาอื่นจะเห็นผิด
+//     ต้องบวกออฟเซ็ตให้เป็นเวลาไทยเสมอ ไม่ว่าเครื่องจะตั้งไว้ยังไง
+//
+//  ถ้านาฬิกาในเครื่องเพี้ยนไปเลย ผลจาก Apps Script ที่ตามมาจะทับให้ถูกเอง
+// ═══════════════════════════════════════════════════════════════════════════
+const OPEN_MIN = 7 * 60 + 30;    // 07:30
+const CLOSE_MIN = 17 * 60 + 30;  // 17:30
+const OPEN_TEXT = 'ทุกวัน 07:30 – 17:30';
+
+function thaiMinutesNow() {
+  const d = new Date();
+  // getTimezoneOffset() เป็นนาทีที่ต้องบวกเพื่อไปถึง UTC · ไทยคือ UTC+7
+  const th = new Date(d.getTime() + (d.getTimezoneOffset() + 7 * 60) * 60000);
+  return th.getHours() * 60 + th.getMinutes();
+}
+
+function paintShopState(openNow) {
+  const mins = thaiMinutesNow();
+  const open = (openNow === undefined || openNow === null)
+    ? (mins >= OPEN_MIN && mins < CLOSE_MIN)
+    : openNow;
+
+  $('shopState').classList.toggle('is-shut', !open);
+  $('ssTitle').textContent = open ? 'เปิดอยู่' : 'ปิดแล้ว';
+
+  if (open) {
+    const left = CLOSE_MIN - mins;
+    $('ssSub').textContent = left <= 60
+      ? `${OPEN_TEXT} · อีก ${left} นาทีร้านปิด`
+      : OPEN_TEXT;
+  } else {
+    $('ssSub').textContent = mins < OPEN_MIN
+      ? `${OPEN_TEXT} · เปิดอีกครั้ง 07:30 น.`
+      : `${OPEN_TEXT} · เปิดอีกครั้งพรุ่งนี้ 07:30 น.`;
+  }
+  return open;
+}
+
+// ── จำผลไว้ในเครื่อง เพื่อไม่ให้หน้าว่างระหว่างรอเน็ต ──────────────────────
+// ส่วนสถิติ (ช่วงคนน้อย กราฟ วันหยุด) แทบไม่เปลี่ยนวันต่อวัน แสดงจากของเก่าได้เลย
+// ส่วนสถานะคิว "ตอนนี้" เปลี่ยนเร็ว จึงใช้ของเก่าได้แค่ถ้าเพิ่งเก็บมาไม่นาน
+const CACHE_KEY = 'bcQueueSeen';
+const STAT_MAX_AGE = 24 * 60 * 60 * 1000;  // สถิติ: 24 ชม.
+const LIVE_MAX_AGE = 10 * 60 * 1000;       // สถานะคิว: 10 นาที
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (!c || !c.at || !c.data) return null;
+    if (Date.now() - c.at > STAT_MAX_AGE) return null;
+    return c;
+  } catch (e) { return null; }
+}
+function writeCache(data) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data: data })); }
+  catch (e) { /* เครื่องปิด localStorage ก็แค่ช้าเหมือนเดิม */ }
+}
+
 // รวมชั่วโมงที่ติดกันให้อ่านง่าย: [15,16,17] -> "15:00–18:00"
 function joinHours(list) {
   if (!list || !list.length) return '';
@@ -27,14 +94,25 @@ function joinHours(list) {
   return runs.map(([a, b]) => `${hh(a)}–${hh(b + 1)}`).join(' และ ');
 }
 
-async function loadQueue() {
+async function loadQueue(silent) {
   const btn = $('refreshBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังดู...'; }
+  if (btn && !silent) { btn.disabled = true; btn.textContent = '⏳ กำลังดู...'; }
   try {
     const res = await fetch(`${GAS_ENDPOINT}?action=queue`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    render(await res.json());
+    const data = await res.json();
+    writeCache(data);
+    render(data);
+    show($('updating'), false);
   } catch (err) {
+    // มีของเก่าค้างจออยู่แล้ว -> ปล่อยให้ดูต่อ ดีกว่าล้างทิ้งเป็นหน้าว่าง
+    if (silent || $('statusCard').dataset.painted === '1') {
+      console.warn('อัปเดตไม่สำเร็จ ใช้ของที่จำไว้:', err);
+      $('updating').textContent = '⚠️ เชื่อมต่อไม่ได้ · กำลังแสดงข้อมูลที่บันทึกไว้';
+      show($('updating'), true);
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 ดูอีกครั้ง'; }
+      return;
+    }
     console.warn('โหลดสถานะไม่สำเร็จ:', err);
     // ไม่มี SweetAlert ในหน้านี้ (ตั้งใจไม่โหลด) เขียนลงการ์ดตรง ๆ
     $('statusDot').textContent = '⚠️';
@@ -47,7 +125,9 @@ async function loadQueue() {
 }
 
 function render(d) {
-  if (d.openText) $('openText').textContent = d.openText;
+  // ยืนยันสถานะร้านจากเซิร์ฟเวอร์ทับที่คำนวณไว้เอง (เผื่อนาฬิกาเครื่องเพี้ยน)
+  paintShopState(d.openNow);
+  $('statusCard').dataset.painted = '1';
 
   // ── การ์ดสถานะ ────────────────────────────────────────────────────────
   // ถ้อยคำต่างกันตามว่าร้านนี้ "มีคิวจริงไหม"
@@ -57,12 +137,17 @@ function render(d) {
 
   // ⚠️ ห้ามใส่จำนวนรถลงในข้อความเหล่านี้ (เจ้าของร้านสั่ง 15 ก.ย. 2569)
   //    บอกได้แค่ว่าคึกหรือว่าง ไม่บอกว่ากี่คัน
+  // ร้านปิด -> ซ่อนการ์ดคิวไปเลย แถบด้านบนบอกครบแล้ว
+  // ขึ้นสองอันซ้อนกันบอกเรื่องเดียวกันไม่ได้ช่วยอะไร แค่ทำให้หน้ารก
+  // ส่วนช่วงคนน้อยกับกราฟยังโชว์อยู่ เพราะเอาไว้วางแผนว่าจะมาพรุ่งนี้ตอนไหน
   if (d.status === 'closed') {
-    dot = '⚪'; cls = 'is-closed';
-    title = 'ตอนนี้ร้านปิดอยู่';
-    sub = `เปิดอีกครั้ง ${d.openText || '07:30'} น.`;
+    show($('statusCard'), false);
+    renderPlanning(d);
+    return;
+  }
+  show($('statusCard'), true);
 
-  } else if (d.status === 'unknown' || !d.enoughData) {
+  if (d.status === 'unknown' || !d.enoughData) {
     dot = '⚪'; cls = 'is-closed';
     title = 'ยังบอกไม่ได้';
     sub = 'ยังประเมินให้ไม่ได้ตอนนี้ โทรถามร้านได้เลยค่ะ';
@@ -96,6 +181,12 @@ function render(d) {
   $('statusSub').textContent = sub;
   $('statusCard').className = 'q-card ' + cls;
 
+  renderPlanning(d);
+}
+
+// ส่วนที่เอาไว้วางแผน (ช่วงคนน้อย · วันหยุด · กราฟ)
+// ใช้สถิติล้วน จึงแสดงได้ทั้งตอนร้านเปิดและร้านปิด
+function renderPlanning(d) {
   // ── ช่วงที่คนน้อย ─────────────────────────────────────────────────────
   // 🔴 แสดงเฉพาะเมื่อ hourPatternReal เท่านั้น
   //    ถ้ารูปแบบยังไม่ต่างจากความบังเอิญ การแนะนำช่วงเวลาก็คือการเดา
@@ -150,12 +241,38 @@ function render(d) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  $('refreshBtn').addEventListener('click', loadQueue);
-  loadQueue();
+  // ── 1. วาดสถานะร้านทันที จากนาฬิกาในเครื่อง ไม่แตะเน็ตเลย ──────────────
+  paintShopState();
+
+  // ── 2. วาดของที่จำไว้ทันที ถ้าเคยเปิดหน้านี้แล้ว ───────────────────────
+  // ของเดิมหน้าจะว่างอยู่ 1–5 วินาทีระหว่างรอ Apps Script ตอบ
+  const cached = readCache();
+  if (cached) {
+    const age = Date.now() - cached.at;
+    if (age <= LIVE_MAX_AGE) {
+      // เพิ่งเก็บมา ใช้ได้ทั้งใบ
+      render(cached.data);
+      $('updating').textContent = '⏳ กำลังตรวจสอบข้อมูลล่าสุด...';
+      show($('updating'), true);
+    } else {
+      // เก่าเกินกว่าจะบอกว่า "ตอนนี้" เป็นยังไง
+      // แต่ส่วนสถิติยังใช้ได้ วาดไปก่อนเลย
+      show($('statusCard'), false);
+      renderPlanning(cached.data);
+      $('updating').textContent = '⏳ กำลังตรวจสอบสถานะตอนนี้...';
+      show($('updating'), true);
+    }
+  }
+
+  // ── 3. ค่อยไปถามของจริง ──────────────────────────────────────────────
+  $('refreshBtn').addEventListener('click', () => loadQueue(false));
+  loadQueue(!!cached);
 
   // กลับมาที่หน้านี้อีกครั้ง (สลับแอปแล้วกลับมา) ให้ดูใหม่ให้เลย
-  // ไม่งั้นลูกค้าจะเห็นตัวเลขค้างจากเมื่อครู่โดยไม่รู้ตัว
+  // ไม่งั้นลูกค้าจะเห็นสถานะค้างจากเมื่อครู่โดยไม่รู้ตัว
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') loadQueue();
+    if (document.visibilityState !== 'visible') return;
+    paintShopState();          // เวลาเดินไปแล้ว ร้านอาจปิดไปแล้วก็ได้
+    loadQueue(true);
   });
 });
