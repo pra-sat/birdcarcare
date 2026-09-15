@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ตรวจสอบคิว</title>
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="style.css">
+  <!--
+    🔴 หน้านี้ตั้งใจ "ไม่โหลด LIFF SDK" และ "ไม่โหลด SweetAlert2"
+
+    เป็นข้อมูลของร้าน ไม่ใช่ข้อมูลส่วนตัวของลูกค้า จึงไม่ต้องรู้ว่าใครเปิด
+    ไม่ต้อง liff.init() = ไม่ต้องรอ LINE ตอบก่อนหนึ่งรอบ
+    ลูกค้ากดจากเมนูแล้วเห็นผลได้เลย เร็วกว่าทุกหน้าที่มีอยู่
+
+    ⚠️ ถ้าวันหลังจะเพิ่มอะไรที่ต้องรู้ตัวตนลูกค้า ให้คิดให้ดีก่อน
+       เพราะจะต้องเอา LIFF SDK กลับเข้ามา แล้วหน้านี้จะช้าลงทันที
+  -->
+  <script src="../theme.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="container">
+
+    <div class="q-hero">
+      <h2>ตรวจสอบคิว</h2>
+      <p class="q-tag">Bird CarCare · เปิดทุกวัน <span id="openText">07:30 – 17:30</span></p>
+    </div>
+
+    <!-- สถานะตอนนี้ -->
+    <div class="q-card" id="statusCard">
+      <div class="q-dot" id="statusDot">•</div>
+      <div class="q-status-text">
+        <div class="q-status-title" id="statusTitle">กำลังตรวจสอบ...</div>
+        <div class="q-status-sub" id="statusSub">&nbsp;</div>
+      </div>
+    </div>
+
+    <!-- ตัวเลขจริง ให้ลูกค้าตัดสินเองได้ ไม่ใช่เชื่อไฟสีอย่างเดียว -->
+    <div class="q-facts hidden" id="facts">
+      <div class="q-fact">
+        <span class="q-fact-n" id="factToday">–</span>
+        <span class="q-fact-l">วันนี้เสร็จไปแล้ว<br>(คัน)</span>
+      </div>
+      <div class="q-fact">
+        <span class="q-fact-n" id="factHour">–</span>
+        <span class="q-fact-l">ชั่วโมงที่ผ่านมา<br>(คัน)</span>
+      </div>
+      <div class="q-fact">
+        <span class="q-fact-n" id="factLast">–</span>
+        <span class="q-fact-l">ล่าสุดเสร็จเมื่อ<br>(นาทีที่แล้ว)</span>
+      </div>
+    </div>
+
+    <p class="q-cycle hidden" id="cycleNote"></p>
+
+    <!-- ช่วงที่คนน้อย — ส่วนนี้ใช้สถิติล้วน ใช้ได้เสมอแม้ร้านปิดอยู่ -->
+    <div class="q-card q-quiet hidden" id="quietCard">
+      <div class="q-quiet-head">🟢 ช่วงที่คนน้อย</div>
+      <div class="q-quiet-body" id="quietBody"></div>
+    </div>
+
+    <!-- กราฟความคึกของวันนี้ -->
+    <div class="q-card hidden" id="chartCard">
+      <div class="q-chart-head">ความคึกของวันนี้ <span id="chartDow"></span> <span class="q-chart-note">(เฉลี่ยจากที่ผ่านมา)</span></div>
+      <div class="q-chart" id="chart"></div>
+      <div class="q-chart-foot">
+        <span class="q-legend"><i class="q-sw now"></i> ตอนนี้</span>
+        <span class="q-legend"><i class="q-sw"></i> คันต่อชั่วโมง</span>
+      </div>
+    </div>
+
+    <button class="btn outline" id="refreshBtn" type="button">🔄 ดูอีกครั้ง</button>
+    <a class="btn" id="callBtn" href="tel:0947727755">📞 โทรถามร้าน</a>
+
+    <p class="q-note">
+      ตัวเลขนี้ประเมินจากสถิติการให้บริการของร้าน <b>ไม่ใช่การนับรถจริงในขณะนี้</b>
+      ใช้ดูแนวโน้มได้ แต่ถ้าอยากรู้แน่นอน โทรถามร้านได้เลยค่ะ
+    </p>
+
+  </div>
+</body>
+</html>
