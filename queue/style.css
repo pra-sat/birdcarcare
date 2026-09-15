@@ -51,26 +51,9 @@
   font-size: 12.5px; line-height: 1.5; color: var(--bc-ink2); margin-top: 3px;
 }
 
-/* ── ตัวเลข 3 ช่อง ───────────────────────────────────────────────────── */
-.q-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 11px; }
-.q-fact {
-  background: var(--bc-foam);
-  border: 1px solid var(--bc-line);
-  border-radius: 14px;
-  padding: 11px 6px;
-  text-align: center;
-}
-.q-fact-n {
-  display: block;
-  font-family: var(--bc-disp); font-weight: 500; font-size: 1.45rem; line-height: 1.1;
-  color: var(--bc-waterD); font-variant-numeric: tabular-nums;
-}
-.q-fact-l { display: block; font-size: 10.5px; line-height: 1.35; color: var(--bc-ink2); margin-top: 4px; }
-
-.q-baseline {
-  font-size: 12px; line-height: 1.5; color: var(--bc-ink2);
-  text-align: center; margin: 0 0 11px;
-}
+/* หมายเหตุ: เคยมีกล่องตัวเลข 3 ช่อง (วันนี้กี่คัน / ชั่วโมงที่ผ่านมา / ล่าสุด)
+   กับบรรทัดค่าเฉลี่ยต่อวัน — เอาออกแล้ว 15 ก.ย. 2569 ตามที่เจ้าของร้านสั่ง
+   ไม่บอกปริมาณธุรกิจให้ลูกค้า · ฝั่ง Apps Script ก็ไม่ส่งตัวเลขพวกนี้มาแล้ว */
 
 .q-dow-note { font-size: 12px; line-height: 1.5; color: #2E7048; }
 /* เส้นคั่นมีเฉพาะตอนที่มีข้อความช่วงเวลาอยู่ข้างบนจริง ๆ

@@ -55,65 +55,46 @@ function render(d) {
   // ว่าต้องรอ ทั้งที่ความจริงคือเดินเข้าไปได้เลย
   let dot, title, sub, cls;
 
+  // ⚠️ ห้ามใส่จำนวนรถลงในข้อความเหล่านี้ (เจ้าของร้านสั่ง 15 ก.ย. 2569)
+  //    บอกได้แค่ว่าคึกหรือว่าง ไม่บอกว่ากี่คัน
   if (d.status === 'closed') {
     dot = '⚪'; cls = 'is-closed';
     title = 'ตอนนี้ร้านปิดอยู่';
     sub = `เปิดอีกครั้ง ${d.openText || '07:30'} น.`;
-    if (d.todayCount) sub += ` · วันนี้ให้บริการไป ${d.todayCount} คัน`;
 
   } else if (d.status === 'unknown' || !d.enoughData) {
     dot = '⚪'; cls = 'is-closed';
     title = 'ยังบอกไม่ได้';
-    sub = 'ข้อมูลยังไม่พอจะประเมินให้ โทรถามร้านได้เลยค่ะ';
+    sub = 'ยังประเมินให้ไม่ได้ตอนนี้ โทรถามร้านได้เลยค่ะ';
 
   } else if (d.status === 'busy') {
     dot = '🔴'; cls = 'is-busy';
     title = 'ช่วงนี้คึกกว่าปกติ';
-    sub = `ชั่วโมงที่ผ่านมามีรถเสร็จไป ${d.lastHourCount} คัน ซึ่งมากกว่าที่ร้านนี้ปกติเป็น อาจต้องรอสักหน่อย`;
+    sub = 'มีรถเข้ามาถี่กว่าที่ร้านปกติเป็น อาจต้องรอสักหน่อย';
 
   } else if (d.rarelyBusy) {
     // ร้านแทบไม่มีคิว -> เขียวทั้ง free และ normal แต่ข้อความต่างกันนิดหน่อย
     dot = '🟢'; cls = 'is-free';
     title = 'ปกติมาได้เลย ไม่ต้องรอ';
-    sub = d.lastHourCount > 0
-      ? `เพิ่งมีรถเสร็จไป ${d.lastHourCount} คันในชั่วโมงที่ผ่านมา อาจมีรถอยู่หน้าคุณสักคัน`
-      : 'ชั่วโมงที่ผ่านมายังไม่มีรถเสร็จ';
+    sub = d.recentActivity
+      ? 'เมื่อครู่มีรถเข้ามาบ้าง อาจมีรถอยู่หน้าคุณสักคัน'
+      : 'ช่วงนี้ร้านว่าง';
 
   } else if (d.status === 'free') {
     dot = '🟢'; cls = 'is-free';
     title = 'น่าจะไม่ต้องรอ';
-    sub = 'ชั่วโมงที่ผ่านมายังไม่มีรถเสร็จ';
+    sub = 'ช่วงนี้ร้านว่าง';
 
   } else {
     dot = '🟡'; cls = 'is-normal';
     title = 'คนปานกลาง';
-    sub = `ชั่วโมงที่ผ่านมามีรถเสร็จไป ${d.lastHourCount} คัน`;
+    sub = 'มีรถเข้ามาบ้างประปราย';
   }
 
   $('statusDot').textContent = dot;
   $('statusTitle').textContent = title;
   $('statusSub').textContent = sub;
   $('statusCard').className = 'q-card ' + cls;
-
-  // ── บรรทัดบอกขนาดร้าน ─────────────────────────────────────────────────
-  // สำคัญมาก เป็นบริบทที่ทำให้ตัวเลขอื่นอ่านแล้วเข้าใจถูก
-  if (d.perDay) {
-    $('baseline').textContent = d.rarelyBusy
-      ? `ร้านรับเฉลี่ยวันละ ${d.perDay} คัน ส่วนใหญ่ลูกค้ามาถึงแล้วได้เลย`
-      : `ร้านรับเฉลี่ยวันละ ${d.perDay} คัน`;
-    show($('baseline'), true);
-  }
-
-  // ── ตัวเลขจริง ────────────────────────────────────────────────────────
-  const hasFacts = d.enoughData && typeof d.todayCount === 'number';
-  show($('facts'), hasFacts);
-  if (hasFacts) {
-    $('factToday').textContent = d.todayCount;
-    $('factHour').textContent = d.lastHourCount;
-    $('factLast').textContent =
-      (d.minsSinceLast === null || d.minsSinceLast === undefined || d.minsSinceLast > 600)
-        ? '–' : d.minsSinceLast;
-  }
 
   // ── ช่วงที่คนน้อย ─────────────────────────────────────────────────────
   // 🔴 แสดงเฉพาะเมื่อ hourPatternReal เท่านั้น
@@ -138,10 +119,9 @@ function render(d) {
       ? `วันหยุดคนเยอะกว่าวันธรรมดาประมาณ ${d.weekendPct}% · วันนี้เป็นวันหยุด`
       : `เสาร์-อาทิตย์คนเยอะกว่าวันธรรมดาประมาณ ${d.weekendPct}%`;
   }
-  if (d.dowPatternReal && Array.isArray(d.dows) && d.dows.length) {
+  if (d.dowPatternReal && d.dowBusiest !== undefined && d.dowQuietest !== undefined) {
     const DOW = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
-    const top = d.dows.slice().sort((a, b) => b.avg - a.avg);
-    note = `วัน${DOW[top[0].dow]}คนเยอะที่สุด · วัน${DOW[top[top.length - 1].dow]}เงียบที่สุด`;
+    note = `วัน${DOW[d.dowBusiest]}คนเยอะที่สุด · วัน${DOW[d.dowQuietest]}เงียบที่สุด`;
   }
   if (note) $('dowNote').textContent = note;
   show($('dowNote'), !!note);
@@ -152,13 +132,15 @@ function render(d) {
   $('quietHead').textContent = hasQuiet ? '🟢 ช่วงที่คนน้อย' : '🟢 ช่วงที่คนเยอะ-คนน้อย';
 
   // ── กราฟรายชั่วโมง ────────────────────────────────────────────────────
+  // rel = สัดส่วนเทียบชั่วโมงที่คึกที่สุด (0–1) ไม่ใช่จำนวนรถ
+  // แท่งสูงเท่าเดิม เพราะเดิมก็หารด้วยค่าสูงสุดอยู่แล้ว
+  // ⚠️ คำอธิบายเมื่อชี้ (title) ห้ามมีจำนวนรถด้วย
   if (d.hourPatternReal && Array.isArray(d.hours) && d.hours.length) {
-    const max = Math.max.apply(null, d.hours.map(x => x.avg).concat([0.1]));
     $('chart').innerHTML = d.hours.map(x => {
-      const pct = Math.max(4, Math.round((x.avg / max) * 100));
+      const pct = Math.max(4, Math.round((x.rel || 0) * 100));
       const isNow = x.hour === d.nowHour && d.openNow;
       return `
-        <div class="q-bar-wrap${isNow ? ' now' : ''}" title="${hh(x.hour)} เฉลี่ย ${x.avg} คัน">
+        <div class="q-bar-wrap${isNow ? ' now' : ''}" title="${hh(x.hour)}">
           <div class="q-bar-track"><div class="q-bar" style="height:${pct}%"></div></div>
           <div class="q-bar-lbl">${x.hour}</div>
         </div>`;

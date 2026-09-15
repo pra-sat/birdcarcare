@@ -36,25 +36,10 @@
       </div>
     </div>
 
-    <!-- ขนาดร้าน — บริบทที่ทำให้ตัวเลขข้างล่างอ่านแล้วเข้าใจถูก
-         ถ้าไม่มีบรรทัดนี้ "ชั่วโมงที่ผ่านมา 1 คัน" จะดูน่ากลัวกว่าความจริง -->
-    <p class="q-baseline hidden" id="baseline"></p>
-
-    <!-- ตัวเลขจริง ให้ลูกค้าตัดสินเองได้ ไม่ใช่เชื่อไฟสีอย่างเดียว -->
-    <div class="q-facts hidden" id="facts">
-      <div class="q-fact">
-        <span class="q-fact-n" id="factToday">–</span>
-        <span class="q-fact-l">วันนี้เสร็จไปแล้ว<br>(คัน)</span>
-      </div>
-      <div class="q-fact">
-        <span class="q-fact-n" id="factHour">–</span>
-        <span class="q-fact-l">ชั่วโมงที่ผ่านมา<br>(คัน)</span>
-      </div>
-      <div class="q-fact">
-        <span class="q-fact-n" id="factLast">–</span>
-        <span class="q-fact-l">ล่าสุดเสร็จเมื่อ<br>(นาทีที่แล้ว)</span>
-      </div>
-    </div>
+    <!-- ⚠️ ไม่แสดงจำนวนรถวันนี้ / ชั่วโมงที่ผ่านมา / ล่าสุดเมื่อกี่นาที /
+            ค่าเฉลี่ยต่อวัน — เจ้าของร้านสั่งไม่ให้บอกลูกค้า (15 ก.ย. 2569)
+            เป็นปริมาณธุรกิจของร้าน ลูกค้าไม่จำเป็นต้องรู้
+            และ Apps Script ก็ไม่ส่งตัวเลขพวกนี้มาแล้วด้วย ไม่ใช่แค่ซ่อนตรงนี้ -->
 
     <!-- ช่วงที่คนน้อย — ใช้สถิติล้วน ใช้ได้เสมอแม้ร้านปิดอยู่
          🔴 script.js จะแสดงส่วนนี้ "เฉพาะเมื่อรูปแบบผ่านการทดสอบทางสถิติแล้ว"
@@ -70,14 +55,17 @@
     <div class="q-card hidden" id="chartCard">
       <div class="q-chart-head">ปกติคนเยอะช่วงไหน <span class="q-chart-note">(เฉลี่ยทั้งสัปดาห์)</span></div>
       <div class="q-chart" id="chart"></div>
+      <!-- แท่งสูง = ช่วงที่คนเยอะกว่า · ไม่มีตัวเลขกำกับโดยตั้งใจ -->
       <div class="q-chart-foot">
         <span class="q-legend"><i class="q-sw now"></i> ตอนนี้</span>
-        <span class="q-legend"><i class="q-sw"></i> คันต่อชั่วโมง</span>
+        <span class="q-legend">ยิ่งแท่งสูง คนยิ่งเยอะ</span>
       </div>
     </div>
 
     <button class="btn outline" id="refreshBtn" type="button">🔄 ดูอีกครั้ง</button>
-    <a class="btn" id="callBtn" href="tel:0947727755">📞 โทรถามร้าน</a>
+    <!-- เขียนให้เหมือนหน้าข้อมูลร้านเป๊ะ ๆ (โชว์เบอร์เป็นข้อความ ไม่ใช่คำว่า "โทรถามร้าน")
+         เพราะหน้านั้นกดแล้วโทรได้เลย ไม่ต้องกดยืนยันก่อน -->
+    <a class="btn" id="callBtn" href="tel:0867876441">📞 086-787-6441</a>
 
     <p class="q-note">
       ตัวเลขนี้ประเมินจากสถิติการให้บริการของร้าน <b>ไม่ใช่การนับรถจริงในขณะนี้</b>
