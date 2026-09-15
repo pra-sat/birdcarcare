@@ -67,10 +67,16 @@
 }
 .q-fact-l { display: block; font-size: 10.5px; line-height: 1.35; color: var(--bc-ink2); margin-top: 4px; }
 
-.q-cycle {
-  font-size: 12px; color: var(--bc-ink2); text-align: center;
-  margin: 0 0 11px;
+.q-baseline {
+  font-size: 12px; line-height: 1.5; color: var(--bc-ink2);
+  text-align: center; margin: 0 0 11px;
 }
+
+.q-dow-note {
+  font-size: 12px; line-height: 1.5; color: #2E7048;
+  margin-top: 6px; padding-top: 6px; border-top: 1px dashed #C8E8D2;
+}
+.q-quiet-busy { color: var(--bc-ink2); font-size: 12px; }
 
 /* ── ช่วงที่คนน้อย ───────────────────────────────────────────────────── */
 .q-quiet { background: #F2FBF5; border-color: #C8E8D2; text-align: left; }

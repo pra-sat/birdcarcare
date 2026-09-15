@@ -36,6 +36,10 @@
       </div>
     </div>
 
+    <!-- ขนาดร้าน — บริบทที่ทำให้ตัวเลขข้างล่างอ่านแล้วเข้าใจถูก
+         ถ้าไม่มีบรรทัดนี้ "ชั่วโมงที่ผ่านมา 1 คัน" จะดูน่ากลัวกว่าความจริง -->
+    <p class="q-baseline hidden" id="baseline"></p>
+
     <!-- ตัวเลขจริง ให้ลูกค้าตัดสินเองได้ ไม่ใช่เชื่อไฟสีอย่างเดียว -->
     <div class="q-facts hidden" id="facts">
       <div class="q-fact">
@@ -52,17 +56,19 @@
       </div>
     </div>
 
-    <p class="q-cycle hidden" id="cycleNote"></p>
-
-    <!-- ช่วงที่คนน้อย — ส่วนนี้ใช้สถิติล้วน ใช้ได้เสมอแม้ร้านปิดอยู่ -->
+    <!-- ช่วงที่คนน้อย — ใช้สถิติล้วน ใช้ได้เสมอแม้ร้านปิดอยู่
+         🔴 script.js จะแสดงส่วนนี้ "เฉพาะเมื่อรูปแบบผ่านการทดสอบทางสถิติแล้ว"
+            ถ้ายังไม่ผ่าน การแนะนำช่วงเวลาก็คือการเดา จึงเงียบไว้ดีกว่า -->
     <div class="q-card q-quiet hidden" id="quietCard">
       <div class="q-quiet-head">🟢 ช่วงที่คนน้อย</div>
       <div class="q-quiet-body" id="quietBody"></div>
+      <div class="q-dow-note hidden" id="dowNote"></div>
     </div>
 
-    <!-- กราฟความคึกของวันนี้ -->
+    <!-- กราฟความคึกรายชั่วโมง (รวมทุกวัน ไม่ใช่เฉพาะวันนี้)
+         แยกรายวันแล้วข้อมูลจะบางเกินจนกลายเป็นความบังเอิญ -->
     <div class="q-card hidden" id="chartCard">
-      <div class="q-chart-head">ความคึกของวันนี้ <span id="chartDow"></span> <span class="q-chart-note">(เฉลี่ยจากที่ผ่านมา)</span></div>
+      <div class="q-chart-head">ปกติคนเยอะช่วงไหน <span class="q-chart-note">(เฉลี่ยทั้งสัปดาห์)</span></div>
       <div class="q-chart" id="chart"></div>
       <div class="q-chart-foot">
         <span class="q-legend"><i class="q-sw now"></i> ตอนนี้</span>
