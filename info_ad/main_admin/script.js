@@ -1213,10 +1213,24 @@ class AdminManager {
     document.getElementById('adminLevel').textContent = result.level || '1';
     document.getElementById('adminRole').textContent = result.role || '-';
 
+    // ── เมนูตามระดับสิทธิ์ (แก้ 18 ก.ย. 2569) ─────────────────────────────
+    //
+    //   ระดับ 2 (พนักงานหน้าร้าน) : 🔍 สแกน QR + 🔐 ตรวจความปลอดภัย เท่านั้น
+    //   ระดับ 3 ขึ้นไป            : เห็นเมนูอื่นทั้งหมด
+    //
+    //   ⚠️ นี่เป็นแค่การ "ซ่อนปุ่ม" ไม่ใช่ด่านกัน
+    //      คนที่รู้ URL ยังพิมพ์เข้ามาเองได้ ด่านจริงต้องอยู่ที่เซิร์ฟเวอร์
+    //      หน้าสรุปยอดตรวจ STATS_MIN_LEVEL ใน stats.gs อยู่แล้ว
+    //      ถ้าเพิ่มเมนูใหม่ที่มีข้อมูลสำคัญ ต้องไปใส่ด่านฝั่งเซิร์ฟเวอร์ด้วยเสมอ
+    //      (ส่วนหน้าข้อมูลร้านไม่ต้อง เพราะเป็นหน้าที่ลูกค้าทุกคนเห็นได้อยู่แล้ว
+    //       ซ่อนไว้เพื่อให้จอพนักงานสะอาด ไม่ใช่เพื่อความปลอดภัย)
     const level = parseInt(result.level || '1');
-    if (level >= 1) document.querySelector('[data-menu="feedback"]')?.classList.remove("hidden");
     if (level >= 2) document.getElementById('scanBtn')?.classList.remove("hidden");
-    if (level >= 3) document.querySelector('[data-menu="stats"]')?.classList.remove("hidden");
+    if (level >= 3) {
+      document.querySelector('[data-menu="stats"]')?.classList.remove("hidden");
+      document.querySelector('[data-menu="shopinfo"]')?.classList.remove("hidden");
+      document.querySelector('[data-menu="feedback"]')?.classList.remove("hidden");
+    }
     if (level >= 5) document.querySelector('[data-menu="settings"]')?.classList.remove("hidden");
 
     // ใส่ชื่อจาก Admin_List (result.name) ไม่ใช่ชื่อ LINE
