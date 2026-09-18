@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>สรุปยอด</title>
+  <link rel="stylesheet" href="../../../theme.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="../../../theme.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="container">
+
+    <div class="st-head">
+      <h2>📊 สรุปยอด</h2>
+      <p class="st-when" id="genAt">กำลังโหลด...</p>
+    </div>
+
+    <p class="st-updating hidden" id="updating"></p>
+
+    <!-- ── วันนี้ ─────────────────────────────────────────────────────── -->
+    <div class="st-card st-today">
+      <div class="st-card-head">วันนี้</div>
+      <div class="st-big">
+        <div class="st-big-item">
+          <span class="st-big-n" id="tdRevenue">–</span>
+          <span class="st-big-l">บาท</span>
+        </div>
+        <div class="st-big-sep"></div>
+        <div class="st-big-item">
+          <span class="st-big-n" id="tdCars">–</span>
+          <span class="st-big-l">คัน</span>
+        </div>
+      </div>
+      <div class="st-cmp" id="tdCmp"></div>
+    </div>
+
+    <!-- ── เดือนนี้ ───────────────────────────────────────────────────── -->
+    <div class="st-card">
+      <div class="st-card-head">เดือนนี้ <span class="st-sub" id="moRange"></span></div>
+      <div class="st-rows">
+        <div class="st-row"><span class="st-k">ยอดเงิน</span><span class="st-v" id="moRevenue">–</span></div>
+        <div class="st-row"><span class="st-k">จำนวนรถ</span><span class="st-v" id="moCars">–</span></div>
+        <div class="st-row"><span class="st-k">เฉลี่ยต่อคัน</span><span class="st-v" id="moAvg">–</span></div>
+        <div class="st-row"><span class="st-k">แลกด้วยแต้ม</span><span class="st-v" id="moRedeem">–</span></div>
+      </div>
+      <!-- เทียบกับเดือนก่อน "ช่วงวันเดียวกัน" ไม่ใช่ทั้งเดือน
+           ไม่งั้นทุกต้นเดือนจะเห็นเป็นยอดตกฮวบ ทั้งที่เดือนยังไม่จบ -->
+      <div class="st-cmp" id="moCmp"></div>
+    </div>
+
+    <!-- ── กราฟรายวัน ────────────────────────────────────────────────── -->
+    <div class="st-card">
+      <div class="st-card-head">ยอดเงินรายวัน <span class="st-sub">30 วันล่าสุด</span></div>
+      <div class="st-chart" id="dailyChart"></div>
+      <div class="st-chart-foot" id="dailyFoot"></div>
+    </div>
+
+    <!-- ── กราฟรายเดือน ──────────────────────────────────────────────── -->
+    <div class="st-card">
+      <div class="st-card-head">ยอดเงินรายเดือน <span class="st-sub">12 เดือนล่าสุด</span></div>
+      <div class="st-chart st-chart-m" id="monthChart"></div>
+      <p class="st-hint">แท่งลายทางคือเดือนนี้ที่ยังไม่จบ</p>
+    </div>
+
+    <!-- ── อันดับบริการ ──────────────────────────────────────────────── -->
+    <div class="st-card">
+      <div class="st-card-head">อันดับบริการ <span class="st-sub">ตามยอดเงิน ทั้งหมดที่ผ่านมา</span></div>
+      <div class="st-rank" id="svcRank"></div>
+    </div>
+
+    <!-- ── ลูกค้า ────────────────────────────────────────────────────── -->
+    <div class="st-card">
+      <div class="st-card-head">ลูกค้า</div>
+      <div class="st-rows">
+        <div class="st-row"><span class="st-k">ทั้งหมดในระบบ</span><span class="st-v" id="cuTotal">–</span></div>
+        <div class="st-row"><span class="st-k">มาใช้บริการเดือนนี้</span><span class="st-v" id="cuActive">–</span></div>
+        <div class="st-row"><span class="st-k">สมัครใหม่เดือนนี้</span><span class="st-v" id="cuNew">–</span></div>
+        <div class="st-row"><span class="st-k">คะแนนเฉลี่ย</span><span class="st-v" id="cuRating">–</span></div>
+      </div>
+    </div>
+
+    <!-- ── ลูกค้าที่หายไป — ส่วนที่เอาไปทำอะไรต่อได้จริง ─────────────── -->
+    <div class="st-card st-lapsed">
+      <div class="st-card-head">
+        ลูกค้าที่หายไปนาน <span class="st-sub">ไม่มาเกิน 3 เดือน</span>
+      </div>
+      <p class="st-lapsed-sum" id="lapsedSum">–</p>
+      <button class="btn outline" id="lapsedBtn" type="button">▼ ดูรายชื่อ</button>
+      <div class="st-lapsed-list hidden" id="lapsedList"></div>
+      <p class="st-hint">เรียงจากคนที่มีแต้มค้างเยอะที่สุด — มีเหตุผลให้ชวนกลับมามากที่สุด</p>
+    </div>
+
+    <!-- ── แอดมิน ────────────────────────────────────────────────────── -->
+    <div class="st-card">
+      <div class="st-card-head">บันทึกโดย</div>
+      <div class="st-rank" id="admRank"></div>
+    </div>
+
+    <button class="btn outline" id="refreshBtn" type="button">🔄 โหลดใหม่</button>
+    <a class="btn" href="../index.html">← กลับหน้าผู้ดูแล</a>
+
+  </div>
+</body>
+</html>

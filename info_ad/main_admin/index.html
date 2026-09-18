@@ -41,7 +41,9 @@
            ส่ง ?stay=1 ไปด้วย ไม่งั้นหน้านั้นจะเด้งกลับมาที่นี่ทันทีที่รู้ว่าเป็นแอดมิน
            ตั้งใจให้ไปทางเดียว ไม่มีปุ่มกลับ — จะกลับมาหน้านี้ให้ปิดแล้วเปิดใหม่ -->
       <a class="btn outline" id="shopInfoBtn" href="../info/index.html?stay=1">🏪 ดูข้อมูลร้าน</a>
-<!--      <a class="btn hidden" data-menu="stats" href="stats/index.html">📊 รายงาน</a> -->
+      <!-- เปิดใช้ 18 ก.ย. 2569 — applyAdmin() โชว์ให้เฉพาะระดับ 3 ขึ้นไป
+           เพราะหน้านี้เห็นยอดขายทั้งร้านกับรายชื่อลูกค้า -->
+      <a class="btn outline hidden" data-menu="stats" href="stats/index.html">📊 สรุปยอด</a>
 <!--      <a class="btn hidden" data-menu="settings" href="settings/index.html">⚙️ ตั้งค่า</a> -->
     </div>
     <button class="btn danger" type="button" onclick="logout()">🚪 ออกจากระบบ</button>

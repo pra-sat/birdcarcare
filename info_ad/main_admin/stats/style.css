@@ -1,0 +1,157 @@
+/* stats/style.css — หน้าสรุปยอดของผู้ดูแล
+   theme.css โหลดก่อนไฟล์นี้ สี/ฟอนต์/box-sizing มาจากที่นั่น
+
+   ⚠️ theme.css มีกฎ button:not(.swal2-close):not(.swal2-cancel) = (0,2,1) + !important
+      ยิงสีฟ้าทับปุ่มทุกตัว · ปุ่มในหน้านี้ที่ต้องแต่งเอง ต้องเขียน
+      .container button.xxx (0,2,1) ขึ้นไป และวางไว้ทีหลัง ไม่งั้นแพ้ */
+
+.container { max-width: 560px; margin: 0 auto; padding: 16px 14px 28px; }
+.hidden { display: none !important; }
+
+/* ── หัวหน้า ─────────────────────────────────────────────────────────── */
+.st-head { text-align: center; margin-bottom: 12px; }
+.st-head h2 {
+  font-family: var(--bc-disp); font-weight: 500;
+  font-size: 21px; color: var(--bc-deep); margin: 0 0 2px;
+}
+.st-when { font-size: 11.5px; color: var(--bc-ink2); margin: 0; }
+
+.st-updating { font-size: 11.5px; color: var(--bc-ink2); text-align: center; margin: 0 0 10px; }
+
+/* ── การ์ด ───────────────────────────────────────────────────────────── */
+.st-card {
+  background: #fff;
+  border: 1px solid var(--bc-line);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 11px;
+  text-align: left;
+}
+.st-card-head {
+  font-family: var(--bc-disp); font-weight: 500; font-size: 14.5px;
+  color: var(--bc-deep); margin-bottom: 10px;
+}
+.st-sub {
+  font-family: var(--bc-body); font-weight: 400;
+  font-size: 11px; color: var(--bc-ink2);
+}
+.st-hint { font-size: 11px; line-height: 1.6; color: var(--bc-ink2); margin: 8px 0 0; }
+
+/* ── ตัวเลขใหญ่ของวันนี้ ─────────────────────────────────────────────── */
+.st-today { background: linear-gradient(135deg, #F4FBFF 0%, #E9F5FD 100%); border-color: #C9E2F1; }
+.st-big { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.st-big-item { text-align: center; }
+.st-big-sep { width: 1px; align-self: stretch; background: var(--bc-line); }
+.st-big-n {
+  display: block;
+  font-family: var(--bc-disp); font-weight: 500; font-size: 2rem; line-height: 1.05;
+  color: var(--bc-waterD); font-variant-numeric: tabular-nums;
+}
+.st-big-l { display: block; font-size: 11px; color: var(--bc-ink2); margin-top: 2px; }
+
+/* ── แถวข้อมูล ───────────────────────────────────────────────────────── */
+.st-rows { display: flex; flex-direction: column; gap: 1px; }
+.st-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 7px 0; border-bottom: 1px dashed var(--bc-line);
+}
+.st-row:last-child { border-bottom: none; }
+.st-k { font-size: 12.5px; color: var(--bc-ink2); }
+.st-v {
+  font-size: 14.5px; font-weight: 600; color: var(--bc-ink);
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+
+/* ── บรรทัดเปรียบเทียบ ───────────────────────────────────────────────── */
+.st-cmp {
+  font-size: 11.5px; line-height: 1.6; margin-top: 9px;
+  padding-top: 9px; border-top: 1px dashed var(--bc-line);
+}
+.st-cmp-up   { color: #1F7A46; font-weight: 700; }
+.st-cmp-down { color: #B3413F; font-weight: 700; }
+.st-cmp-flat { color: var(--bc-ink2); }
+.st-cmp-extra { color: var(--bc-ink2); margin-top: 2px; }
+
+/* ── กราฟแท่ง ────────────────────────────────────────────────────────── */
+/* จำนวนคอลัมน์ตั้งจาก JS เพราะรายวัน 30 แท่ง รายเดือน 12 แท่ง
+   ห้ามตั้งความกว้างแท่งเป็น px ตายตัว จอแคบจะล้น */
+.st-chart { display: grid; gap: 2px; align-items: end; }
+.st-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.st-bar-track {
+  width: 100%; height: 76px; display: flex; align-items: flex-end;
+  background: #F2F7FA; border-radius: 4px; overflow: hidden;
+}
+.st-bar {
+  width: 100%; background: var(--bc-water);
+  border-radius: 4px 4px 0 0; transition: height .25s ease;
+}
+.st-bar.is-weekend { background: #6FC2A6; }   /* เสาร์-อาทิตย์ แยกสีให้เห็นรูปแบบ */
+.st-bar.is-partial {                          /* เดือนที่ยังไม่จบ */
+  background: repeating-linear-gradient(
+    45deg, var(--bc-water), var(--bc-water) 4px, #7FB8DC 4px, #7FB8DC 8px);
+}
+.st-bar-lbl {
+  font-size: 9px; color: var(--bc-ink2); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* รายวัน 30 แท่งใส่ป้ายทุกแท่งไม่ไหว ตะแคงแล้วโชว์เว้นแท่ง */
+.st-bar-lbl.dense { font-size: 0; }
+.st-chart .st-bar-wrap:nth-child(5n+1) .st-bar-lbl.dense { font-size: 8.5px; }
+.st-chart-m .st-bar-track { height: 92px; }
+.st-chart-foot {
+  font-size: 11px; color: var(--bc-ink2); text-align: center; margin-top: 9px;
+}
+
+/* ── อันดับ ──────────────────────────────────────────────────────────── */
+.st-rank-row { margin-bottom: 11px; }
+.st-rank-row:last-child { margin-bottom: 0; }
+.st-rank-top { display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; }
+.st-rank-no {
+  flex: 0 0 auto; width: 17px; height: 17px; border-radius: 50%;
+  background: var(--bc-foam); border: 1px solid var(--bc-line);
+  font-size: 10px; line-height: 15px; text-align: center; color: var(--bc-ink2);
+}
+.st-rank-name {
+  flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 600; color: var(--bc-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.st-rank-val {
+  flex: 0 0 auto; font-size: 13px; font-weight: 700; color: var(--bc-waterD);
+  font-variant-numeric: tabular-nums;
+}
+.st-rank-bar { height: 6px; background: #F2F7FA; border-radius: 3px; overflow: hidden; }
+.st-rank-fill { height: 100%; background: var(--bc-water); border-radius: 3px; }
+.st-rank-sub { font-size: 10.5px; color: var(--bc-ink2); margin-top: 3px; }
+
+/* ── ลูกค้าที่หายไป ──────────────────────────────────────────────────── */
+.st-lapsed { background: #FFFBF2; border-color: #F0E0BC; }
+.st-lapsed-sum { font-size: 13.5px; font-weight: 600; color: #8A5A00; margin: 0 0 10px; }
+.container button.btn.outline#lapsedBtn { width: 100%; margin: 0; }
+
+.st-lapsed-list { margin-top: 11px; display: flex; flex-direction: column; gap: 8px; }
+.st-lap {
+  background: #fff; border: 1px solid var(--bc-line); border-radius: 12px; padding: 10px 11px;
+}
+.st-lap-top { display: flex; align-items: baseline; justify-content: space-between; gap: 9px; }
+.st-lap-name {
+  font-size: 13.5px; font-weight: 600; color: var(--bc-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.st-lap-pt {
+  flex: 0 0 auto; font-size: 12px; font-weight: 700; color: #B07A12;
+  font-variant-numeric: tabular-nums;
+}
+.st-lap-sub { font-size: 11.5px; line-height: 1.55; color: var(--bc-ink2); margin-top: 3px; }
+.st-lap-tel {
+  display: inline-block; margin-top: 7px;
+  font-size: 12.5px; font-weight: 600; color: var(--bc-waterD);
+  text-decoration: none; border-bottom: 1px solid #BFDDF0;
+}
+
+/* ── ปุ่มท้ายหน้า ────────────────────────────────────────────────────── */
+.container > .btn { display: block; width: 100%; margin: 0 0 9px; text-align: center; }
+.container > a.btn { text-decoration: none !important; padding: 12px 16px; line-height: 1.35; }
+
+@media (prefers-reduced-motion: reduce) {
+  .st-bar { transition: none; }
+}
