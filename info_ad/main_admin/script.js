@@ -23,6 +23,80 @@ document.addEventListener('DOMContentLoaded', () => {
 //    - อุ่นไว้เบื้องหลังหลังหน้าโผล่แล้ว (ดู applyAdmin) พอกดสแกนจึงพร้อมทันที
 //    - จำ Promise ไว้ เรียกซ้ำกี่ครั้งก็โหลดไฟล์เดียว
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+//  🔴 เซสชัน LINE หมดอายุ — ต้นเหตุที่ทำให้ประวัติหาย (แก้ 19 ก.ย. 2569)
+//
+//  หลักฐานจาก Security_Log: 15–18 ก.ย. record_service ถูกบล็อก 13 ครั้ง
+//  ทุกครั้งเหตุผลเดียวกัน "LINE ปฏิเสธ token (400): IdToken expired"
+//  ร้านทำวันละราว 5 คัน = งานส่วนใหญ่ไม่ได้ถูกบันทึกเลยตลอด 4 วัน
+//
+//  ต้นเหตุ: this.token ถูกดึงครั้งเดียวตอนเปิดหน้าแล้วไม่เคยรีเฟรช
+//  liff.getIDToken() คืน token ที่ออกตอนล็อกอิน ไม่ต่ออายุให้เอง
+//  พอหมดอายุ ทุกการบันทึกถูกบล็อกหมด
+//
+//  ที่แย่กว่านั้นคือทางแก้เดิมเป็นแบบ "ตั้งรับ" — รู้ตัวตอนกดบันทึกไปแล้ว
+//  ซึ่งเป็นจังหวะที่แอดมินสแกน เลือกรถ เลือกบริการ ใส่ราคาเสร็จหมดแล้ว
+//  และลูกค้ายืนรออยู่ · กล่องเตือนยังบอกว่า "ข้อมูลลูกค้ายังอยู่ครบ"
+//  ทั้งที่ liff.login() โหลดหน้าใหม่ = ข้อมูลที่กรอกหายเกลี้ยง
+//  แอดมินต้องทำใหม่ทั้งชุด ส่วนใหญ่จึงเลิกทำ แล้วประวัติก็หายไป
+//
+//  แก้เป็น "เชิงรุก" — ตรวจอายุ token ตั้งแต่ตอนเปิดหน้าและตอนกดสแกน
+//  ซึ่งเป็นจังหวะที่ยังไม่มีอะไรให้เสีย ต่ออายุตอนนั้นไม่มีใครเดือดร้อน
+//  และถ้าพลาดไปจนถูกบล็อกจริง ให้เก็บฟอร์มไว้ก่อนแล้วคืนให้หลังล็อกอินเสร็จ
+// ═══════════════════════════════════════════════════════════════════════════
+
+// เหลืออายุน้อยกว่านี้ถือว่าใกล้หมด ให้ต่อใหม่ก่อนเริ่มงาน
+// เผื่อไว้ 15 นาที เพราะแอดมินอาจสแกนแล้วคุยกับลูกค้าอีกพักก่อนกดบันทึก
+const TOKEN_MIN_LEFT_SEC = 15 * 60;
+
+// อ่านเวลาหมดอายุจาก ID token (เป็น JWT) — อ่านอย่างเดียว ไม่ได้ใช้ตัดสินสิทธิ์
+// การตรวจสิทธิ์จริงอยู่ที่เซิร์ฟเวอร์ซึ่งให้ LINE ยืนยันลายเซ็นให้ทุกครั้ง
+// ตรงนี้แค่ใช้ตัดสินใจว่า "ควรต่ออายุก่อนไหม" เท่านั้น
+function bcTokenSecondsLeft(token) {
+  try {
+    const t = String(token || '');
+    if (!t || t === 'N/A') return 0;
+    const parts = t.split('.');
+    if (parts.length !== 3) return null;          // ไม่ใช่ JWT อ่านไม่ได้
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(atob(b64).split('').map(
+      c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    const exp = JSON.parse(json).exp;
+    if (!exp) return null;                        // ไม่มี exp ก็ตัดสินไม่ได้
+    return Math.floor(exp - Date.now() / 1000);
+  } catch (e) {
+    return null;                                  // อ่านไม่ได้ = ไม่รู้ ไม่ใช่ว่าหมดอายุ
+  }
+}
+
+// null = อ่านไม่ได้ ให้ถือว่ายังใช้ได้ (ปล่อยให้เซิร์ฟเวอร์ตัดสิน ห้ามเดาว่าเสีย
+// ไม่งั้นจะไล่แอดมินไปล็อกอินใหม่ทั้งวันโดยไม่จำเป็น)
+function bcTokenNeedsRefresh(token) {
+  const left = bcTokenSecondsLeft(token);
+  return left !== null && left < TOKEN_MIN_LEFT_SEC;
+}
+
+// ── เก็บงานที่ค้างไว้ข้ามการล็อกอินใหม่ ──────────────────────────────────
+// liff.login() โหลดหน้าใหม่ ทุกอย่างใน memory หายหมด
+// ต้องฝากไว้ก่อน แล้วค่อยหยิบกลับมาหลังกลับเข้าหน้า
+// ใช้ sessionStorage เพราะเป็นงานเฉพาะรอบนี้ ไม่ควรค้างข้ามวัน
+const PENDING_KEY = 'bcPendingSave';
+function bcSavePending(obj) {
+  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ at: Date.now(), ...obj })); }
+  catch (e) { /* เก็บไม่ได้ก็ยังทำงานต่อได้ แค่ต้องกรอกใหม่ */ }
+}
+function bcTakePending() {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    sessionStorage.removeItem(PENDING_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    // เกิน 30 นาทีถือว่าเลิกแล้ว อย่าเอากลับมาให้งง
+    if (!p.at || Date.now() - p.at > 30 * 60 * 1000) return null;
+    return p;
+  } catch (e) { return null; }
+}
+
 const QR_LIB_URL = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
 let qrLibPromise = null;
 
@@ -109,6 +183,25 @@ class QRScanner {
     } else if (!this.adminUserId) {
       // เข้าหน้านี้ตรง ๆ โดยไม่ผ่าน AdminManager (ไม่ควรเกิด แต่กันไว้)
       await this.init();
+    }
+
+    // 🔴 ต่ออายุเซสชันก่อนเริ่มงาน ไม่ใช่ตอนกดบันทึกไปแล้ว
+    //    จังหวะนี้ยังไม่มีอะไรให้เสีย ต่อใหม่ตอนนี้ไม่มีใครเดือดร้อน
+    //    ต่างจากตอนกดบันทึกซึ่งกรอกทุกอย่างเสร็จแล้วและลูกค้ายืนรออยู่
+    if (bcTokenNeedsRefresh(this.token)) {
+      const go = await Swal.fire({
+        icon: 'info',
+        title: '🔐 ต่ออายุเซสชันก่อน',
+        html: 'เซสชัน LINE ใกล้หมดอายุแล้ว<br>' +
+              'ต่ออายุตอนนี้เลยดีกว่า จะได้ไม่ติดตอนกดบันทึก',
+        showCancelButton: true,
+        confirmButtonText: 'ต่ออายุเลย',
+        cancelButtonText: 'ข้ามไปก่อน'
+      });
+      if (go.isConfirmed) {
+        try { liff.login(); } catch (e) { location.reload(); }
+        return;                      // หน้าจะโหลดใหม่ ไม่ต้องทำอะไรต่อ
+      }
     }
 
     this.startCamera();
@@ -346,11 +439,27 @@ class QRScanner {
     }
 
     // ── เซสชัน LINE หมดอายุ (เกิดได้ถ้าเปิดหน้าค้างไว้ทั้งวัน) ──────────────
+    //
+    // 🔴 ของเดิมบอกว่า "ข้อมูลลูกค้ายังอยู่ครบ" ซึ่งไม่จริง
+    //    liff.login() โหลดหน้าใหม่ ทุกอย่างที่กรอกไว้หายเกลี้ยง
+    //    แอดมินต้องสแกนและกรอกใหม่ทั้งชุดตอนลูกค้ายืนรอ
+    //    เป็นเหตุผลที่ 15–18 ก.ย. มีรายการถูกบล็อก 13 ครั้งแล้วไม่ได้ถูกบันทึก
+    //
+    //    ตอนนี้ฝากงานไว้ใน sessionStorage ก่อนล็อกอิน แล้วหยิบกลับมาให้เอง
+    //    หลังกลับเข้าหน้า คำว่า "ข้อมูลยังอยู่ครบ" จึงเป็นความจริงแล้ว
     if (result.code === 'IDTOKEN_INVALID') {
+      bcSavePending({
+        foundUser: this.foundUser,
+        draft: this.draft || null,
+        data: data,
+        scanToken: this.scanToken || '',
+        requestId: this.requestId
+      });
       const relog = await Swal.fire({
         icon: 'warning',
         title: '🔐 เซสชันหมดอายุ',
-        text: 'ต้องเข้าสู่ระบบ LINE ใหม่อีกครั้ง แล้วค่อยบันทึกรายการนี้ซ้ำ (ข้อมูลลูกค้ายังอยู่ครบ)',
+        html: 'ต้องเข้าสู่ระบบ LINE ใหม่ก่อนครับ<br>' +
+              '<b>รายการนี้ถูกเก็บไว้ให้แล้ว</b> กลับมาจะขึ้นให้บันทึกต่อได้ทันที',
         showCancelButton: true,
         confirmButtonText: 'เข้าสู่ระบบใหม่',
         cancelButtonText: 'ไว้ก่อน'
@@ -1264,6 +1373,12 @@ class AdminManager {
     // ทำครั้งเดียวพอ ถึงจะวาดหน้าซ้ำก็ไม่ยิงซ้ำ
     if (!this._afterReady) {
       this._afterReady = true;
+      // มีงานค้างจากก่อนล็อกอินไหม
+      // ⚠️ ห่อกันพังไว้ — ตัวนี้อยู่บนทางที่หน้าแอดมินต้องวิ่งผ่านตอนเปิด
+      //    ถ้ามันพัง บรรทัดถัดไป (อุ่นรายการบริการ + อุ่นไลบรารีสแกน) จะไม่ทำงาน
+      //    ผลคือกดสแกนแล้วช้าลง ทั้งที่เป็นแค่ฟีเจอร์เสริม
+      try { Promise.resolve(this.resumePendingSave()).catch(e => console.warn('งานค้าง:', e)); }
+      catch (e) { console.warn('งานค้าง:', e); }
       this.verifySessionQuietly();                 // ตรวจเซสชันเบื้องหลัง
       // อุ่นรายการบริการไว้ล่วงหน้า พอกดสแกนแล้วปุ่มบริการจะขึ้นทันที
       if (window.scanner?.loadServices) window.scanner.loadServices();
@@ -1271,6 +1386,40 @@ class AdminManager {
       // ทำหลังหน้าโผล่แล้ว จึงไม่หน่วงการเปิดหน้าเลย แต่พอกดสแกนก็พร้อมใช้ทันที
       ensureQrLibrary().catch(() => { /* กดสแกนแล้วค่อยลองใหม่ได้ */ });
     }
+  }
+
+  // ── งานที่ค้างไว้ตอนเซสชันหมดอายุ — เอากลับมาให้บันทึกต่อ ────────────────
+  //
+  // ถ้าไม่มีตัวนี้ แอดมินต้องสแกนและกรอกใหม่ทั้งชุด ซึ่งคือเหตุผลที่
+  // รายการถูกบล็อกแล้วหายไปเลย 13 ครั้งระหว่าง 15–18 ก.ย.
+  async resumePendingSave() {
+    const p = bcTakePending();
+    if (!p || !p.foundUser || !p.data) return;
+
+    const go = await Swal.fire({
+      icon: 'question',
+      title: '📋 มีรายการค้างอยู่',
+      html: 'รายการที่ค้างไว้ตอนเซสชันหมดอายุ<hr>' + (p.data.confirmHtml || '') +
+            '<hr>บันทึกต่อเลยไหม',
+      showCancelButton: true,
+      confirmButtonText: '✅ บันทึกเลย',
+      cancelButtonText: 'ทิ้งรายการนี้'
+    });
+    if (!go.isConfirmed) return;
+
+    const sc = window.scanner;
+    if (!sc) return;
+    sc.adminUserId = this.userId;
+    sc.adminName = window.adminInfo?.name || this.name || '-';
+    sc.token = this.token;
+    sc.foundUser = p.foundUser;
+    sc.draft = p.draft || null;
+    sc.scanToken = p.scanToken || '';
+    // ⚠️ ใช้ requestId เดิม ไม่สร้างใหม่
+    //    ถ้าครั้งก่อนเซิร์ฟเวอร์บันทึกสำเร็จแล้วแต่ตอบกลับไม่ถึง
+    //    ด่านกันบันทึกซ้ำจะจำ requestId นี้ได้แล้วไม่บันทึกซ้ำให้
+    sc.requestId = p.requestId || '';
+    sc.confirmAndSave(p.data, true);               // ยืนยันไปแล้ว ไม่ถามซ้ำ
   }
 
   async logAction(name, action, detail) {

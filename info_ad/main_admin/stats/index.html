@@ -60,20 +60,21 @@
     </div>
 
     <!-- ── กราฟรายเดือน ──────────────────────────────────────────────── -->
-    <div class="st-card">
+    <!-- การ์ดตั้งแต่ตรงนี้ลงไปเป็นส่วนที่โหลดช้า มาทีหลัง ซ่อนไว้ก่อน -->
+    <div class="st-card hidden" id="monthCard">
       <div class="st-card-head">ยอดเงินรายเดือน <span class="st-sub">12 เดือนล่าสุด</span></div>
       <div class="st-chart st-chart-m" id="monthChart"></div>
       <p class="st-hint">แท่งลายทางคือเดือนนี้ที่ยังไม่จบ</p>
     </div>
 
     <!-- ── อันดับบริการ ──────────────────────────────────────────────── -->
-    <div class="st-card">
+    <div class="st-card hidden" id="svcCard">
       <div class="st-card-head">อันดับบริการ <span class="st-sub">ตามยอดเงิน ทั้งหมดที่ผ่านมา</span></div>
       <div class="st-rank" id="svcRank"></div>
     </div>
 
     <!-- ── ลูกค้า ────────────────────────────────────────────────────── -->
-    <div class="st-card">
+    <div class="st-card hidden" id="cuCard">
       <div class="st-card-head">ลูกค้า</div>
       <div class="st-rows">
         <div class="st-row"><span class="st-k">ทั้งหมดในระบบ</span><span class="st-v" id="cuTotal">–</span></div>
@@ -84,7 +85,7 @@
     </div>
 
     <!-- ── ลูกค้าที่หายไป — ส่วนที่เอาไปทำอะไรต่อได้จริง ─────────────── -->
-    <div class="st-card st-lapsed">
+    <div class="st-card st-lapsed hidden" id="lapsedCard">
       <div class="st-card-head">
         ลูกค้าที่หายไปนาน <span class="st-sub">ไม่มาเกิน 3 เดือน</span>
       </div>
@@ -95,7 +96,7 @@
     </div>
 
     <!-- ── แอดมิน ────────────────────────────────────────────────────── -->
-    <div class="st-card">
+    <div class="st-card hidden" id="admCard">
       <div class="st-card-head">บันทึกโดย</div>
       <div class="st-rank" id="admRank"></div>
     </div>

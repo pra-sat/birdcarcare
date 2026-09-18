@@ -13,6 +13,8 @@ const show = (el, yes) => { if (el) el.classList.toggle('hidden', !yes); };
 const baht = n => (Number(n) || 0).toLocaleString('th-TH');
 
 let adminUserId = '', idToken = '';
+// เก็บผลรวมของทั้ง core และ deep ไว้ก้อนเดียว เพราะมาคนละรอบ
+let lastData = {};
 
 // จำผลไว้ในเครื่องแอดมินเอง หน้าจะได้ไม่ว่างระหว่างรอ Apps Script
 // ⚠️ นี่เป็นข้อมูลยอดขาย เก็บได้เฉพาะในเครื่องของแอดมินที่ยืนยันตัวตนแล้ว
@@ -40,18 +42,25 @@ function clearCache() {
 // ═══════════════════════════════════════════════════════════════════════════
 //  ดึงข้อมูล
 // ═══════════════════════════════════════════════════════════════════════════
+// ยิงขอเป็นส่วน ๆ — core มาก่อนแล้ววาดเลย ไม่ต้องรอ deep
+//   core = ยอดวันนี้ / เดือนนี้ / กราฟรายวัน  (ของที่ดูทุกวัน)
+//   deep = อันดับบริการ / รายเดือน / ลูกค้า   (ช้ากว่ามาก เพราะอ่านอีกชีต)
+async function fetchPart(part) {
+  const res = await fetch(`${GAS_ENDPOINT}?action=stats`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ adminUserId, idToken, part })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 async function loadStats(silent) {
   const btn = $('refreshBtn');
   if (btn && !silent) { btn.disabled = true; btn.textContent = '⏳ กำลังโหลด...'; }
 
   try {
-    const res = await fetch(`${GAS_ENDPOINT}?action=stats`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ adminUserId, idToken })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await fetchPart('core');
 
     if (data.status === 'error') {
       // สิทธิ์ถูกปฏิเสธ -> ล้างของที่จำไว้ ไม่ให้ค้างอยู่ในเครื่อง
@@ -66,9 +75,25 @@ async function loadStats(silent) {
       return;
     }
 
-    writeCache(data);
-    render(data);
-    show($('updating'), false);
+    // วาดส่วนที่ดูทุกวันทันที ไม่รอส่วนที่เหลือ
+    lastData = Object.assign({}, lastData, data);
+    writeCache(lastData);
+    render(lastData);
+    $('updating').textContent = '⏳ กำลังโหลดอันดับบริการและข้อมูลลูกค้า...';
+    show($('updating'), true);
+
+    // ── ส่วนที่ช้า ตามมาทีหลัง ────────────────────────────────────────
+    // ไม่ await ตรงนี้ เพื่อให้ finally ปลดปุ่มได้เลย หน้าจะได้ไม่ดูค้าง
+    fetchPart('deep').then(deep => {
+      if (!deep || deep.status === 'error') { show($('updating'), false); return; }
+      lastData = Object.assign({}, lastData, deep);
+      writeCache(lastData);
+      render(lastData);
+      show($('updating'), false);
+    }).catch(err => {
+      console.warn('โหลดส่วนละเอียดไม่สำเร็จ:', err);
+      $('updating').textContent = '⚠️ โหลดอันดับบริการไม่สำเร็จ · ยอดด้านบนถูกต้อง';
+    });
 
   } catch (err) {
     console.warn('โหลดสรุปยอดไม่สำเร็จ:', err);
@@ -130,6 +155,16 @@ function render(d) {
   const best = d.daily.reduce((m, x) => (x.revenue > m.revenue ? x : m), d.daily[0]);
   $('dailyFoot').textContent = best && best.revenue > 0
     ? `วันที่ดีที่สุดใน 30 วัน: ${best.label} · ${baht(best.revenue)} บาท (${best.cars} คัน)` : '';
+
+  // ── ตั้งแต่ตรงนี้ลงไปเป็นส่วน deep ซึ่งมาทีหลัง ────────────────────
+  //    ตอนวาดรอบแรก (core) ยังไม่มีข้อมูลพวกนี้ ต้องซ่อนการ์ดไว้ก่อน
+  //    ห้ามเข้าถึงตรง ๆ ไม่งั้นพังตั้งแต่รอบแรก แล้วยอดวันนี้ก็ไม่ขึ้นด้วย
+  const hasDeep = Array.isArray(d.months) && d.months.length > 0;
+  ['monthCard', 'svcCard', 'cuCard', 'lapsedCard', 'admCard'].forEach(id => {
+    const el = $(id);
+    if (el) el.classList.toggle('hidden', !hasDeep);
+  });
+  if (!hasDeep) return;
 
   // ── กราฟรายเดือน ───────────────────────────────────────────────────
   drawBars($('monthChart'), d.months.map(x => ({
