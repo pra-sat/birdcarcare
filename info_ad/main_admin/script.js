@@ -1224,14 +1224,23 @@ class AdminManager {
     //      ถ้าเพิ่มเมนูใหม่ที่มีข้อมูลสำคัญ ต้องไปใส่ด่านฝั่งเซิร์ฟเวอร์ด้วยเสมอ
     //      (ส่วนหน้าข้อมูลร้านไม่ต้อง เพราะเป็นหน้าที่ลูกค้าทุกคนเห็นได้อยู่แล้ว
     //       ซ่อนไว้เพื่อให้จอพนักงานสะอาด ไม่ใช่เพื่อความปลอดภัย)
+    //   🔴 ต้องสั่งทั้ง "โชว์" และ "ซ่อน" ห้ามสั่งแค่โชว์อย่างเดียว
+    //      ฟังก์ชันนี้ถูกเรียก 2 รอบ — จากของที่จำไว้ (ทันที) แล้วจากผลจริง
+    //      (ตามมาทีหลัง) · ของเดิมมีแต่ removeSTyle hidden ไม่เคยใส่กลับ
+    //      พอเจ้าของร้านลดระดับใครในชีต คนนั้นจะยังเห็นเมนูเดิมค้างอยู่
+    //      จนกว่าของที่จำไว้จะหมดอายุ (12 ชม.) เพราะรอบที่สองซ่อนคืนไม่ได้
+    //      ตอนนี้ใช้ toggle จึงแก้ตัวเองได้ทันทีที่ผลจริงมาถึง
     const level = parseInt(result.level || '1');
-    if (level >= 2) document.getElementById('scanBtn')?.classList.remove("hidden");
-    if (level >= 3) {
-      document.querySelector('[data-menu="stats"]')?.classList.remove("hidden");
-      document.querySelector('[data-menu="shopinfo"]')?.classList.remove("hidden");
-      document.querySelector('[data-menu="feedback"]')?.classList.remove("hidden");
-    }
-    if (level >= 5) document.querySelector('[data-menu="settings"]')?.classList.remove("hidden");
+    [
+      { sel: '#scanBtn',                 min: 2 },   // งานหลักของพนักงานหน้าร้าน
+      { sel: '[data-menu="stats"]',      min: 3 },
+      { sel: '[data-menu="shopinfo"]',   min: 3 },
+      { sel: '[data-menu="feedback"]',   min: 3 },
+      { sel: '[data-menu="settings"]',   min: 5 }
+    ].forEach(m => {
+      const el = document.querySelector(m.sel);
+      if (el) el.classList.toggle('hidden', level < m.min);
+    });
 
     // ใส่ชื่อจาก Admin_List (result.name) ไม่ใช่ชื่อ LINE
     // เพราะชื่อนี้คือชื่อที่จะถูกบันทึกลงคอลัมน์ "แอดมิน" ใน Service_History
