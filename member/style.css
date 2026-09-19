@@ -339,3 +339,22 @@ tbody tr:hover {
 #closeQRBtn {
   margin-top: 20px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   กล่องขอทะเบียนรถก่อนแสดง QR (20 ก.ย. 2569)
+
+   ⚠️ กล่องนี้เป็นป๊อปอัป SweetAlert ซึ่งถูกวางไว้ที่ระดับ body
+      ไม่ได้อยู่ใต้ #memberInfo จึงเขียนเป็นคลาสระดับบนสุดได้
+      (ต่างจากคลาสสั้น .row .val .pts ของการ์ดรถ ที่ต้องอยู่ใต้ #memberInfo เท่านั้น)
+      ตั้งชื่อขึ้นต้น mp- กันชนกับของเดิม
+   ช่องกรอกใช้คลาส pl-* ที่มีอยู่แล้วใน theme.css จะได้หน้าตาเดียวกับฟอร์มสมัคร
+   ══════════════════════════════════════════════════════════════════════════ */
+.mp-why { text-align: left; font-size: 13px; line-height: 1.65; color: var(--bc-ink2); }
+.mp-why p { margin: 0 0 7px; }
+.mp-why b { color: var(--bc-ink); }
+.mp-car {
+  font-family: var(--bc-disp); font-weight: 500;
+  font-size: 15px !important; color: var(--bc-deep);
+}
+.mp-list { margin: 0 0 12px; padding-left: 18px; }
+.mp-list li { margin-bottom: 4px; }

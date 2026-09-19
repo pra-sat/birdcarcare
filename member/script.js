@@ -291,11 +291,173 @@ function deleteTokenOnServer(token) {
   }).catch(() => { /* ลบไม่สำเร็จก็ปล่อย เดี๋ยวหมดอายุเองอยู่แล้ว */ });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  ขอทะเบียนรถจากลูกค้า ก่อนแสดง QR (20 ก.ย. 2569)
+//
+//  ทำไมต้องมาถามตรงนี้
+//    ทะเบียนเป็นข้อมูลที่รอบ C ต้องใช้เป็นกุญแจแทน ยี่ห้อ+รุ่น+ปี
+//    แต่ของจริงแอดมินแทบไม่ได้กรอกให้ เพราะตอนเก็บเงินรีบและลูกค้ารออยู่
+//    ทะเบียนจึงไม่ถูกเก็บสักที
+//
+//    จังหวะ "กดแสดง QR" คือจังหวะเดียวที่ลูกค้าว่าง ถือมือถืออยู่ และ
+//    ยืนอยู่ข้างรถตัวเองพอดี = ถามตอนนี้ได้คำตอบที่ถูกต้องที่สุด
+//
+//  🔴 กติกา
+//     ก. **ห้ามบล็อก** ถ้าลูกค้าไม่สะดวกต้องกดข้ามแล้วได้ QR ทันที
+//        ลูกค้ายืนรอจ่ายเงินอยู่ ห้ามให้ฟอร์มขวางการจ่ายเงินเด็ดขาด
+//     ข. ต้องบอกเหตุผลและบอกว่าเอาไปใช้ทำอะไร ไม่ใช่ขอเฉย ๆ
+//     ค. กดข้ามแล้วไม่ถามซ้ำในรอบนี้ (จำไว้ใน sessionStorage)
+//        แต่ครั้งหน้าที่เปิดหน้าใหม่ถามได้อีก ไม่งั้นจะไม่ได้กรอกสักที
+//     ง. ถ้าไม่มี token เลย = บันทึกไม่ได้อยู่ดี -> ไม่ต้องถามให้เสียเวลา
+//     จ. อะไรพังก็ห้ามลาก QR พังไปด้วย ครอบ try/catch ทั้งก้อน
+// ═══════════════════════════════════════════════════════════════════════════
+const memberTokens = { id: '', access: '' };
+const PLATE_SKIP_KEY = 'bcPlateAskSkip';
+
+function plateAskSkipped() {
+  try { return sessionStorage.getItem(PLATE_SKIP_KEY) === '1'; } catch (e) { return false; }
+}
+function markPlateAskSkipped() {
+  try { sessionStorage.setItem(PLATE_SKIP_KEY, '1'); } catch (e) {}
+}
+
+async function savePlateForMe(vehicle, plate, province) {
+  const res = await fetch(GAS_ENDPOINT + '?action=set_own_plate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'set_own_plate',
+      idToken: memberTokens.id,
+      accessToken: memberTokens.access,
+      brand: vehicle.brand || '',
+      model: vehicle.model || '',
+      year: vehicle.year || '',
+      plate: plate,
+      province: province
+    })
+  });
+  return res.json();
+}
+
+async function askPlateIfMissing() {
+  try {
+    if (!memberData || !Array.isArray(memberData.vehicles)) return;
+    if (!memberTokens.id && !memberTokens.access) return;   // (ง)
+    if (plateAskSkipped()) return;
+
+    const v = memberData.vehicles.find(x => !String(x.plate || '').trim());
+    if (!v) return;                                          // มีครบแล้ว ไม่ต้องถาม
+
+    const carName = [v.brand, v.model, v.year ? 'ปี ' + v.year : '']
+      .filter(Boolean).map(esc).join(' ');
+
+    const provOpts = (typeof plateProvinceOptions === 'function')
+      ? plateProvinceOptions(v.province || '') : '<option value="">—</option>';
+
+    const html = `
+      <div class="mp-why">
+        <p class="mp-car">🚘 ${carName}</p>
+        <p><b>ขอเลขทะเบียนรถคันนี้หน่อยนะคะ</b> กรอกครั้งเดียว ครั้งต่อไปกดแล้วขึ้น QR ทันที</p>
+        <ul class="mp-list">
+          <li>ใช้ยืนยันว่าแต้มเข้ารถคันไหน — บ้านที่มีรถรุ่นเดียวกันหลายคันจะได้ไม่สลับกัน</li>
+          <li>เวลาสแกน พนักงานจะเห็นทะเบียนขึ้นให้ตรวจ ลดการบันทึกผิดคัน</li>
+          <li>เก็บไว้ในระบบของร้านเท่านั้น <b>ไม่เปิดเผยให้บุคคลอื่น</b> และไม่ใช้ติดต่อเรื่องอื่น</li>
+        </ul>
+      </div>
+      <div class="pl-grid">
+        <input id="mpHead" class="pl-in" type="text" inputmode="text"
+               placeholder="หมวด เช่น 1กร" autocomplete="off" maxlength="6">
+        <input id="mpTail" class="pl-in" type="text" inputmode="numeric"
+               placeholder="เลข เช่น 1723" autocomplete="off" maxlength="4">
+      </div>
+      <select id="mpProv" class="pl-in pl-prov">${provOpts}</select>
+      <div class="pl-preview" id="mpPreview">
+        <p class="pl-eg">พิมพ์แล้วจะขึ้นตัวอย่างป้ายให้ดูตรงนี้</p>
+      </div>
+    `;
+
+    const result = await Swal.fire({
+      title: '🚗 ขอเลขทะเบียนก่อนนะคะ',
+      html: html,
+      width: 400,
+      showCancelButton: true,
+      confirmButtonText: '💾 บันทึกแล้วแสดง QR',
+      cancelButtonText: 'ยังไม่สะดวกตอนนี้',
+      focusConfirm: false,
+      allowOutsideClick: () => !Swal.isLoading(),
+      didOpen: () => {
+        // ตัวอย่างป้ายอัปเดตตามที่พิมพ์ ให้เห็นว่าจะออกมาหน้าตาแบบไหน
+        const head = document.getElementById('mpHead');
+        const tail = document.getElementById('mpTail');
+        const prov = document.getElementById('mpProv');
+        const box = document.getElementById('mpPreview');
+        const draw = () => {
+          const h = (typeof plateCleanHead === 'function')
+            ? plateCleanHead(head.value) : head.value;
+          const t = String(tail.value || '').replace(/[^0-9]/g, '');
+          tail.value = t;
+          const txt = (typeof platePretty === 'function') ? platePretty(h, t) : (h + ' ' + t);
+          box.innerHTML = (h || t) && typeof plateHtml === 'function'
+            ? plateHtml(txt, prov.value, true)
+            : '<p class="pl-eg">พิมพ์แล้วจะขึ้นตัวอย่างป้ายให้ดูตรงนี้</p>';
+        };
+        head.oninput = draw; tail.oninput = draw; prov.onchange = draw;
+        setTimeout(() => head.focus(), 60);
+      },
+      // ⚠️ ที่นี่ทำได้แค่ "ตรวจ + ยิงบันทึก" ห้ามเปิดป๊อปอัปตัวใหม่เด็ดขาด
+      //    SweetAlert เปิดได้ทีละอัน เปิดตัวใหม่ = ตัวนี้ถูกปิดทิ้งทันที
+      preConfirm: async () => {
+        const h = document.getElementById('mpHead').value;
+        const t = document.getElementById('mpTail').value;
+        const prov = document.getElementById('mpProv').value;
+
+        if (typeof plateValidate === 'function') {
+          const chk = plateValidate(h, t, { required: true });
+          if (!chk.ok) { Swal.showValidationMessage(chk.warn); return false; }
+        }
+
+        const pretty = (typeof platePretty === 'function')
+          ? platePretty(plateCleanHead(h), t) : (h + ' ' + t);
+
+        try {
+          const out = await savePlateForMe(v, pretty, prov);
+          if (out && (out.status === 'success' || out.status === 'exists')) return out;
+          Swal.showValidationMessage((out && out.message) || 'บันทึกไม่สำเร็จ');
+          return false;
+        } catch (err) {
+          Swal.showValidationMessage('เชื่อมต่อไม่ได้ ลองอีกครั้ง หรือกด "ยังไม่สะดวกตอนนี้"');
+          return false;
+        }
+      }
+    });
+
+    if (result.isConfirmed && result.value) {
+      // อัปเดตในมือทันที ไม่ต้องรอโหลดหน้าใหม่
+      v.plate = result.value.plate || '';
+      v.province = result.value.province || '';
+      try { writeMemberCache(currentUserId, memberData); } catch (e) {}
+      try { renderMember(memberData); } catch (e) {}
+    } else {
+      markPlateAskSkipped();                                 // (ค)
+    }
+
+  } catch (err) {
+    // (จ) ตรงนี้พังห้ามลาก QR พังไปด้วย
+    console.warn('ถามทะเบียนไม่สำเร็จ (ข้ามไป):', err);
+  }
+}
+
+
 async function showQRSection() {
 
   if (!document.getElementById('qrSection').classList.contains('hidden')) {
     return; // ถ้าแสดงอยู่แล้ว ไม่ต้องสร้างใหม่
   }
+
+  // ยังไม่มีทะเบียน -> ขอก่อน (ข้ามได้ ไม่บล็อกการแสดง QR)
+  // ⚠️ ต้องอยู่ก่อนการเช็คอายุ QR ที่เตรียมไว้ เพราะลูกค้าใช้เวลากรอกสักพัก
+  //    ถ้าเช็คอายุไปก่อนแล้วค่อยถาม ของที่เตรียมไว้อาจหมดอายุระหว่างกรอก
+  await askPlateIfMissing();
 
   // ── มีของเตรียมไว้และยังสดอยู่ -> ขึ้นเลย ไม่แตะเน็ต ────────────────────
   if (warmToken && warmTokenAgeSec() <= QR_PREWARM_MAX_AGE) {
@@ -485,6 +647,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const profile = await liff.getProfile();
+
+    // เก็บ token ไว้ใช้ตอนลูกค้ากรอกทะเบียนรถเอง (ดู askPlateIfMissing)
+    // ⚠️ getIDToken() ใช้ได้ต่อเมื่อ LIFF ตัวนี้เปิดสิทธิ์ openid ไว้
+    //    ถ้าไม่ได้เปิดจะคืน null เงียบ ๆ จึงเก็บ access token ไว้เป็นทางสำรอง
+    //    (มีติดมากับ LIFF ทุกตัวอยู่แล้ว) เซิร์ฟเวอร์รับได้ทั้งสองแบบ
+    try {
+      memberTokens.id = (liff.getIDToken && liff.getIDToken()) || '';
+    } catch (e) { memberTokens.id = ''; }
+    try {
+      memberTokens.access = (liff.getAccessToken && liff.getAccessToken()) || '';
+    } catch (e) { memberTokens.access = ''; }
 
     // ยิงแล้วไม่รอผล (14 ก.ย. 2569)
     // ของเดิมใช้ await ทำให้ต้องรอ Apps Script ครบ 1 รอบก่อน แล้วค่อยไปขอแต้ม
