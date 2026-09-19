@@ -136,6 +136,14 @@ function render(d) {
   $('moRedeem').textContent = d.month.redeemCount > 0
     ? `${d.month.redeemCount} ครั้ง (${baht(d.month.redeemValue)} แต้ม)`
     : 'ไม่มี';
+
+  // แยกยอดตามช่องทางรับเงิน — แถวเก่าก่อน 19 ก.ย. 2569 ยังไม่มีข้อมูลนี้
+  // จึงมีส่วนที่ไม่เข้าทั้งสองช่อง ต้องบอกให้รู้ ไม่ใช่ปล่อยให้ยอดไม่ตรงแล้วงง
+  const known = (d.month.transfer || 0) + (d.month.cash || 0);
+  const unknown = Math.max(0, d.month.revenue - known);
+  $('moTransfer').textContent = baht(d.month.transfer || 0) + ' บาท';
+  $('moCash').textContent = baht(d.month.cash || 0) + ' บาท'
+    + (unknown > 0 ? ` · ไม่ระบุ ${baht(unknown)}` : '');
   $('moRange').textContent = `วันที่ 1–${d.dayOfMonth}`;
 
   // เทียบช่วงวันเดียวกันของเดือนก่อน
@@ -148,13 +156,16 @@ function render(d) {
       : '');
 
   // ── กราฟรายวัน ─────────────────────────────────────────────────────
+  const DOW_TH = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
   drawBars($('dailyChart'), d.daily.map(x => ({
     value: x.revenue,
+    cars: x.cars,
     label: x.label,
+    full: `วัน${DOW_TH[x.dow]}ที่ ${x.label}`,
     // เสาร์-อาทิตย์ทำสีต่าง เพราะสถิติบอกว่าวันหยุดคนเยอะกว่า 39%
     weekend: x.dow === 0 || x.dow === 6,
     title: `${x.label} · ${x.cars} คัน · ${baht(x.revenue)} บาท`
-  })), true);
+  })), true, $('dailyPick'));
   const best = d.daily.reduce((m, x) => (x.revenue > m.revenue ? x : m), d.daily[0]);
   $('dailyFoot').textContent = best && best.revenue > 0
     ? `วันที่ดีที่สุดใน 30 วัน: ${best.label} · ${baht(best.revenue)} บาท (${best.cars} คัน)` : '';
@@ -170,12 +181,20 @@ function render(d) {
   if (!hasDeep) return;
 
   // ── กราฟรายเดือน ───────────────────────────────────────────────────
-  drawBars($('monthChart'), d.months.map(x => ({
-    value: x.revenue,
-    label: x.label,
-    partial: x.partial,
-    title: `${x.label} · ${x.cars} คัน · ${baht(x.revenue)} บาท`
-  })), false);
+  const MON_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
+                  'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  drawBars($('monthChart'), d.months.map(x => {
+    const p = String(x.ym || '').split('-');     // 'yyyy-MM'
+    const full = p.length === 2 ? `${MON_TH[Number(p[1]) - 1]} ${p[0]}` : x.label;
+    return {
+      value: x.revenue,
+      cars: x.cars,
+      label: x.label,
+      full: full,
+      partial: x.partial,
+      title: `${x.label} · ${x.cars} คัน · ${baht(x.revenue)} บาท`
+    };
+  }), false, $('monthPick'));
 
   // ── อันดับบริการ ───────────────────────────────────────────────────
   const maxSvc = d.services.length ? d.services[0].revenue : 0;
@@ -248,17 +267,42 @@ function cmpLine(label, cur, prev, detail) {
 
 
 // วาดกราฟแท่ง — ไม่ใช้ไลบรารี หน้าจะได้ไม่หนัก
-function drawBars(box, items, dense) {
+//
+// แตะที่แท่งแล้วเห็นยอดของช่วงนั้น (เพิ่ม 19 ก.ย. 2569 ตามที่เจ้าของร้านขอ
+// ให้กดดูเป็นรายวัน/รายเดือนได้)
+// ข้อมูลมีอยู่ในมือแล้วทั้งก้อน จึงไม่ต้องยิงถามเซิร์ฟเวอร์ใหม่ = กดแล้วขึ้นทันที
+function drawBars(box, items, dense, pickBox) {
   const max = Math.max.apply(null, items.map(x => x.value).concat([1]));
   box.style.gridTemplateColumns = `repeat(${items.length}, 1fr)`;
-  box.innerHTML = items.map(x => {
+  box.innerHTML = items.map((x, i) => {
     const pct = x.value > 0 ? Math.max(3, Math.round(x.value / max * 100)) : 0;
     const cls = [x.weekend ? 'is-weekend' : '', x.partial ? 'is-partial' : ''].join(' ').trim();
-    return `<div class="st-bar-wrap" title="${esc(x.title)}">
+    return `<div class="st-bar-wrap" data-i="${i}" title="${esc(x.title)}">
               <div class="st-bar-track"><div class="st-bar ${cls}" style="height:${pct}%"></div></div>
               <div class="st-bar-lbl${dense ? ' dense' : ''}">${esc(x.label)}</div>
             </div>`;
   }).join('');
+
+  if (!pickBox) return;
+  box.onclick = e => {
+    const wrap = e.target.closest('.st-bar-wrap');
+    if (!wrap) return;
+    const x = items[Number(wrap.dataset.i)];
+    if (!x) return;
+
+    // เน้นแท่งที่เลือกอยู่ ให้รู้ว่ากำลังดูอันไหน
+    box.querySelectorAll('.st-bar-wrap').forEach(w => w.classList.remove('is-pick'));
+    wrap.classList.add('is-pick');
+
+    const avg = x.cars > 0 ? Math.round(x.value / x.cars) : 0;
+    pickBox.innerHTML =
+      `<span class="st-pick-when">${esc(x.full || x.label)}</span>` +
+      `<span class="st-pick-main">${baht(x.value)} บาท</span>` +
+      `<span class="st-pick-sub">${x.cars} คัน` +
+      (x.cars > 0 ? ` · เฉลี่ย ${baht(avg)} บาท/คัน` : '') +
+      (x.partial ? ' · เดือนนี้ยังไม่จบ' : '') + `</span>`;
+    pickBox.classList.remove('hidden');
+  };
 }
 
 function esc(s) {

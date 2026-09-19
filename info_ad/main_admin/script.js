@@ -379,12 +379,18 @@ class QRScanner {
     // เพิ่มทะเบียนเข้าไปด้วย ช่วยให้แอดมินยันกับรถที่จอดอยู่หน้าร้านได้ก่อนกดยืนยัน
     const plateLine = String(selectedVehicle.Plate || '').trim();
 
+    // ช่องทางรับเงิน — แลกแต้มไม่มีเงินเข้าร้าน จึงไม่มีช่องทาง
+    const payWay = this.isRedeeming ? '' : (this.payWay || 'transfer');
+    const payWayText = payWay === 'cash' ? '💵 เงินสด'
+                     : payWay === 'transfer' ? '📱 โอนจ่าย' : '';
+
     const confirmHtml = `
       <p>ลูกค้า: ${esc(this.foundUser.Name)}</p>
       <p>รถ: ${esc(selectedVehicle.Brand)} ${esc(selectedVehicle.Model)} (${esc(selectedVehicle.Year)})${
         plateLine ? ' · ' + esc(plateLine) : ''}</p>
       <p>บริการ: ${esc(name)}</p>
       <p>${esc(label)}</p>
+      ${payWayText ? `<p>รับเงินทาง: ${esc(payWayText)}</p>` : ''}
       <p>หมายเหตุ: ${esc(note || '-')}</p>
     `;
 
@@ -394,12 +400,13 @@ class QRScanner {
       serviceName: name,
       price: priceInputEl.value,
       note: note,
-      isRedeeming: this.isRedeeming
+      isRedeeming: this.isRedeeming,
+      payWay: payWay || 'transfer'
     };
 
     // ส่งข้อมูลที่ตรวจแล้วออกไปให้ .then เอาไปทำต่อ
     return {
-      name, note, price, point, label, confirmHtml,
+      name, note, price, point, label, confirmHtml, payWay,
       vehicle: selectedVehicle
     };
   }
@@ -439,6 +446,7 @@ class QRScanner {
       price: data.price,
       point: data.point,
       note: data.note,
+      payWay: data.payWay || '',       // 'transfer' | 'cash' | '' (แลกแต้ม)
       timestamp: this.getThaiDateTime(),
       admin: this.adminName,
 
@@ -1024,6 +1032,16 @@ class QRScanner {
           </div>
         </div>
 
+        <!-- รับเงินทางไหน — ขึ้นเฉพาะตอนจ่ายเงิน (แลกแต้มไม่มีเงินเข้า)
+             ค่าเริ่มต้นเป็น "โอน" ตามที่เจ้าของร้านสั่ง เพราะเป็นทางที่ใช้บ่อยสุด -->
+        <div class="fld" id="payWayRow">
+          <label class="fld-lbl">รับเงินทาง</label>
+          <div class="pay-seg" role="group" aria-label="เลือกช่องทางรับเงิน">
+            <button type="button" id="wayTransfer" class="pay-opt is-on">📱 โอนจ่าย</button>
+            <button type="button" id="wayCash"     class="pay-opt">💵 เงินสด</button>
+          </div>
+        </div>
+
         <input type="number" id="priceInput" placeholder="ราคา (บาท)" class="swal2-input">
         <p id="pointInfo">แต้มที่จะได้: <span id="pointPreview">0</span></p>
         <input type="text" id="noteInput" placeholder="หมายเหตุ (ไม่บังคับ)" class="swal2-input">
@@ -1147,15 +1165,34 @@ class QRScanner {
   
         // แถบเลือกวิธีชำระ — เห็นทั้ง 2 ทางเลือกพร้อมกัน และรู้ว่าตอนนี้อยู่โหมดไหน
         // ของเดิมเป็นปุ่มเดียวที่กดสลับไปมา ซึ่งชวนสับสนว่ากดแล้วบันทึกเลยหรือเปล่า
+        const wayTransfer = document.getElementById('wayTransfer');
+        const wayCash = document.getElementById('wayCash');
+        const payWayRow = document.getElementById('payWayRow');
+
+        // ช่องทางรับเงิน — เก็บไว้ที่ this เพื่อให้ collectForm อ่านได้
+        // ค่าเริ่มต้น 'transfer' ตามที่เจ้าของร้านสั่ง
+        const setWay = (way) => {
+          this.payWay = way;
+          wayTransfer.classList.toggle('is-on', way === 'transfer');
+          wayCash.classList.toggle('is-on', way === 'cash');
+        };
+        wayTransfer.addEventListener('click', () => setWay('transfer'));
+        wayCash.addEventListener('click', () => setWay('cash'));
+
         const setMode = (redeem) => {
           this.isRedeeming = redeem;
           modeCash.classList.toggle('is-on', !redeem);
           modePts.classList.toggle('is-on', redeem);
           priceInput.placeholder = redeem ? 'จำนวนแต้มที่ใช้' : 'ราคา (บาท)';
+          // แลกแต้มไม่มีเงินเข้าร้าน ซ่อนแถบช่องทางรับเงินไปเลย
+          // ถ้าปล่อยไว้ แอดมินจะเลือกแล้วเข้าใจว่ามีเงินเข้าทั้งที่ไม่มี
+          payWayRow.classList.toggle('hidden', redeem);
           updatePointDisplay();
         };
         modeCash.addEventListener('click', () => setMode(false));
         modePts.addEventListener('click', () => setMode(true));
+
+        setWay(this.payWay || 'transfer');       // ตั้งค่าเริ่มต้นให้ทุกครั้งที่เปิดฟอร์ม
 
         // ── รายการบริการให้แตะเลือก ─────────────────────────────────────
         const serviceInput = document.getElementById('serviceName');
@@ -1204,9 +1241,11 @@ class QRScanner {
           this.renderVehiclePicks();
           this.renderPlateBox();
           this.renderServiceChips();
+          setWay(d.payWay || 'transfer');          // คืนช่องทางรับเงินที่เลือกไว้
           setMode(!!d.isRedeeming);                // คืนโหมดจ่ายเงิน/แลกแต้ม
         } else {
-          setMode(false);       // เปิดใหม่ปกติ เริ่มที่จ่ายเงินเสมอ
+          setWay('transfer');   // เปิดใหม่ปกติ เริ่มที่โอนจ่ายเสมอ
+          setMode(false);       // และเริ่มที่จ่ายเงิน (ไม่ใช่แลกแต้ม)
         }
         updateCurrentPoint();   // โหลดครั้งแรก
       },

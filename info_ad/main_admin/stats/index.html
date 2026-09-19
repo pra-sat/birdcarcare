@@ -45,6 +45,8 @@
         <div class="st-row"><span class="st-k">ยอดเงิน</span><span class="st-v" id="moRevenue">–</span></div>
         <div class="st-row"><span class="st-k">จำนวนรถ</span><span class="st-v" id="moCars">–</span></div>
         <div class="st-row"><span class="st-k">เฉลี่ยต่อคัน</span><span class="st-v" id="moAvg">–</span></div>
+        <div class="st-row"><span class="st-k">รับเป็นเงินโอน</span><span class="st-v" id="moTransfer">–</span></div>
+        <div class="st-row"><span class="st-k">รับเป็นเงินสด</span><span class="st-v" id="moCash">–</span></div>
         <div class="st-row"><span class="st-k">แลกด้วยแต้ม</span><span class="st-v" id="moRedeem">–</span></div>
       </div>
       <!-- เทียบกับเดือนก่อน "ช่วงวันเดียวกัน" ไม่ใช่ทั้งเดือน
@@ -55,7 +57,9 @@
     <!-- ── กราฟรายวัน ────────────────────────────────────────────────── -->
     <div class="st-card">
       <div class="st-card-head">ยอดเงินรายวัน <span class="st-sub">30 วันล่าสุด</span></div>
+      <p class="st-tip">แตะที่แท่งเพื่อดูยอดของวันนั้น</p>
       <div class="st-chart" id="dailyChart"></div>
+      <div class="st-pick hidden" id="dailyPick"></div>
       <div class="st-chart-foot" id="dailyFoot"></div>
     </div>
 
@@ -63,7 +67,9 @@
     <!-- การ์ดตั้งแต่ตรงนี้ลงไปเป็นส่วนที่โหลดช้า มาทีหลัง ซ่อนไว้ก่อน -->
     <div class="st-card hidden" id="monthCard">
       <div class="st-card-head">ยอดเงินรายเดือน <span class="st-sub">12 เดือนล่าสุด</span></div>
+      <p class="st-tip">แตะที่แท่งเพื่อดูยอดของเดือนนั้น</p>
       <div class="st-chart st-chart-m" id="monthChart"></div>
+      <div class="st-pick hidden" id="monthPick"></div>
       <p class="st-hint">แท่งลายทางคือเดือนนี้ที่ยังไม่จบ</p>
     </div>
 

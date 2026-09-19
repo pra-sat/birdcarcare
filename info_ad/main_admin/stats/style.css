@@ -102,6 +102,26 @@
   font-size: 11px; color: var(--bc-ink2); text-align: center; margin-top: 9px;
 }
 
+/* ── แตะแท่งเพื่อดูยอดของช่วงนั้น ────────────────────────────────────── */
+.st-tip { font-size: 11px; color: var(--bc-ink2); margin: -4px 0 9px; }
+.st-bar-wrap { cursor: pointer; }
+.st-bar-wrap.is-pick .st-bar-track { background: #DCEDF7; }
+.st-bar-wrap.is-pick .st-bar { background: var(--bc-deep); }
+.st-bar-wrap.is-pick .st-bar-lbl {
+  color: var(--bc-deep); font-weight: 700; font-size: 9px !important;
+}
+.st-pick {
+  margin-top: 10px; padding: 10px 12px;
+  background: var(--bc-foam); border: 1px solid var(--bc-line); border-radius: 12px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.st-pick-when { font-size: 11.5px; color: var(--bc-ink2); }
+.st-pick-main {
+  font-family: var(--bc-disp); font-weight: 500; font-size: 1.35rem; line-height: 1.15;
+  color: var(--bc-waterD); font-variant-numeric: tabular-nums;
+}
+.st-pick-sub { font-size: 11.5px; color: var(--bc-ink2); }
+
 /* ── อันดับ ──────────────────────────────────────────────────────────── */
 .st-rank-row { margin-bottom: 11px; }
 .st-rank-row:last-child { margin-bottom: 0; }
