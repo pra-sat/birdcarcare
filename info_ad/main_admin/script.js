@@ -1,5 +1,10 @@
 // script.js (main_admin)
 const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxdxUvmwLS3_nETwGLk4J8ipPq2LYNSWyhJ2ZwVsEJQgONG11NSSX3jVaeqWCU1TXvE5g/exec';
+
+// นานแค่ไหนที่ห้ามกดบันทึกรถคันเดิมซ้ำ หลังจากบันทึกไม่สำเร็จ (20 ก.ย. 2569)
+// ⚠️ ต้องตรงกับ DUP_WINDOW_MIN ใน security.gs ฝั่งเซิร์ฟเวอร์
+//    ถ้าสองฝั่งไม่ตรงกัน จะเกิดอาการ "หน้าเว็บบอกว่าลองได้แล้ว แต่เซิร์ฟเวอร์ยังปฏิเสธ"
+const CAR_LOCK_MIN = 10;
 window.liffId = '2007421084-2OgzWbpV';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -511,22 +516,37 @@ class QRScanner {
         .then(() => liff.closeWindow());
     }
 
-    // ── รายการนี้เพิ่งถูกบันทึกไปเมื่อกี้ ให้แอดมินยืนยันก่อนว่าตั้งใจซ้ำจริง ──
-    if (result.code === 'DUPLICATE') {
-      const again = await Swal.fire({
-        icon: 'warning',
-        title: '⚠️ รายการนี้เพิ่งบันทึกไปแล้ว',
-        text: result.message || '',
-        showCancelButton: true,
-        confirmButtonText: 'ยืนยัน บันทึกซ้ำ',
-        cancelButtonText: 'ไม่บันทึก'
-      });
-      if (!again.isConfirmed) return this.reopenForm();
+    // ══════════════════════════════════════════════════════════════════
+    //  ด่านกันกดซ้ำ (20 ก.ย. 2569) — เซิร์ฟเวอร์เป็นคนตัดสิน หน้าเว็บแค่เล่าต่อ
+    //
+    //  🔴 เอาทางเลือก "ยืนยัน บันทึกซ้ำ" ออกทั้งหมดตามที่เจ้าของร้านสั่ง
+    //     ของเดิมกดยืนยันแล้วยิงซ้ำได้ ซึ่งทำให้แต้มเด้งสองรอบได้ถ้ากดพลาด
+    //     และไม่ช่วยอะไรเลยในเคสที่ระบบกำลังมีปัญหา
+    // ══════════════════════════════════════════════════════════════════
 
-      // ยิงใหม่พร้อมธงยืนยัน และเปลี่ยนรหัสคำขอ ไม่งั้นจะไปชนตัวกันซ้ำของตัวเอง
-      this.forceDuplicate = true;
-      this.requestId = 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
-      return this.confirmAndSave(data, true);   // ยืนยันไปแล้ว ไม่ต้องถามซ้ำ
+    // (ก) รถคันนี้เพิ่งบันทึกไม่สำเร็จไปเมื่อกี้ -> ให้จดไว้ อย่าให้ลูกค้ารอ
+    if (result.code === 'RETRY_LOCKED') {
+      this.lockCar(data.vehicle);              // กันเปิดฟอร์มคันนี้ซ้ำในเครื่องด้วย
+      this.logAction('บันทึกบริการ', `⛔ ถูกล็อกไม่ให้ยิงซ้ำ: ${data.name}`);
+      await Swal.fire({
+        icon: 'warning',
+        title: '⛔ อย่าเพิ่งกดซ้ำ',
+        html: `<div class="lock-msg">${esc(result.message || '').replace(/\n/g, '<br>')}</div>`,
+        confirmButtonText: 'รับทราบ'
+      });
+      return this.resetToScan();
+    }
+
+    // (ข) รายการนี้บันทึกสำเร็จไปแล้วเมื่อกี้ -> ลูกค้าได้แต้มแล้ว ไม่ต้องทำอีก
+    if (result.code === 'DUPLICATE_LOCKED') {
+      this.logAction('บันทึกบริการ', `⛔ ซ้ำกับรายการที่บันทึกไปแล้ว: ${data.name}`);
+      await Swal.fire({
+        icon: 'info',
+        title: '✅ บันทึกไปแล้ว',
+        html: `<div class="lock-msg">${esc(result.message || '').replace(/\n/g, '<br>')}</div>`,
+        confirmButtonText: 'รับทราบ'
+      });
+      return this.resetToScan();
     }
 
     // ── เซสชัน LINE หมดอายุ (เกิดได้ถ้าเปิดหน้าค้างไว้ทั้งวัน) ──────────────
@@ -565,6 +585,40 @@ class QRScanner {
     this.logAction('บันทึกบริการ', `❌ ล้มเหลว: ${data.name}, เหตุ: ${result.message}`);
     await Swal.fire('❌ บันทึกไม่สำเร็จ', result.message || '', 'error');
     return this.reopenForm();
+  }
+
+  // ── ล็อกรถคันที่เพิ่งบันทึกไม่สำเร็จ ไว้ในเครื่องแอดมินเอง ───────────────
+  //
+  // ด่านจริงอยู่ที่เซิร์ฟเวอร์ ตรงนี้เป็นแค่ "กันไม่ให้เสียเวลา" —
+  // พนักงานจะได้ไม่ต้องสแกนและกรอกฟอร์มใหม่ทั้งชุดแล้วค่อยโดนปฏิเสธ
+  // ซึ่งเป็นตอนที่ลูกค้ายืนรออยู่พอดี
+  //
+  // ⚠️ กุญแจใช้ userId + ยี่ห้อ + รุ่น **ห้ามใช้ทะเบียน** เพราะรถส่วนใหญ่
+  //    ยังไม่ได้กรอกทะเบียน ถ้าอิงทะเบียนจะล็อกไม่ตรงคัน
+  carLockKey(vehicle) {
+    if (!vehicle || !this.foundUser) return '';
+    return ['bcCarLock', this.foundUser.UserID,
+            String(vehicle.Brand || '').trim(),
+            String(vehicle.Model || '').trim()].join('|');
+  }
+
+  lockCar(vehicle) {
+    const k = this.carLockKey(vehicle);
+    if (!k) return;
+    try { localStorage.setItem(k, String(Date.now())); } catch (e) {}
+  }
+
+  // เหลืออีกกี่นาทีถึงจะปลดล็อก (0 = ไม่ได้ถูกล็อก)
+  carLockLeft(vehicle) {
+    const k = this.carLockKey(vehicle);
+    if (!k) return 0;
+    try {
+      const at = Number(localStorage.getItem(k) || 0);
+      if (!at) return 0;
+      const left = CAR_LOCK_MIN - (Date.now() - at) / 60000;
+      if (left <= 0) { localStorage.removeItem(k); return 0; }
+      return Math.ceil(left);
+    } catch (e) { return 0; }
   }
 
   // เปิดฟอร์มบันทึกบริการขึ้นมาใหม่ พร้อมค่าที่กรอกค้างไว้ (this.draft)
@@ -1002,6 +1056,29 @@ class QRScanner {
     }
   }
 
+  // เตือนตั้งแต่ตอนเปิดฟอร์ม ถ้ารถคันที่ลูกค้าเลือกมาเพิ่งบันทึกไม่สำเร็จ
+  // คืน true = ถูกล็อก (ไม่ต้องเปิดฟอร์ม)
+  warnIfCarLocked() {
+    const list = (this.foundUser && this.foundUser.vehicles) || [];
+    const picked = list[this.startIdxForLock || 0];
+    const left = this.carLockLeft(picked);
+    if (!left) return false;
+
+    Swal.fire({
+      icon: 'warning',
+      title: '⛔ รถคันนี้เพิ่งบันทึกไม่สำเร็จ',
+      html: `<div class="lock-msg">` +
+            `รอบที่แล้วบันทึกไม่สำเร็จ และระบบเก็บรายการไว้ให้แล้ว<br>` +
+            `แจ้งเจ้าของร้านแล้วเช่นกัน<br><br>` +
+            `<b>อีก ${left} นาที</b> ถึงจะลองใหม่ได้<br><br>` +
+            `ระหว่างนี้ให้จดไว้ในกระดาษก่อน:<br>` +
+            `• เบอร์โทรลูกค้า<br>• ทะเบียนรถ (หรือ ยี่ห้อ/รุ่น)<br>• บริการที่ทำ และราคา` +
+            `</div>`,
+      confirmButtonText: 'รับทราบ'
+    }).then(() => this.resetToScan());
+    return true;
+  }
+
   showCustomerPopup() {
     this.isRedeeming = false;
     this.currentPoint = 0;
@@ -1032,6 +1109,11 @@ class QRScanner {
 
     const startIdx = picked >= 0 ? picked : 0;
     this.pickedByCustomer = picked >= 0;
+    this.startIdxForLock = startIdx;
+
+    // รถคันนี้เพิ่งบันทึกไม่สำเร็จไปเมื่อกี้ -> บอกให้จดไว้ ไม่ต้องกรอกฟอร์มใหม่
+    // ให้เสียเวลาแล้วค่อยโดนเซิร์ฟเวอร์ปฏิเสธตอนลูกค้ายืนรออยู่
+    if (this.warnIfCarLocked()) return;
 
     const vehicleOptions = this.foundUser.vehicles.map((v, i) =>
       `<option value="${i}"${i === startIdx ? ' selected' : ''}>${esc(v.Brand)} ${esc(v.Model)} (${esc(v.Year)}) - ${esc(v.point)} แต้ม</option>`

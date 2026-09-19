@@ -197,3 +197,9 @@ input#manualPhone::placeholder {
 .cf-plate.is-none .cf-plate-ask { color: #A43F3D; }
 .cf-plate-sub { font-size: 11.5px; line-height: 1.5; color: #8A6212; text-align: center; }
 .cf-plate.is-none .cf-plate-sub { color: #A43F3D; }
+
+/* ข้อความเตือนตอนถูกล็อกไม่ให้บันทึกซ้ำ — ต้องอ่านง่ายตอนลูกค้ายืนรออยู่ */
+.lock-msg {
+  text-align: left; font-size: 14px; line-height: 1.75; color: var(--bc-ink);
+}
+.lock-msg b { color: var(--bc-rose); }
