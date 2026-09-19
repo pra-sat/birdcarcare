@@ -384,7 +384,10 @@ async function askPlateIfMissing() {
       confirmButtonText: '💾 บันทึกแล้วแสดง QR',
       cancelButtonText: 'ยังไม่สะดวกตอนนี้',
       focusConfirm: false,
-      allowOutsideClick: () => !Swal.isLoading(),
+      // ⚠️ แตะโดนขอบนอกแล้วป๊อปอัปหายไปเฉย ๆ = ลูกค้าไม่รู้ว่าเกิดอะไรขึ้น
+      //    และถ้านับว่า "ข้าม" ด้วย จะไม่ถามซ้ำทั้งรอบทั้งที่เขาไม่ได้ตั้งใจข้าม
+      allowOutsideClick: false,
+      allowEscapeKey: false,
       didOpen: () => {
         // ตัวอย่างป้ายอัปเดตตามที่พิมพ์ ให้เห็นว่าจะออกมาหน้าตาแบบไหน
         const head = document.getElementById('mpHead');
@@ -402,7 +405,9 @@ async function askPlateIfMissing() {
             : '<p class="pl-eg">พิมพ์แล้วจะขึ้นตัวอย่างป้ายให้ดูตรงนี้</p>';
         };
         head.oninput = draw; tail.oninput = draw; prov.onchange = draw;
-        setTimeout(() => head.focus(), 60);
+        // ⚠️ ห้าม focus() ให้เอง — คีย์บอร์ดจะเด้งขึ้นมาบังข้อความที่อธิบายว่า
+        //    ขอทะเบียนไปทำอะไร ซึ่งเป็นส่วนที่ทำให้ลูกค้าสบายใจพอจะกรอก
+        //    ให้ลูกค้าอ่านจบแล้วแตะช่องเอง
       },
       // ⚠️ ที่นี่ทำได้แค่ "ตรวจ + ยิงบันทึก" ห้ามเปิดป๊อปอัปตัวใหม่เด็ดขาด
       //    SweetAlert เปิดได้ทีละอัน เปิดตัวใหม่ = ตัวนี้ถูกปิดทิ้งทันที
@@ -437,7 +442,10 @@ async function askPlateIfMissing() {
       v.province = result.value.province || '';
       try { writeMemberCache(currentUserId, memberData); } catch (e) {}
       try { renderMember(memberData); } catch (e) {}
-    } else {
+    } else if (result.dismiss === Swal.DismissReason.cancel) {
+      // นับว่า "ข้าม" เฉพาะตอนกดปุ่มยังไม่สะดวกเท่านั้น
+      // ปิดด้วยวิธีอื่น (เช่นกดปุ่มย้อนกลับของเครื่อง) ไม่ใช่การตัดสินใจข้าม
+      // ครั้งหน้าที่กดแสดง QR ต้องถามอีก
       markPlateAskSkipped();                                 // (ค)
     }
 
