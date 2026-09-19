@@ -118,7 +118,10 @@ function render(d) {
     $('genAt').textContent = 'ยังไม่มีข้อมูลบริการในระบบ';
     return;
   }
-  $('genAt').textContent = 'ข้อมูล ณ ' + (d.generatedAt || '-');
+  // บอกให้ชัดว่าตัดรถของแอดมินออกแล้ว ไม่งั้นเจ้าของร้านจะงงว่าทำไมยอดน้อยลง
+  let head = 'ข้อมูล ณ ' + (d.generatedAt || '-');
+  if (d.excludedAdmin > 0) head += ` · ไม่รวมรถของแอดมิน ${d.excludedAdmin} รายการ`;
+  $('genAt').textContent = head;
 
   // ── วันนี้ ──────────────────────────────────────────────────────────
   $('tdRevenue').textContent = baht(d.today.revenue);
