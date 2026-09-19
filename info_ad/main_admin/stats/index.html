@@ -21,82 +21,86 @@
 
     <p class="st-updating hidden" id="updating"></p>
 
-    <!-- ── วันนี้ ─────────────────────────────────────────────────────── -->
+    <!-- ── เลือกมุมมอง ────────────────────────────────────────────────────
+         ช่วงเวลาที่เลือกตรงนี้คุมทุกการ์ดด้านล่างทั้งหน้า
+         ของเดิมเป็นการ์ด "วันนี้" กับ "เดือนนี้" ตายตัว ดูย้อนหลังไม่ได้
+         ทั้งที่ข้อมูล 30 วัน/12 เดือน ถูกส่งมาพร้อมกันอยู่แล้ว -->
+    <div class="st-seg" id="segView">
+      <button type="button" class="st-seg-b is-on" data-mode="day">รายวัน</button>
+      <button type="button" class="st-seg-b" data-mode="month">รายเดือน</button>
+      <button type="button" class="st-seg-b" data-mode="all">ภาพรวม</button>
+    </div>
+
+    <!-- ── เลือกวัน/เดือน ─────────────────────────────────────────────────
+         กดที่วันที่เพื่อเปิดปฏิทินของเครื่อง หรือกดลูกศรเลื่อนทีละช่วง
+         เลือกแล้วขึ้นทันที ไม่ยิงถามเซิร์ฟเวอร์ใหม่ -->
+    <div id="pickWrap">
+      <div class="st-pickrow">
+        <button type="button" class="st-arrow" id="periodPrev" aria-label="ย้อนกลับ">◀</button>
+        <input type="date" class="st-dateinput" id="dayInput" aria-label="เลือกวันที่">
+        <input type="month" class="st-dateinput hidden" id="monInput" aria-label="เลือกเดือน">
+        <button type="button" class="st-arrow" id="periodNext" aria-label="ถัดไป">▶</button>
+      </div>
+      <p class="st-pickrel" id="pickRel"></p>
+      <div class="st-quick" id="quickRow"></div>
+    </div>
+
+    <!-- ── ยอดหลักของช่วงที่เลือก ────────────────────────────────────── -->
     <div class="st-card st-today">
-      <div class="st-card-head">วันนี้</div>
       <div class="st-big">
         <div class="st-big-item">
-          <span class="st-big-n" id="tdRevenue">–</span>
+          <span class="st-big-n" id="hRevenue">–</span>
           <span class="st-big-l">บาท</span>
         </div>
         <div class="st-big-sep"></div>
         <div class="st-big-item">
-          <span class="st-big-n" id="tdCars">–</span>
+          <span class="st-big-n" id="hCars">–</span>
           <span class="st-big-l">คัน</span>
         </div>
+        <div class="st-big-sep"></div>
+        <div class="st-big-item">
+          <span class="st-big-n" id="hPoints">–</span>
+          <span class="st-big-l">แต้มที่แจก</span>
+        </div>
       </div>
-      <div class="st-cmp" id="tdCmp"></div>
+      <div class="st-cmp" id="hCmp"></div>
     </div>
 
-    <!-- ── เดือนนี้ ───────────────────────────────────────────────────── -->
+    <!-- ── ช่องทางรับเงิน ─────────────────────────────────────────────────
+         ⚠️ แถวก่อน 19 ก.ย. 2569 ไม่มีข้อมูลนี้ ต้องแสดงเป็น "ไม่ระบุ" แยกไว้
+            ห้ามเหมาเข้าทางใดทางหนึ่ง ไม่งั้นยอดรวมไม่ตรงแล้วหาสาเหตุไม่เจอ -->
     <div class="st-card">
-      <div class="st-card-head">เดือนนี้ <span class="st-sub" id="moRange"></span></div>
+      <div class="st-card-head">ช่องทางรับเงิน</div>
+      <div class="st-paybar" id="payBar"></div>
+      <div class="st-paykey" id="payKey"></div>
       <div class="st-rows">
-        <div class="st-row"><span class="st-k">ยอดเงิน</span><span class="st-v" id="moRevenue">–</span></div>
-        <div class="st-row"><span class="st-k">จำนวนรถ</span><span class="st-v" id="moCars">–</span></div>
-        <div class="st-row"><span class="st-k">เฉลี่ยต่อคัน</span><span class="st-v" id="moAvg">–</span></div>
-        <div class="st-row"><span class="st-k">ช่องทางรับเงิน · เงินโอน</span><span class="st-v" id="moTransfer">–</span></div>
-        <div class="st-row"><span class="st-k">ช่องทางรับเงิน · เงินสด</span><span class="st-v" id="moCash">–</span></div>
-        <div class="st-row"><span class="st-k">แลกด้วยแต้ม</span><span class="st-v" id="moRedeem">–</span></div>
+        <div class="st-row"><span class="st-k">เฉลี่ยต่อคัน</span><span class="st-v" id="payAvg">–</span></div>
+        <div class="st-row"><span class="st-k">แลกด้วยแต้ม</span><span class="st-v" id="payRedeem">–</span></div>
       </div>
-      <!-- เทียบกับเดือนก่อน "ช่วงวันเดียวกัน" ไม่ใช่ทั้งเดือน
-           ไม่งั้นทุกต้นเดือนจะเห็นเป็นยอดตกฮวบ ทั้งที่เดือนยังไม่จบ -->
-      <div class="st-cmp" id="moCmp"></div>
     </div>
 
-    <!-- ── กราฟรายวัน ────────────────────────────────────────────────── -->
+    <!-- ── บริการที่ทำในช่วงที่เลือก ─────────────────────────────────── -->
     <div class="st-card">
-      <div class="st-card-head">ยอดเงินรายวัน <span class="st-sub">30 วันล่าสุด</span></div>
-
-      <!-- เลือกวันที่ — กดที่วันที่เพื่อเปิดปฏิทินของเครื่อง
-           หรือกดลูกศรเลื่อนทีละวัน · เลือกแล้วขึ้นทันที ไม่ยิงถามเซิร์ฟเวอร์ใหม่
-           เพราะข้อมูลทั้ง 30 วันถูกส่งมาพร้อมกันอยู่แล้ว -->
-      <div class="st-pickrow">
-        <button type="button" class="st-arrow" id="dayPrev" aria-label="วันก่อนหน้า">◀</button>
-        <input type="date" class="st-dateinput" id="dayInput" aria-label="เลือกวันที่">
-        <button type="button" class="st-arrow" id="dayNext" aria-label="วันถัดไป">▶</button>
-      </div>
-      <div class="st-quick">
-        <button type="button" class="st-q" data-day="today">วันนี้</button>
-        <button type="button" class="st-q" data-day="yesterday">เมื่อวาน</button>
-      </div>
-
-      <p class="st-tip">เลือกวันที่ด้านบน หรือแตะที่แท่งกราฟก็ได้</p>
-      <div class="st-chart" id="dailyChart"></div>
-      <div class="st-pick hidden" id="dailyPick"></div>
-      <div class="st-chart-foot" id="dailyFoot"></div>
+      <div class="st-card-head">บริการที่ทำ <span class="st-sub" id="psvcSub"></span></div>
+      <div id="psvcList"></div>
     </div>
 
-    <!-- ── กราฟรายเดือน ──────────────────────────────────────────────── -->
-    <!-- การ์ดตั้งแต่ตรงนี้ลงไปเป็นส่วนที่โหลดช้า มาทีหลัง ซ่อนไว้ก่อน -->
-    <div class="st-card hidden" id="monthCard">
-      <div class="st-card-head">ยอดเงินรายเดือน <span class="st-sub">12 เดือนล่าสุด</span></div>
-
-      <div class="st-pickrow">
-        <button type="button" class="st-arrow" id="monPrev" aria-label="เดือนก่อนหน้า">◀</button>
-        <input type="month" class="st-dateinput" id="monInput" aria-label="เลือกเดือน">
-        <button type="button" class="st-arrow" id="monNext" aria-label="เดือนถัดไป">▶</button>
-      </div>
-      <div class="st-quick">
-        <button type="button" class="st-q" data-mon="this">เดือนนี้</button>
-        <button type="button" class="st-q" data-mon="prev">เดือนก่อน</button>
-      </div>
-
-      <p class="st-tip">เลือกเดือนด้านบน หรือแตะที่แท่งกราฟก็ได้</p>
-      <div class="st-chart st-chart-m" id="monthChart"></div>
-      <div class="st-pick hidden" id="monthPick"></div>
-      <p class="st-hint">แท่งลายทางคือเดือนนี้ที่ยังไม่จบ</p>
+    <!-- ── กราฟ ─────────────────────────────────────────────────────────── -->
+    <div class="st-card">
+      <div class="st-card-head" id="chartHead">ย้อนหลัง</div>
+      <p class="st-tip">แตะที่แท่งกราฟเพื่อกระโดดไปช่วงนั้น</p>
+      <div class="st-chart" id="chart"></div>
+      <div class="st-chart-foot" id="chartFoot"></div>
+      <p class="st-hint hidden" id="chartNote">แท่งลายทางคือเดือนนี้ที่ยังไม่จบ</p>
     </div>
+
+    <!-- ── ภาพรวมทั้งหมด (โหมดภาพรวมเท่านั้น) ────────────────────────── -->
+    <div class="st-card hidden" id="allCard">
+      <div class="st-card-head">ภาพรวมทั้งหมด</div>
+      <div class="st-rows" id="allRows"></div>
+    </div>
+
+    <!-- ══ ตั้งแต่ตรงนี้ลงไปคือส่วน deep ที่มาทีหลัง ไม่ขึ้นกับช่วงที่เลือก ══ -->
 
     <!-- ── อันดับบริการ ──────────────────────────────────────────────── -->
     <div class="st-card hidden" id="svcCard">

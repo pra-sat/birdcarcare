@@ -110,11 +110,6 @@
 .st-bar-wrap.is-pick .st-bar-lbl {
   color: var(--bc-deep); font-weight: 700; font-size: 9px !important;
 }
-.st-pick {
-  margin-top: 10px; padding: 10px 12px;
-  background: var(--bc-foam); border: 1px solid var(--bc-line); border-radius: 12px;
-  display: flex; flex-direction: column; gap: 2px;
-}
 /* ── เลือกวัน/เดือนด้วยปฏิทิน (19 ก.ย. 2569) ──────────────────────────
    ของเดิมเลือกได้ทางเดียวคือแตะแท่งกราฟ ซึ่งรายวันมี 30 แท่งเบียดกัน
    แท่งละไม่ถึง 10px กดพลาดตลอด · ปฏิทินของเครื่องกดครั้งเดียวได้วันที่ต้องการ
@@ -157,12 +152,6 @@ input.st-dateinput {
 }
 .st-quick button.st-q:hover { background-color: #EAF4FA !important; }
 
-.st-pick-when { font-size: 11.5px; color: var(--bc-ink2); }
-.st-pick-main {
-  font-family: var(--bc-disp); font-weight: 500; font-size: 1.35rem; line-height: 1.15;
-  color: var(--bc-waterD); font-variant-numeric: tabular-nums;
-}
-.st-pick-sub { font-size: 11.5px; color: var(--bc-ink2); }
 
 /* ── อันดับ ──────────────────────────────────────────────────────────── */
 .st-rank-row { margin-bottom: 11px; }
@@ -216,4 +205,86 @@ input.st-dateinput {
 
 @media (prefers-reduced-motion: reduce) {
   .st-bar { transition: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   โครงใหม่ 20 ก.ย. 2569 — ช่วงที่เลือกคุมทั้งหน้า
+   ⚠️ ปุ่มทุกตัวด้านล่างต้องเขียนแบบ .พ่อ button.ลูก ให้ได้ (0,2,1)
+      เพื่อสู้กฎ button:not(.swal2-close):not(.swal2-cancel) ของ theme.css
+      ที่เป็น (0,2,1) + !important — ถ้าเขียนแค่ .st-seg-b (0,1,0) จะแพ้ทันที
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── แถบเลือกมุมมอง ──────────────────────────────────────────────────── */
+.st-seg {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
+  background: #fff; border: 1px solid var(--bc-line);
+  border-radius: 13px; padding: 4px; margin-bottom: 10px;
+}
+.st-seg button.st-seg-b {
+  font-family: var(--bc-body) !important;
+  font-size: 13px !important; font-weight: 600 !important;
+  padding: 9px 4px !important; margin: 0 !important; width: auto !important;
+  border: none !important; border-radius: 10px !important;
+  background: transparent !important; background-image: none !important;
+  color: var(--bc-ink2) !important;
+  box-shadow: none !important; cursor: pointer;
+}
+.st-seg button.st-seg-b.is-on {
+  background: var(--bc-water) !important; background-image: none !important;
+  color: #fff !important;
+}
+.st-seg button.st-seg-b[disabled] { opacity: .35; cursor: default; }
+
+/* ── บรรทัดบอกว่าช่วงที่เลือกห่างจากปัจจุบันเท่าไหร่ ─────────────────── */
+.st-pickrel {
+  font-size: 11.5px; color: var(--bc-ink2);
+  text-align: center; margin: -3px 0 8px;
+}
+
+/* ── ช่องทางรับเงิน ──────────────────────────────────────────────────── */
+.st-paybar {
+  display: flex; height: 11px; border-radius: 6px; overflow: hidden;
+  background: #EEF4F8; margin: 2px 0 8px;
+}
+.st-paybar .st-pb { display: block; height: 100%; }
+.st-pb.t { background: var(--bc-water); }
+.st-pb.c { background: #6FC2A6; }
+.st-pb.u { background: #C9D6DE; }
+
+.st-paykey {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  font-size: 11px; color: var(--bc-ink2); margin-bottom: 4px;
+}
+.st-paykey span { display: inline-flex; align-items: center; gap: 5px; }
+.st-sw { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.st-sw.t { background: var(--bc-water); }
+.st-sw.c { background: #6FC2A6; }
+.st-sw.u { background: #C9D6DE; }
+
+/* ── บริการที่ทำในช่วงที่เลือก ───────────────────────────────────────── */
+.st-psvc { margin-bottom: 9px; }
+.st-psvc:last-child { margin-bottom: 0; }
+.st-psvc-top { display: flex; align-items: baseline; gap: 7px; margin-bottom: 3px; }
+.st-psvc-n {
+  flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--bc-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.st-psvc-c { flex: 0 0 auto; font-size: 11px; color: var(--bc-ink2); }
+.st-psvc-v {
+  flex: 0 0 auto; font-size: 12.5px; font-weight: 700;
+  color: var(--bc-waterD); font-variant-numeric: tabular-nums;
+}
+.st-psvc-bar { height: 5px; background: #F2F7FA; border-radius: 3px; overflow: hidden; }
+.st-psvc-fill { height: 100%; background: var(--bc-water); border-radius: 3px; }
+
+.st-empty {
+  text-align: center; color: var(--bc-ink2);
+  font-size: 12.5px; padding: 12px 0; margin: 0;
+}
+
+/* ตัวเลขสามช่องในการ์ดยอดหลัก — จอแคบต้องไม่ล้น */
+.st-big-item .st-big-n { font-size: 1.7rem; }
+@media (max-width: 360px) {
+  .st-big { gap: 8px; }
+  .st-big-item .st-big-n { font-size: 1.45rem; }
 }

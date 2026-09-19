@@ -4,6 +4,24 @@
 //    เพราะข้อมูลที่ขอมาคือยอดขายกับรายชื่อลูกค้า
 //    ต้องส่ง adminUserId + idToken ให้ bcGuardAdmin_ ตรวจทุกครั้ง
 //    (การ "เห็นหน้าจอ" ไม่ใช่ด่านกัน — ด่านจริงอยู่ที่เซิร์ฟเวอร์)
+//
+// ── โครงหน้าจอ (20 ก.ย. 2569) ─────────────────────────────────────────────
+//  ช่วงเวลาที่เลือกด้านบน "คุมทั้งหน้า" — ยอดหลัก · ช่องทางรับเงิน ·
+//  บริการที่ทำ · กราฟ เปลี่ยนตามช่วงที่เลือกทั้งหมด
+//
+//  ของเดิมเป็นการ์ด "วันนี้" กับ "เดือนนี้" ตายตัว อยากดูว่าเมื่อวานขายอะไรบ้าง
+//  ก็ดูไม่ได้ ทั้งที่ข้อมูล 30 วัน/12 เดือนถูกส่งมาพร้อมกันอยู่แล้วตั้งแต่แรก
+//
+//  🔴 กฎที่ห้ามพลาดในไฟล์นี้
+//     ก. render() ถูกเรียกได้ถึง 3 รอบ (แคช -> core -> deep)
+//        ต้องผูกเหตุการณ์ด้วย el.onclick = ห้ามใช้ addEventListener
+//        ไม่งั้นตัวจับเหตุการณ์ทับถมกันทุกรอบ
+//     ข. ต้องจำช่วงที่แอดมินเลือกไว้ (view) ไม่งั้นพอ deep มาถึง
+//        หน้าจะเด้งกลับไปวันล่าสุดแล้วทิ้งสิ่งที่กำลังดูอยู่
+//     ค. ห้ามใช้ toISOString() สร้างค่าให้ input — มันแปลงเป็น UTC
+//        แล้ววันเลื่อนไป 1 วัน · คีย์จากเซิร์ฟเวอร์เป็นวันที่ไทยอยู่แล้ว
+//     ง. โหมดรายเดือน/ภาพรวมต้องรอข้อมูลส่วน deep — ปิดปุ่มไว้ก่อน
+//        ดีกว่าให้กดแล้วเจอหน้าว่างโดยไม่รู้ว่าเพราะอะไร
 
 const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxdxUvmwLS3_nETwGLk4J8ipPq2LYNSWyhJ2ZwVsEJQgONG11NSSX3jVaeqWCU1TXvE5g/exec';
 const liffId = '2007421084-2OgzWbpV';
@@ -12,9 +30,16 @@ const $ = id => document.getElementById(id);
 const show = (el, yes) => { if (el) el.classList.toggle('hidden', !yes); };
 const baht = n => (Number(n) || 0).toLocaleString('th-TH');
 
+const DOW_TH = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+const MON_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
+                'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
 let adminUserId = '', idToken = '';
 // เก็บผลรวมของทั้ง core และ deep ไว้ก้อนเดียว เพราะมาคนละรอบ
 let lastData = {};
+
+// ช่วงที่แอดมินกำลังดูอยู่ — ต้องอยู่นอก render() เพราะ render ถูกเรียกหลายรอบ
+let view = { mode: 'day', dayKey: '', monKey: '' };
 
 // จำผลไว้ในเครื่องแอดมินเอง หน้าจะได้ไม่ว่างระหว่างรอ Apps Script
 // ⚠️ นี่เป็นข้อมูลยอดขาย เก็บได้เฉพาะในเครื่องของแอดมินที่ยืนยันตัวตนแล้ว
@@ -44,7 +69,7 @@ function clearCache() {
 // ═══════════════════════════════════════════════════════════════════════════
 // ยิงขอเป็นส่วน ๆ — core มาก่อนแล้ววาดเลย ไม่ต้องรอ deep
 //   core = ยอดวันนี้ / เดือนนี้ / กราฟรายวัน  (ของที่ดูทุกวัน)
-//   deep = อันดับบริการ / รายเดือน / ลูกค้า   (ช้ากว่ามาก เพราะอ่านอีกชีต)
+//   deep = อันดับบริการ / รายเดือน / ภาพรวม / ลูกค้า   (ช้ากว่ามาก เพราะอ่านอีกชีต)
 async function fetchPart(part) {
   const res = await fetch(`${GAS_ENDPOINT}?action=stats`, {
     method: 'POST',
@@ -79,7 +104,7 @@ async function loadStats(silent) {
     lastData = Object.assign({}, lastData, data);
     writeCache(lastData);
     render(lastData);
-    $('updating').textContent = '⏳ กำลังโหลดอันดับบริการและข้อมูลลูกค้า...';
+    $('updating').textContent = '⏳ กำลังโหลดรายเดือน ภาพรวม และข้อมูลลูกค้า...';
     show($('updating'), true);
 
     // ── ส่วนที่ช้า ตามมาทีหลัง ────────────────────────────────────────
@@ -92,7 +117,7 @@ async function loadStats(silent) {
       show($('updating'), false);
     }).catch(err => {
       console.warn('โหลดส่วนละเอียดไม่สำเร็จ:', err);
-      $('updating').textContent = '⚠️ โหลดอันดับบริการไม่สำเร็จ · ยอดด้านบนถูกต้อง';
+      $('updating').textContent = '⚠️ โหลดรายเดือน/ลูกค้าไม่สำเร็จ · ยอดรายวันด้านบนถูกต้อง';
     });
 
   } catch (err) {
@@ -118,90 +143,229 @@ function render(d) {
     $('genAt').textContent = 'ยังไม่มีข้อมูลบริการในระบบ';
     return;
   }
+
   // บอกให้ชัดว่าตัดรถของแอดมินออกแล้ว ไม่งั้นเจ้าของร้านจะงงว่าทำไมยอดน้อยลง
   let head = 'ข้อมูล ณ ' + (d.generatedAt || '-');
   if (d.excludedAdmin > 0) head += ` · ไม่รวมรถของแอดมิน ${d.excludedAdmin} รายการ`;
   $('genAt').textContent = head;
 
-  // ── วันนี้ ──────────────────────────────────────────────────────────
-  $('tdRevenue').textContent = baht(d.today.revenue);
-  $('tdCars').textContent = d.today.cars;
-  $('tdCmp').innerHTML = cmpLine('เมื่อวาน', d.today.revenue, d.yesterday.revenue,
-                                 d.yesterday.cars + ' คัน · ' + baht(d.yesterday.revenue) + ' บาท');
+  renderPeriod(d);
+  renderDeep(d);
+}
 
-  // ── เดือนนี้ ────────────────────────────────────────────────────────
-  $('moRevenue').textContent = baht(d.month.revenue) + ' บาท';
-  $('moCars').textContent = d.month.cars + ' คัน';
-  $('moAvg').textContent = baht(d.month.avg) + ' บาท';
-  $('moRedeem').textContent = d.month.redeemCount > 0
-    ? `${d.month.redeemCount} ครั้ง (${baht(d.month.redeemValue)} แต้ม)`
-    : 'ไม่มี';
 
-  // แยกยอดตามช่องทางรับเงิน — แถวเก่าก่อน 19 ก.ย. 2569 ยังไม่มีข้อมูลนี้
-  // จึงมีส่วนที่ไม่เข้าทั้งสองช่อง ต้องบอกให้รู้ ไม่ใช่ปล่อยให้ยอดไม่ตรงแล้วงง
-  const known = (d.month.transfer || 0) + (d.month.cash || 0);
-  const unknown = Math.max(0, d.month.revenue - known);
-  $('moTransfer').textContent = baht(d.month.transfer || 0) + ' บาท';
-  $('moCash').textContent = baht(d.month.cash || 0) + ' บาท'
-    + (unknown > 0 ? ` · ไม่ระบุ ${baht(unknown)}` : '');
-  $('moRange').textContent = `วันที่ 1–${d.dayOfMonth}`;
-
-  // เทียบช่วงวันเดียวกันของเดือนก่อน
-  $('moCmp').innerHTML = cmpLine(
-    `เดือนก่อน วันที่ 1–${d.dayOfMonth}`,
-    d.month.revenue, d.prevSame.revenue,
-    d.prevSame.cars + ' คัน · ' + baht(d.prevSame.revenue) + ' บาท'
-  ) + (d.prevFull.revenue > 0
-      ? `<div class="st-cmp-extra">เดือนก่อนทั้งเดือน ${d.prevFull.cars} คัน · ${baht(d.prevFull.revenue)} บาท</div>`
-      : '');
-
-  // ── กราฟรายวัน ─────────────────────────────────────────────────────
-  const DOW_TH = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
-  const dailyCtl = drawBars($('dailyChart'), d.daily.map(x => ({
-    key: x.date,                            // 'yyyy-MM-dd' = ค่าที่ input[type=date] ใช้
+// ── รายการของแต่ละโหมด ────────────────────────────────────────────────────
+// bucket คือก้อนตัวเลขเต็มใบของช่วงนั้น (ยอดเงิน · แต้ม · ช่องทาง · บริการ)
+// ซึ่ง stats.gs ส่งมาให้ครบทุกวัน/ทุกเดือนแล้ว จึงไม่ต้องยิงถามใหม่เวลาเปลี่ยนช่วง
+function dayItems(d) {
+  return (d.daily || []).map(x => ({
+    key: x.date,                       // 'yyyy-MM-dd' = ค่าที่ input[type=date] ใช้
+    label: x.label,
     value: x.revenue,
     cars: x.cars,
-    label: x.label,
-    full: `วัน${DOW_TH[x.dow]}ที่ ${x.label}`,
-    // เสาร์-อาทิตย์ทำสีต่าง เพราะสถิติบอกว่าวันหยุดคนเยอะกว่า 39%
+    dow: x.dow,
     weekend: x.dow === 0 || x.dow === 6,
-    title: `${x.label} · ${x.cars} คัน · ${baht(x.revenue)} บาท`
-  })), true, $('dailyPick'));
-  // วันนี้ = ตัวท้ายสุด · เมื่อวาน = ถัดเข้ามาหนึ่ง
-  bindPicker(dailyCtl, 'dayInput', 'dayPrev', 'dayNext', '[data-day]',
-             (b, n) => b.dataset.day === 'yesterday' ? n - 2 : n - 1);
-  const best = d.daily.reduce((m, x) => (x.revenue > m.revenue ? x : m), d.daily[0]);
-  $('dailyFoot').textContent = best && best.revenue > 0
-    ? `วันที่ดีที่สุดใน 30 วัน: ${best.label} · ${baht(best.revenue)} บาท (${best.cars} คัน)` : '';
+    full: `วัน${DOW_TH[x.dow]}ที่ ${x.label}`,
+    title: `${x.label} · ${x.cars} คัน · ${baht(x.revenue)} บาท`,
+    bucket: x
+  }));
+}
 
-  // ── ตั้งแต่ตรงนี้ลงไปเป็นส่วน deep ซึ่งมาทีหลัง ────────────────────
-  //    ตอนวาดรอบแรก (core) ยังไม่มีข้อมูลพวกนี้ ต้องซ่อนการ์ดไว้ก่อน
-  //    ห้ามเข้าถึงตรง ๆ ไม่งั้นพังตั้งแต่รอบแรก แล้วยอดวันนี้ก็ไม่ขึ้นด้วย
+function monItems(d) {
+  return (d.months || []).map(x => {
+    const p = String(x.ym || '').split('-');           // 'yyyy-MM'
+    const full = p.length === 2 ? `${MON_TH[Number(p[1]) - 1]} ${p[0]}` : x.label;
+    return {
+      key: x.ym,
+      label: x.label,
+      value: x.revenue,
+      cars: x.cars,
+      partial: x.partial,
+      full: full,
+      title: `${x.label} · ${x.cars} คัน · ${baht(x.revenue)} บาท`,
+      bucket: x
+    };
+  });
+}
+
+
+// ── ส่วนที่ขึ้นกับช่วงที่เลือก ─────────────────────────────────────────────
+function renderPeriod(d) {
   const hasDeep = Array.isArray(d.months) && d.months.length > 0;
-  ['monthCard', 'svcCard', 'cuCard', 'lapsedCard', 'admCard'].forEach(id => {
+
+  // โหมดรายเดือน/ภาพรวมต้องรอข้อมูลส่วน deep — ปิดปุ่มไว้ก่อนดีกว่าให้กดแล้วหน้าว่าง
+  document.querySelectorAll('#segView .st-seg-b').forEach(b => {
+    const needDeep = b.dataset.mode !== 'day';
+    b.disabled = needDeep && !hasDeep;
+    b.classList.toggle('is-on', b.dataset.mode === view.mode);
+  });
+  if (!hasDeep && view.mode !== 'day') view.mode = 'day';
+
+  const mode = view.mode;
+  const items = mode === 'day' ? dayItems(d) : monItems(d);
+  if (!items.length) return;
+
+  // ── เลือกช่วง ────────────────────────────────────────────────────────
+  const keyField = mode === 'day' ? 'dayKey' : 'monKey';
+  let idx = items.findIndex(x => x.key === view[keyField]);
+  if (idx < 0) idx = items.length - 1;                 // ยังไม่เคยเลือก = ล่าสุด
+  view[keyField] = items[idx].key;
+
+  const isAll = mode === 'all';
+  show($('pickWrap'), !isAll);
+  show($('allCard'), isAll);
+  show($('chartNote'), mode !== 'day');
+
+  if (!isAll) bindPicker(items, idx, mode);
+
+  // ── ก้อนตัวเลขที่จะเอามาวาด ──────────────────────────────────────────
+  const cur = isAll ? (d.overview || null) : items[idx].bucket;
+  if (!cur) return;
+
+  drawHero(d, cur, items, idx, mode);
+  drawPay(cur);
+  drawServices(isAll ? { services: d.services || [] } : cur, isAll);
+  drawChart(d, items, isAll ? -1 : idx, mode);
+  if (isAll) drawOverview(d.overview, d);
+}
+
+
+// ── ยอดหลัก + บรรทัดเทียบ ─────────────────────────────────────────────────
+function drawHero(d, cur, items, idx, mode) {
+  $('hRevenue').textContent = baht(cur.revenue);
+  $('hCars').textContent = cur.cars;
+  $('hPoints').textContent = baht(cur.points || 0);
+
+  const cmp = $('hCmp');
+
+  if (mode === 'all') {
+    cmp.innerHTML = '<span class="st-cmp-flat">ทั้งหมดที่ผ่านมา · ไม่รวมรถของแอดมิน</span>';
+    return;
+  }
+
+  if (mode === 'day') {
+    const prev = idx > 0 ? items[idx - 1].bucket : null;
+    cmp.innerHTML = prev
+      ? cmpLine('วันก่อนหน้า', cur.revenue, prev.revenue,
+                `${prev.cars} คัน · ${baht(prev.revenue)} บาท`)
+      : '<span class="st-cmp-flat">ไม่มีข้อมูลวันก่อนหน้า</span>';
+    return;
+  }
+
+  // ── รายเดือน ──────────────────────────────────────────────────────────
+  // 🔴 เดือนที่ยังไม่จบ ห้ามเอาไปเทียบกับเดือนก่อน "ทั้งเดือน"
+  //    ไม่งั้นทุกต้นเดือนจะเห็นยอดตกฮวบทั้งที่เดือนยังไม่จบ
+  //    เซิร์ฟเวอร์ส่ง prevSame (เดือนก่อน เฉพาะวันที่ 1–วันนี้) มาให้ใช้ตรงนี้
+  if (items[idx].partial && d.prevSame) {
+    cmp.innerHTML = cmpLine(
+      `เดือนก่อน วันที่ 1–${d.dayOfMonth}`,
+      cur.revenue, d.prevSame.revenue,
+      `${d.prevSame.cars} คัน · ${baht(d.prevSame.revenue)} บาท`
+    ) + (d.prevFull && d.prevFull.revenue > 0
+      ? `<div class="st-cmp-extra">เดือนก่อนทั้งเดือน ${d.prevFull.cars} คัน · ${baht(d.prevFull.revenue)} บาท</div>`
+      : '');
+    return;
+  }
+
+  const prev = idx > 0 ? items[idx - 1].bucket : null;
+  cmp.innerHTML = prev
+    ? cmpLine('เดือนก่อน', cur.revenue, prev.revenue,
+              `${prev.cars} คัน · ${baht(prev.revenue)} บาท`)
+    : '<span class="st-cmp-flat">ไม่มีข้อมูลเดือนก่อน</span>';
+}
+
+
+// ── ช่องทางรับเงิน ────────────────────────────────────────────────────────
+// ⚠️ แถวก่อน 19 ก.ย. 2569 ไม่มีข้อมูลนี้ ต้องโชว์เป็น "ไม่ระบุ" แยกไว้ต่างหาก
+//    ห้ามเหมาเข้าเงินสดหรือเงินโอน ไม่งั้นยอดรวมไม่ตรงแล้วหาสาเหตุไม่เจอ
+function drawPay(b) {
+  const transfer = Number(b.transfer) || 0;
+  const cash = Number(b.cash) || 0;
+  const revenue = Number(b.revenue) || 0;
+  const unknown = Math.max(0, revenue - transfer - cash);
+
+  const pc = n => (revenue > 0 ? (n / revenue * 100) : 0);
+
+  $('payBar').innerHTML = revenue > 0
+    ? `<i class="st-pb t" style="width:${pc(transfer)}%"></i>` +
+      `<i class="st-pb c" style="width:${pc(cash)}%"></i>` +
+      `<i class="st-pb u" style="width:${pc(unknown)}%"></i>`
+    : '<i class="st-pb u" style="width:100%"></i>';
+
+  if (revenue > 0) {
+    const part = (cls, name, val) => val > 0
+      ? `<span><i class="st-sw ${cls}"></i>${name} ${baht(val)} (${Math.round(pc(val))}%)</span>` : '';
+    $('payKey').innerHTML = part('t', 'เงินโอน', transfer) + part('c', 'เงินสด', cash) +
+      part('u', 'ไม่ระบุ', unknown);
+  } else {
+    $('payKey').innerHTML = '<span>ไม่มียอดรับเงินในช่วงนี้</span>';
+  }
+
+  // เฉลี่ยต่อคัน — หารด้วยเฉพาะคันที่จ่ายเงินจริง ไม่รวมคันที่แลกด้วยแต้ม
+  const paying = Math.max(0, (Number(b.cars) || 0) - (Number(b.redeemCount) || 0));
+  $('payAvg').textContent = paying > 0 ? baht(Math.round(revenue / paying)) + ' บาท' : '–';
+  $('payRedeem').textContent = b.redeemCount > 0
+    ? `${b.redeemCount} ครั้ง (${baht(b.redeemValue)} แต้ม)` : 'ไม่มี';
+}
+
+
+// ── บริการที่ทำในช่วงที่เลือก ─────────────────────────────────────────────
+function drawServices(b, isAll) {
+  const list = (b.services || []).slice(0, isAll ? 10 : 8);
+  $('psvcSub').textContent = list.length
+    ? `(${list.length} ประเภท)` + (isAll ? ' ทั้งหมดที่ผ่านมา' : '') : '';
+
+  if (!list.length) {
+    $('psvcList').innerHTML = '<p class="st-empty">ช่วงนี้ยังไม่มีรถเข้าเลย</p>';
+    return;
+  }
+
+  const max = Math.max.apply(null, list.map(s => s.revenue).concat([1]));
+  $('psvcList').innerHTML = list.map(s => `
+    <div class="st-psvc">
+      <div class="st-psvc-top">
+        <span class="st-psvc-n">${esc(s.name)}</span>
+        <span class="st-psvc-c">${s.count} คัน</span>
+        <span class="st-psvc-v">${baht(s.revenue)}</span>
+      </div>
+      <div class="st-psvc-bar">
+        <div class="st-psvc-fill" style="width:${Math.max(3, Math.round(s.revenue / max * 100))}%"></div>
+      </div>
+    </div>`).join('');
+}
+
+
+// ── ภาพรวมทั้งหมด ─────────────────────────────────────────────────────────
+function drawOverview(o, d) {
+  if (!o) return;
+
+  // ⚠️ "เฉลี่ยต่อวัน" หารด้วยวันที่มีรถจริง ไม่ใช่วันในปฏิทิน
+  //    เพราะร้านไม่ได้เปิดทุกวัน และโค้ดไม่รู้ว่าวันไหนปิด
+  const rows = [
+    ['ช่วงข้อมูล', o.firstDate ? `${thaiDate(o.firstDate)} ถึงวันนี้ (${o.spanDays} วัน)` : '–'],
+    ['วันที่มีรถเข้า', `${o.daysWithCars} วัน`],
+    ['เฉลี่ยเฉพาะวันที่มีรถ', `${baht(o.avgPerActiveDay)} บาท · ${o.avgCarsPerActiveDay} คัน/วัน`],
+    ['วันที่ขายดีที่สุด', o.bestDay
+      ? `${thaiDate(o.bestDay.date)} · ${baht(o.bestDay.revenue)} บาท (${o.bestDay.cars} คัน)` : '–'],
+    ['แต้มที่แจกไปทั้งหมด', `${baht(o.points)} แต้ม`],
+    ['แลกแต้มไปแล้ว', o.redeemCount > 0
+      ? `${o.redeemCount} ครั้ง · ${baht(o.redeemValue)} แต้ม` : 'ยังไม่มี']
+  ];
+
+  $('allRows').innerHTML = rows.map(r =>
+    `<div class="st-row"><span class="st-k">${r[0]}</span><span class="st-v">${esc(r[1])}</span></div>`
+  ).join('');
+}
+
+
+// ── ส่วนที่ไม่ขึ้นกับช่วงที่เลือก (มาพร้อม deep) ──────────────────────────
+function renderDeep(d) {
+  const hasDeep = Array.isArray(d.months) && d.months.length > 0;
+  ['svcCard', 'cuCard', 'lapsedCard', 'admCard'].forEach(id => {
     const el = $(id);
     if (el) el.classList.toggle('hidden', !hasDeep);
   });
   if (!hasDeep) return;
-
-  // ── กราฟรายเดือน ───────────────────────────────────────────────────
-  const MON_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
-                  'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  const monthCtl = drawBars($('monthChart'), d.months.map(x => {
-    const p = String(x.ym || '').split('-');     // 'yyyy-MM'
-    const full = p.length === 2 ? `${MON_TH[Number(p[1]) - 1]} ${p[0]}` : x.label;
-    return {
-      key: x.ym,                                 // 'yyyy-MM' = ค่าที่ input[type=month] ใช้
-      value: x.revenue,
-      cars: x.cars,
-      label: x.label,
-      full: full,
-      partial: x.partial,
-      title: `${x.label} · ${x.cars} คัน · ${baht(x.revenue)} บาท`
-    };
-  }), false, $('monthPick'));
-  bindPicker(monthCtl, 'monInput', 'monPrev', 'monNext', '[data-mon]',
-             (b, n) => b.dataset.mon === 'prev' ? n - 2 : n - 1);
 
   // ── อันดับบริการ ───────────────────────────────────────────────────
   const maxSvc = d.services.length ? d.services[0].revenue : 0;
@@ -273,70 +437,50 @@ function cmpLine(label, cur, prev, detail) {
 }
 
 
-// วาดกราฟแท่ง — ไม่ใช้ไลบรารี หน้าจะได้ไม่หนัก
-//
-// แตะที่แท่งแล้วเห็นยอดของช่วงนั้น (เพิ่ม 19 ก.ย. 2569 ตามที่เจ้าของร้านขอ
-// ให้กดดูเป็นรายวัน/รายเดือนได้)
-// ข้อมูลมีอยู่ในมือแล้วทั้งก้อน จึงไม่ต้องยิงถามเซิร์ฟเวอร์ใหม่ = กดแล้วขึ้นทันที
-//
-// คืน "ตัวควบคุม" กลับไปให้ปฏิทินเรียกใช้ทางเดียวกัน (pick) จะได้ไม่มี
-// โค้ดเลือกช่วงสองชุดที่ค่อย ๆ เพี้ยนออกจากกัน
-function drawBars(box, items, dense, pickBox) {
+// ── กราฟแท่ง — ไม่ใช้ไลบรารี หน้าจะได้ไม่หนัก ────────────────────────────
+// แตะที่แท่ง = เลือกช่วงนั้น ซึ่งเป็นทางเดียวกับปฏิทินด้านบน
+// ข้อมูลอยู่ในมือแล้วทั้งก้อน ไม่ยิงถามเซิร์ฟเวอร์ใหม่ = กดแล้วขึ้นทันที
+function drawChart(d, items, selectedIdx, mode) {
+  const box = $('chart');
+  const dense = mode === 'day';
+
+  $('chartHead').textContent = dense
+    ? 'ยอดเงินรายวัน 30 วันล่าสุด' : 'ยอดเงินรายเดือน 12 เดือนล่าสุด';
+
   const max = Math.max.apply(null, items.map(x => x.value).concat([1]));
   box.style.gridTemplateColumns = `repeat(${items.length}, 1fr)`;
   box.innerHTML = items.map((x, i) => {
     const pct = x.value > 0 ? Math.max(3, Math.round(x.value / max * 100)) : 0;
     const cls = [x.weekend ? 'is-weekend' : '', x.partial ? 'is-partial' : ''].join(' ').trim();
-    return `<div class="st-bar-wrap" data-i="${i}" title="${esc(x.title)}">
+    const wrapCls = i === selectedIdx ? ' is-pick' : '';
+    return `<div class="st-bar-wrap${wrapCls}" data-i="${i}" title="${esc(x.title)}">
               <div class="st-bar-track"><div class="st-bar ${cls}" style="height:${pct}%"></div></div>
               <div class="st-bar-lbl${dense ? ' dense' : ''}">${esc(x.label)}</div>
             </div>`;
   }).join('');
 
-  const pick = i => {
-    const x = items[i];
-    if (!x || !pickBox) return;
+  // ผูกด้วยการ "กำหนดค่า" ไม่ใช่ addEventListener
+  // เพราะ render() ถูกเรียกหลายรอบ ถ้าใช้ addEventListener ตัวจับเหตุการณ์จะทับถมกัน
+  box.onclick = e => {
+    const wrap = e.target.closest('.st-bar-wrap');
+    if (!wrap) return;
+    const i = Number(wrap.dataset.i);
+    if (!items[i]) return;
 
-    // เน้นแท่งที่เลือกอยู่ ให้รู้ว่ากำลังดูอันไหน
-    box.querySelectorAll('.st-bar-wrap').forEach(w => w.classList.remove('is-pick'));
-    const wrap = box.querySelector(`.st-bar-wrap[data-i="${i}"]`);
-    if (wrap) wrap.classList.add('is-pick');
-
-    const avg = x.cars > 0 ? Math.round(x.value / x.cars) : 0;
-    pickBox.innerHTML =
-      `<span class="st-pick-when">${esc(x.full || x.label)}</span>` +
-      `<span class="st-pick-main">${baht(x.value)} บาท</span>` +
-      `<span class="st-pick-sub">${x.cars} คัน` +
-      (x.cars > 0 ? ` · เฉลี่ย ${baht(avg)} บาท/คัน` : '') +
-      (x.partial ? ' · เดือนนี้ยังไม่จบ' : '') + `</span>`;
-    pickBox.classList.remove('hidden');
+    // อยู่ในโหมดภาพรวมแล้วแตะแท่ง = อยากดูเดือนนั้น พาไปโหมดรายเดือนเลย
+    if (view.mode === 'all') view.mode = 'month';
+    view[view.mode === 'day' ? 'dayKey' : 'monKey'] = items[i].key;
+    renderPeriod(lastData);
   };
 
-  // onBarPick ถูกเติมทีหลังโดย bindPicker เพื่อให้ปฏิทินขยับตามแท่งที่แตะ
-  const api = { items, pick, onBarPick: null,
-                indexOfKey: k => items.findIndex(x => x.key === k) };
-
-  if (pickBox) {
-    // ผูกด้วยการ "กำหนดค่า" ไม่ใช่ addEventListener
-    // เพราะ render() ถูกเรียกหลายรอบ (แคช -> core -> deep) ถ้าใช้ addEventListener
-    // ตัวจับเหตุการณ์จะทับถมกันทุกรอบ
-    box.onclick = e => {
-      const wrap = e.target.closest('.st-bar-wrap');
-      if (!wrap) return;
-      const i = Number(wrap.dataset.i);
-      if (!items[i]) return;
-      pick(i);
-      if (api.onBarPick) api.onBarPick(i);
-    };
-  }
-
-  return api;
+  const best = items.reduce((m, x) => (x.value > m.value ? x : m), items[0]);
+  $('chartFoot').textContent = best && best.value > 0
+    ? `${dense ? 'วันที่ดีที่สุดใน 30 วัน' : 'เดือนที่ดีที่สุด'}: ${best.full || best.label} · ${baht(best.value)} บาท (${best.cars} คัน)`
+    : '';
 }
 
 
-// ── ปฏิทินเลือกวัน/เดือน (19 ก.ย. 2569) ───────────────────────────────
-// ของเดิมเลือกได้ทางเดียวคือแตะแท่ง ซึ่งรายวัน 30 แท่งเบียดกันจนกดพลาด
-//
+// ── ปฏิทินเลือกวัน/เดือน ──────────────────────────────────────────────────
 // 🔴 ห้ามใช้ toISOString() สร้างค่าให้ input ที่ไหนในนี้
 //    มันแปลงเป็นเวลา UTC ก่อน ไทยเร็วกว่า 7 ชม. วันจะเลื่อนไป 1 วันแบบเงียบ ๆ
 //    ค่าที่ใส่คือคีย์ที่เซิร์ฟเวอร์ส่งมาตรง ๆ (daily[].date / months[].ym)
@@ -344,59 +488,77 @@ function drawBars(box, items, dense, pickBox) {
 //
 // คีย์เป็น 'yyyy-MM-dd' และ 'yyyy-MM' จึงเทียบด้วย < > ตรง ๆ ได้
 // (เรียงตามตัวอักษร = เรียงตามเวลา) ไม่ต้องแปลงเป็น Date เลย
-function bindPicker(ctl, inpId, prevId, nextId, quickSel, quickPos) {
-  const inp = document.getElementById(inpId);
-  const prev = document.getElementById(prevId);
-  const next = document.getElementById(nextId);
-  if (!ctl || !inp || !prev || !next) return;
-
-  const items = ctl.items;
-  if (!items.length) return;
+function bindPicker(items, idx, mode) {
+  const isDay = mode === 'day';
+  const inp = isDay ? $('dayInput') : $('monInput');
+  const other = isDay ? $('monInput') : $('dayInput');
+  show(inp, true);
+  show(other, false);
 
   inp.min = items[0].key;
   inp.max = items[items.length - 1].key;
+  inp.value = items[idx].key;
 
   // Safari/iOS ไม่รองรับ input type=month — มันจะกลายเป็นช่องพิมพ์ธรรมดา
   // ปล่อยให้พิมพ์เองจะได้ค่ามั่ว จึงล็อกไม่ให้พิมพ์ แล้วใช้ลูกศร/ปุ่มลัด/แตะแท่งแทน
-  // (ทั้งสามทางใช้ได้ปกติทุกเบราว์เซอร์) · type=date รองรับทุกตัวอยู่แล้ว
   if (inp.type === 'text') inp.readOnly = true;
 
-  function apply(n) {
+  $('periodPrev').disabled = (idx === 0);
+  $('periodNext').disabled = (idx === items.length - 1);
+
+  // ── ห่างจากปัจจุบันเท่าไหร่ ────────────────────────────────────────
+  // รายการเรียงติดกันทีละวัน/ทีละเดือนอยู่แล้ว จึงนับจากระยะห่างในอาร์เรย์
+  // ไม่ต้องคำนวณวันที่เลย = ไม่มีทางพลาดเรื่องเขตเวลา
+  const back = items.length - 1 - idx;
+  let rel;
+  if (isDay) {
+    rel = back === 0 ? 'วันนี้' : back === 1 ? 'เมื่อวาน'
+        : back < 7 ? `${back} วันก่อน` : `${Math.floor(back / 7)} สัปดาห์ก่อน`;
+    // ใช้ dow ที่เซิร์ฟเวอร์คำนวณด้วยเขตเวลาของชีตมาแล้ว
+    // ห้ามสร้าง Date จากคีย์เองตรงนี้ เรื่องเขตเวลาพลาดง่ายโดยไม่มีอะไรฟ้อง
+    rel = `วัน${DOW_TH[items[idx].dow]} · ${rel}`;
+  } else {
+    rel = back === 0 ? 'เดือนนี้ (ยังไม่จบเดือน)'
+        : back === 1 ? 'เดือนก่อน' : `${back} เดือนก่อน`;
+    rel = `${items[idx].full} · ${rel}`;
+  }
+  $('pickRel').textContent = rel;
+
+  const go = n => {
     n = Math.max(0, Math.min(items.length - 1, n));
-    inp.value = items[n].key;
-    prev.disabled = (n === 0);
-    next.disabled = (n === items.length - 1);
-    ctl.pick(n);
-    return n;
-  }
-
-  // หาว่าตอนนี้ค้างอยู่ที่ช่องไหน — ถ้าผู้ใช้เลือกไว้แล้วต้องคงไว้
-  // ไม่งั้นพอข้อมูลส่วน deep มาถึงแล้ว render() รอบสอง จะเด้งกลับไปวันล่าสุดเอง
-  function currentIndex() {
-    const n = ctl.indexOfKey(inp.value);
-    if (n >= 0) return n;
-    // พิมพ์/เลือกวันที่นอกช่วงที่มีข้อมูล -> เด้งไปขอบที่ใกล้ที่สุด
-    if (inp.value && inp.value < items[0].key) return 0;
-    return items.length - 1;                     // ไม่มีค่า = เปิดมาครั้งแรก -> ล่าสุด
-  }
-
-  let cur = apply(currentIndex());
-
-  inp.onchange = () => { cur = apply(currentIndex()); };
-  prev.onclick = () => { cur = apply(cur - 1); };
-  next.onclick = () => { cur = apply(cur + 1); };
-
-  document.querySelectorAll(quickSel).forEach(b => {
-    b.onclick = () => { cur = apply(quickPos(b, items.length)); };
-  });
-
-  // แตะแท่งกราฟ -> ปฏิทินด้านบนต้องขยับตามด้วย ไม่งั้นสองที่จะบอกคนละวัน
-  ctl.onBarPick = i => {
-    cur = i;
-    inp.value = items[i].key;
-    prev.disabled = (i === 0);
-    next.disabled = (i === items.length - 1);
+    view[isDay ? 'dayKey' : 'monKey'] = items[n].key;
+    renderPeriod(lastData);
   };
+
+  $('periodPrev').onclick = () => go(idx - 1);
+  $('periodNext').onclick = () => go(idx + 1);
+  inp.onchange = () => {
+    const n = items.findIndex(x => x.key === inp.value);
+    if (n >= 0) return go(n);
+    // เลือกช่วงที่ไม่มีข้อมูล -> เด้งไปขอบที่ใกล้ที่สุด แล้วบอกให้รู้
+    $('pickRel').textContent = 'ไม่มีข้อมูลของช่วงนั้น';
+    go(inp.value && inp.value < items[0].key ? 0 : items.length - 1);
+  };
+
+  // ── ปุ่มลัด — เปลี่ยนตามโหมด ───────────────────────────────────────
+  const quick = isDay
+    ? [['วันนี้', items.length - 1], ['เมื่อวาน', items.length - 2]]
+    : [['เดือนนี้', items.length - 1], ['เดือนก่อน', items.length - 2]];
+  $('quickRow').innerHTML = quick
+    .filter(q => q[1] >= 0)
+    .map(q => `<button type="button" class="st-q" data-n="${q[1]}">${q[0]}</button>`).join('');
+  $('quickRow').onclick = e => {
+    const b = e.target.closest('[data-n]');
+    if (b) go(Number(b.dataset.n));
+  };
+}
+
+
+// 'yyyy-MM-dd' -> '19 ก.ย. 2026' · ไม่แปลงเป็น Date เพื่อเลี่ยงเรื่องเขตเวลา
+function thaiDate(key) {
+  const p = String(key || '').split('-');
+  if (p.length !== 3) return key || '–';
+  return `${Number(p[2])} ${MON_TH[Number(p[1]) - 1]} ${p[0]}`;
 }
 
 function esc(s) {
@@ -414,7 +576,7 @@ function formatPhone(p) {
 //  เริ่มทำงาน
 // ═══════════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
-  // ปุ่มดูรายชื่อ ผูกไว้ก่อนเลย ไม่ต้องรอเน็ต
+  // ปุ่มที่ไม่ต้องรอข้อมูล ผูกไว้ก่อนเลย
   $('lapsedBtn').addEventListener('click', () => {
     const list = $('lapsedList');
     const open = list.classList.contains('hidden');
@@ -423,10 +585,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('refreshBtn').addEventListener('click', () => loadStats(false));
 
+  $('segView').addEventListener('click', e => {
+    const b = e.target.closest('[data-mode]');
+    if (!b || b.disabled) return;
+    view.mode = b.dataset.mode;
+    renderPeriod(lastData);
+  });
+
   // วาดของที่จำไว้ก่อน หน้าจะได้ไม่ว่างระหว่างรอ
   const cached = readCache();
   if (cached) {
-    render(cached.data);
+    lastData = cached.data;
+    render(lastData);
     $('updating').textContent = '⏳ กำลังโหลดข้อมูลล่าสุด...';
     show($('updating'), true);
   }
