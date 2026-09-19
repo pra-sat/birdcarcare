@@ -16,10 +16,10 @@
     <div class="container">
         <h2>สมัครสมาชิก</h2>
         <form id="registrationForm">
-            <div class="form-group">
-                <label for="userId">User ID (LINE):</label>
-                <input type="text" id="userId" name="userId" readonly style="pointer-events: none;">
-            </div>
+            <!-- เอาช่องแสดง User ID (LINE) ออก 19 ก.ย. 2569
+                 เป็นช่องอ่านอย่างเดียวที่ลูกค้าไม่ได้ใช้และไม่ควรต้องเห็น
+                 ⚠️ ไม่กระทบการสมัคร — ค่าที่ส่งจริงใช้ตัวแปร userId ใน script.js
+                    (ได้จาก liff.getProfile() โดยตรง) ช่องนี้แค่โชว์เฉย ๆ -->
             <div class="form-group">
                 <label for="name">ชื่อ:</label>
                 <input type="text" id="name" name="name" required>

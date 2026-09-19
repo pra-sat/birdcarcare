@@ -63,15 +63,9 @@ async function initLIFF() {
             return;
         }
 
-        userId = profile.userId;  // เก็บ userId เต็มตรงนี้เท่านั้น
-        const maskedUserId = userId.substring(0, 8) + 'xxx...';
-        const userIdInput = document.getElementById('userId');
-        if (userIdInput) {
-            userIdInput.value = maskedUserId;
-            console.log('userId set to:', userId);
-        } else {
-            console.error('userId input element not found');
-        }
+        // เก็บ userId เต็มไว้ในตัวแปรนี้ที่เดียว — เป็นค่าที่ใช้ส่งตอนสมัครจริง
+        // ไม่ได้เอาไปโชว์บนหน้าจอแล้ว (เอาช่อง User ID ออกเมื่อ 19 ก.ย. 2569)
+        userId = profile.userId;
 
     } catch (err) {
         console.error('LIFF Init Error:', err);
@@ -737,13 +731,8 @@ form.addEventListener('submit', async event => {
             form.reset();
             if (typeof window.resetCarPicker === 'function') window.resetCarPicker();
             if (typeof window.resetPlateFields === 'function') window.resetPlateFields();
-            // ป้องกันกรณี userId หายระหว่าง session
-            if (userId) {
-                const userIdInput = document.getElementById('userId');
-                if (userIdInput) {
-                    userIdInput.value = userId.substring(0, 8) + 'xxx...';
-                }
-            }
+            // form.reset() ล้างเฉพาะช่องในฟอร์ม ไม่แตะตัวแปร userId
+            // จึงไม่ต้องเขียนคืนอะไรตรงนี้แล้ว (เดิมเขียนคืนเพราะมีช่องโชว์ UID อยู่)
             // document.getElementById('name').focus();
             submitBtn.disabled = false;
         }
