@@ -157,7 +157,8 @@ function render(d) {
 
   // ── กราฟรายวัน ─────────────────────────────────────────────────────
   const DOW_TH = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
-  drawBars($('dailyChart'), d.daily.map(x => ({
+  const dailyCtl = drawBars($('dailyChart'), d.daily.map(x => ({
+    key: x.date,                            // 'yyyy-MM-dd' = ค่าที่ input[type=date] ใช้
     value: x.revenue,
     cars: x.cars,
     label: x.label,
@@ -166,6 +167,9 @@ function render(d) {
     weekend: x.dow === 0 || x.dow === 6,
     title: `${x.label} · ${x.cars} คัน · ${baht(x.revenue)} บาท`
   })), true, $('dailyPick'));
+  // วันนี้ = ตัวท้ายสุด · เมื่อวาน = ถัดเข้ามาหนึ่ง
+  bindPicker(dailyCtl, 'dayInput', 'dayPrev', 'dayNext', '[data-day]',
+             (b, n) => b.dataset.day === 'yesterday' ? n - 2 : n - 1);
   const best = d.daily.reduce((m, x) => (x.revenue > m.revenue ? x : m), d.daily[0]);
   $('dailyFoot').textContent = best && best.revenue > 0
     ? `วันที่ดีที่สุดใน 30 วัน: ${best.label} · ${baht(best.revenue)} บาท (${best.cars} คัน)` : '';
@@ -183,10 +187,11 @@ function render(d) {
   // ── กราฟรายเดือน ───────────────────────────────────────────────────
   const MON_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
                   'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  drawBars($('monthChart'), d.months.map(x => {
+  const monthCtl = drawBars($('monthChart'), d.months.map(x => {
     const p = String(x.ym || '').split('-');     // 'yyyy-MM'
     const full = p.length === 2 ? `${MON_TH[Number(p[1]) - 1]} ${p[0]}` : x.label;
     return {
+      key: x.ym,                                 // 'yyyy-MM' = ค่าที่ input[type=month] ใช้
       value: x.revenue,
       cars: x.cars,
       label: x.label,
@@ -195,6 +200,8 @@ function render(d) {
       title: `${x.label} · ${x.cars} คัน · ${baht(x.revenue)} บาท`
     };
   }), false, $('monthPick'));
+  bindPicker(monthCtl, 'monInput', 'monPrev', 'monNext', '[data-mon]',
+             (b, n) => b.dataset.mon === 'prev' ? n - 2 : n - 1);
 
   // ── อันดับบริการ ───────────────────────────────────────────────────
   const maxSvc = d.services.length ? d.services[0].revenue : 0;
@@ -271,6 +278,9 @@ function cmpLine(label, cur, prev, detail) {
 // แตะที่แท่งแล้วเห็นยอดของช่วงนั้น (เพิ่ม 19 ก.ย. 2569 ตามที่เจ้าของร้านขอ
 // ให้กดดูเป็นรายวัน/รายเดือนได้)
 // ข้อมูลมีอยู่ในมือแล้วทั้งก้อน จึงไม่ต้องยิงถามเซิร์ฟเวอร์ใหม่ = กดแล้วขึ้นทันที
+//
+// คืน "ตัวควบคุม" กลับไปให้ปฏิทินเรียกใช้ทางเดียวกัน (pick) จะได้ไม่มี
+// โค้ดเลือกช่วงสองชุดที่ค่อย ๆ เพี้ยนออกจากกัน
 function drawBars(box, items, dense, pickBox) {
   const max = Math.max.apply(null, items.map(x => x.value).concat([1]));
   box.style.gridTemplateColumns = `repeat(${items.length}, 1fr)`;
@@ -283,16 +293,14 @@ function drawBars(box, items, dense, pickBox) {
             </div>`;
   }).join('');
 
-  if (!pickBox) return;
-  box.onclick = e => {
-    const wrap = e.target.closest('.st-bar-wrap');
-    if (!wrap) return;
-    const x = items[Number(wrap.dataset.i)];
-    if (!x) return;
+  const pick = i => {
+    const x = items[i];
+    if (!x || !pickBox) return;
 
     // เน้นแท่งที่เลือกอยู่ ให้รู้ว่ากำลังดูอันไหน
     box.querySelectorAll('.st-bar-wrap').forEach(w => w.classList.remove('is-pick'));
-    wrap.classList.add('is-pick');
+    const wrap = box.querySelector(`.st-bar-wrap[data-i="${i}"]`);
+    if (wrap) wrap.classList.add('is-pick');
 
     const avg = x.cars > 0 ? Math.round(x.value / x.cars) : 0;
     pickBox.innerHTML =
@@ -302,6 +310,92 @@ function drawBars(box, items, dense, pickBox) {
       (x.cars > 0 ? ` · เฉลี่ย ${baht(avg)} บาท/คัน` : '') +
       (x.partial ? ' · เดือนนี้ยังไม่จบ' : '') + `</span>`;
     pickBox.classList.remove('hidden');
+  };
+
+  // onBarPick ถูกเติมทีหลังโดย bindPicker เพื่อให้ปฏิทินขยับตามแท่งที่แตะ
+  const api = { items, pick, onBarPick: null,
+                indexOfKey: k => items.findIndex(x => x.key === k) };
+
+  if (pickBox) {
+    // ผูกด้วยการ "กำหนดค่า" ไม่ใช่ addEventListener
+    // เพราะ render() ถูกเรียกหลายรอบ (แคช -> core -> deep) ถ้าใช้ addEventListener
+    // ตัวจับเหตุการณ์จะทับถมกันทุกรอบ
+    box.onclick = e => {
+      const wrap = e.target.closest('.st-bar-wrap');
+      if (!wrap) return;
+      const i = Number(wrap.dataset.i);
+      if (!items[i]) return;
+      pick(i);
+      if (api.onBarPick) api.onBarPick(i);
+    };
+  }
+
+  return api;
+}
+
+
+// ── ปฏิทินเลือกวัน/เดือน (19 ก.ย. 2569) ───────────────────────────────
+// ของเดิมเลือกได้ทางเดียวคือแตะแท่ง ซึ่งรายวัน 30 แท่งเบียดกันจนกดพลาด
+//
+// 🔴 ห้ามใช้ toISOString() สร้างค่าให้ input ที่ไหนในนี้
+//    มันแปลงเป็นเวลา UTC ก่อน ไทยเร็วกว่า 7 ชม. วันจะเลื่อนไป 1 วันแบบเงียบ ๆ
+//    ค่าที่ใส่คือคีย์ที่เซิร์ฟเวอร์ส่งมาตรง ๆ (daily[].date / months[].ym)
+//    ซึ่ง stats.gs คำนวณด้วยเขตเวลาของชีตแล้ว = เป็นวันที่ไทยแน่นอน
+//
+// คีย์เป็น 'yyyy-MM-dd' และ 'yyyy-MM' จึงเทียบด้วย < > ตรง ๆ ได้
+// (เรียงตามตัวอักษร = เรียงตามเวลา) ไม่ต้องแปลงเป็น Date เลย
+function bindPicker(ctl, inpId, prevId, nextId, quickSel, quickPos) {
+  const inp = document.getElementById(inpId);
+  const prev = document.getElementById(prevId);
+  const next = document.getElementById(nextId);
+  if (!ctl || !inp || !prev || !next) return;
+
+  const items = ctl.items;
+  if (!items.length) return;
+
+  inp.min = items[0].key;
+  inp.max = items[items.length - 1].key;
+
+  // Safari/iOS ไม่รองรับ input type=month — มันจะกลายเป็นช่องพิมพ์ธรรมดา
+  // ปล่อยให้พิมพ์เองจะได้ค่ามั่ว จึงล็อกไม่ให้พิมพ์ แล้วใช้ลูกศร/ปุ่มลัด/แตะแท่งแทน
+  // (ทั้งสามทางใช้ได้ปกติทุกเบราว์เซอร์) · type=date รองรับทุกตัวอยู่แล้ว
+  if (inp.type === 'text') inp.readOnly = true;
+
+  function apply(n) {
+    n = Math.max(0, Math.min(items.length - 1, n));
+    inp.value = items[n].key;
+    prev.disabled = (n === 0);
+    next.disabled = (n === items.length - 1);
+    ctl.pick(n);
+    return n;
+  }
+
+  // หาว่าตอนนี้ค้างอยู่ที่ช่องไหน — ถ้าผู้ใช้เลือกไว้แล้วต้องคงไว้
+  // ไม่งั้นพอข้อมูลส่วน deep มาถึงแล้ว render() รอบสอง จะเด้งกลับไปวันล่าสุดเอง
+  function currentIndex() {
+    const n = ctl.indexOfKey(inp.value);
+    if (n >= 0) return n;
+    // พิมพ์/เลือกวันที่นอกช่วงที่มีข้อมูล -> เด้งไปขอบที่ใกล้ที่สุด
+    if (inp.value && inp.value < items[0].key) return 0;
+    return items.length - 1;                     // ไม่มีค่า = เปิดมาครั้งแรก -> ล่าสุด
+  }
+
+  let cur = apply(currentIndex());
+
+  inp.onchange = () => { cur = apply(currentIndex()); };
+  prev.onclick = () => { cur = apply(cur - 1); };
+  next.onclick = () => { cur = apply(cur + 1); };
+
+  document.querySelectorAll(quickSel).forEach(b => {
+    b.onclick = () => { cur = apply(quickPos(b, items.length)); };
+  });
+
+  // แตะแท่งกราฟ -> ปฏิทินด้านบนต้องขยับตามด้วย ไม่งั้นสองที่จะบอกคนละวัน
+  ctl.onBarPick = i => {
+    cur = i;
+    inp.value = items[i].key;
+    prev.disabled = (i === 0);
+    next.disabled = (i === items.length - 1);
   };
 }
 

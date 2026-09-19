@@ -115,6 +115,48 @@
   background: var(--bc-foam); border: 1px solid var(--bc-line); border-radius: 12px;
   display: flex; flex-direction: column; gap: 2px;
 }
+/* ── เลือกวัน/เดือนด้วยปฏิทิน (19 ก.ย. 2569) ──────────────────────────
+   ของเดิมเลือกได้ทางเดียวคือแตะแท่งกราฟ ซึ่งรายวันมี 30 แท่งเบียดกัน
+   แท่งละไม่ถึง 10px กดพลาดตลอด · ปฏิทินของเครื่องกดครั้งเดียวได้วันที่ต้องการ
+
+   🔴 theme.css มีกฎ button:not(.swal2-close):not(.swal2-cancel) = (0,2,1) + !important
+      ยิงพื้นฟ้าทับปุ่มทุกตัวในทุกหน้า · กฎที่นี่จึงต้องนำหน้าด้วย
+      .st-pickrow button.st-arrow ให้ได้ (0,2,1) เท่ากัน แล้วชนะเพราะไฟล์นี้โหลดทีหลัง
+      ห้ามลดรูปเหลือ .st-arrow (0,1,0) เด็ดขาด — ปุ่มจะกลายเป็นสีฟ้าทึบทันที */
+.st-pickrow {
+  display: grid; grid-template-columns: auto 1fr auto;
+  gap: 8px; align-items: stretch; margin-bottom: 7px;
+}
+.st-pickrow button.st-arrow {
+  min-width: 46px; padding: 9px 0;
+  font-size: 16px; font-weight: 700; line-height: 1;
+  background: var(--bc-foam) !important;
+  background-color: var(--bc-foam) !important;
+  color: var(--bc-waterD) !important;
+  border: 1.5px solid var(--bc-line) !important;
+  box-shadow: none;
+}
+.st-pickrow button.st-arrow:hover { background-color: #EAF4FA !important; }
+.st-pickrow button.st-arrow[disabled] { opacity: .32; cursor: default; transform: none; }
+input.st-dateinput {
+  width: 100%; min-width: 0; padding: 8px 6px;
+  font-family: var(--bc-disp); font-weight: 500; font-size: 15px;
+  color: var(--bc-deep); text-align: center;
+  font-variant-numeric: tabular-nums;
+  background: var(--bc-foam); border: 1.5px solid var(--bc-line);
+  border-radius: 12px; cursor: pointer;
+}
+.st-quick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-bottom: 9px; }
+.st-quick button.st-q {
+  padding: 8px 4px; font-size: 12.5px; font-weight: 600;
+  background: var(--bc-foam) !important;
+  background-color: var(--bc-foam) !important;
+  color: var(--bc-waterD) !important;
+  border: 1.5px solid var(--bc-line) !important;
+  box-shadow: none;
+}
+.st-quick button.st-q:hover { background-color: #EAF4FA !important; }
+
 .st-pick-when { font-size: 11.5px; color: var(--bc-ink2); }
 .st-pick-main {
   font-family: var(--bc-disp); font-weight: 500; font-size: 1.35rem; line-height: 1.15;
