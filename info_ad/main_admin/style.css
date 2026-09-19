@@ -172,3 +172,13 @@ input#manualPhone {
 input#manualPhone::placeholder {
   font-size: 15px; font-weight: 400; letter-spacing: normal;
 }
+
+/* ── แถบบอกว่าลูกค้าเลือกรถมาเอง (20 ก.ย. 2569) ─────────────────────────
+   หน้าที่ของแอดมินเปลี่ยนจาก "เลือกรถ" เป็น "ตรวจว่าทะเบียนตรงกับรถที่มา"
+   จึงต้องเขียนให้ชัดว่ายังเปลี่ยนได้ ไม่ใช่ล็อกไว้แล้ว */
+.vpick-note {
+  font-size: 12px; line-height: 1.55; text-align: left;
+  color: #1F7A46; background: #EFFBF4;
+  border: 1px solid #BFE6D2; border-radius: 11px;
+  padding: 8px 11px; margin-bottom: 9px;
+}

@@ -82,7 +82,7 @@ function historyOf(vehicle, history) {
 
 // สร้างการ์ดรถ 1 คัน — รถกับแต้มอยู่กรอบเดียวกัน เพื่อให้แยกคันได้ง่ายเวลามีหลายคัน
 // countable = false เมื่อมีรถ ยี่ห้อ+รุ่น ซ้ำกัน จะซ่อนจำนวนครั้งไว้ ดีกว่าโชว์เลขผิด
-function vehicleCardHtml(vehicle, history, countable) {
+function vehicleCardHtml(vehicle, history, countable, index) {
   const left = daysLeft(vehicle.expirationDate);
   const point = parseInt(vehicle.point || 0) || 0;
   const expired = parseInt(vehicle.expiredPoints || 0) || 0;
@@ -158,6 +158,10 @@ function vehicleCardHtml(vehicle, history, countable) {
         ${lastDate ? `<div class="row"><span class="lbl">ใช้บริการล่าสุด</span><span class="val small">${esc(lastDate)}</span></div>` : ''}
         ${bits.length ? `<div class="subline">${bits.join(' · ')}</div>` : ''}
       </div>
+      <!-- ปุ่ม QR อยู่ในกรอบของรถคันนี้ (20 ก.ย. 2569)
+           ของเดิมเป็นปุ่มเดียวอยู่นอกการ์ด ลูกค้าที่มีรถหลายคันจึงบอกไม่ได้ว่า
+           กำลังจะรับแต้มให้คันไหน แล้วแอดมินต้องมานั่งเดาเองตอนสแกน -->
+      <button type="button" class="uqr" data-vi="${index}">📱 แสดง QR รับแต้มคันนี้</button>
     </div>
   `;
 }
@@ -232,6 +236,52 @@ const QR_REWARM_AGE      = 180;   // กลับมาที่หน้าน�
 
 let warmToken = null;      // { token, at }
 let warmPending = null;    // กันขอซ้อนกัน
+let warmVehKey = '';       // รถที่ผูกกับ token ที่เตรียมไว้แล้ว ('' = ยังไม่ได้ผูก)
+
+// ผูกรถเข้ากับ token ที่เตรียมไว้ — ยิงเบื้องหลัง ลูกค้าไม่ต้องรอ
+//
+// ทำไมต้องมีขั้นนี้: token ถูกเตรียมไว้ตั้งแต่เปิดหน้า ซึ่งตอนนั้นยังไม่รู้เลยว่า
+// ลูกค้ามีรถกี่คัน (ข้อมูลยังเดินทางอยู่) พอรู้แล้วว่ามีคันเดียว ก็ผูกให้เลย
+// ตอนกดปุ่มจะได้ไม่ต้องรอเน็ตอีกรอบ — ซึ่งเป็นเหตุผลที่มีการเตรียมไว้ตั้งแต่แรก
+//
+// create_token ตัวเดิมลบแถวที่ token ซ้ำก่อนเขียนใหม่อยู่แล้ว
+// ยิงด้วย token เดิมจึงเป็นการ "เขียนทับ" ไม่ใช่สร้างเพิ่ม
+function attachWarmVehicle(vehicle) {
+  const want = vehKeyOf(vehicle);
+  if (!want) return;
+  Promise.resolve(warmPending).then(() => {
+    if (!warmToken || warmVehKey === want) return;
+    return createTokenOnServer(warmToken.token, vehicle)
+      .then(() => { warmVehKey = want; })
+      .catch(() => { /* ผูกไม่สำเร็จก็ไม่เป็นไร ตอนกดปุ่มจะผูกให้เอง */ });
+  });
+}
+
+// ขอ token ที่ผูกกับรถคันที่ลูกค้าเลือก
+async function tokenForVehicle(vehicle) {
+  const want = vehKeyOf(vehicle);
+  if (warmPending) { try { await warmPending; } catch (e) {} }
+
+  const fresh = warmToken && warmTokenAgeSec() <= QR_PREWARM_MAX_AGE;
+
+  if (fresh && warmVehKey === want) {
+    const t = warmToken.token;
+    warmToken = null; warmVehKey = '';     // ใช้แล้วใช้ซ้ำไม่ได้
+    return t;
+  }
+
+  if (fresh) {
+    // มีของสดอยู่แต่ผูกไว้กับคันอื่น (หรือยังไม่ผูก) -> เขียนทับด้วย token เดิม
+    const t = warmToken.token;
+    await createTokenOnServer(t, vehicle);
+    warmToken = null; warmVehKey = '';
+    return t;
+  }
+
+  const t = generateToken();
+  await createTokenOnServer(t, vehicle);
+  return t;
+}
 
 // ขอ token เตรียมไว้ — ยิงแล้วไม่รอ ไม่รบกวนหน้าจอ ถ้าพลาดก็เงียบ ๆ
 function prewarmQRToken() {
@@ -244,6 +294,7 @@ function prewarmQRToken() {
       // ของเก่าที่ยังไม่ได้ใช้ ลบทิ้งด้วย ไม่งั้นค้างในชีตเปล่า ๆ
       const old = warmToken;
       warmToken = { token, at: Date.now() };
+      warmVehKey = '';                     // ของใหม่ ยังไม่ได้ผูกรถ
       if (old && old.token !== token) deleteTokenOnServer(old.token);
       return warmToken;
     })
@@ -260,7 +311,13 @@ function warmTokenAgeSec() {
   return warmToken ? (Date.now() - warmToken.at) / 1000 : Infinity;
 }
 
-function createTokenOnServer(token) {
+// กุญแจเทียบรถ — ชุดเดียวกับที่เซิร์ฟเวอร์ใช้ (userId + ยี่ห้อ + รุ่น + ปี)
+function vehKeyOf(v) {
+  return v ? [v.brand, v.model, v.year]
+    .map(x => String(x == null ? '' : x).trim()).join('|') : '';
+}
+
+function createTokenOnServer(token, vehicle) {
   // createdAt: ฝั่ง Apps Script ไม่ได้ใช้ค่านี้เลย (token.gs ใช้ new Date() ของตัวเอง
   // เป็นเวลาสร้าง QR เสมอ ซึ่งถูกแล้ว) ส่งเวลาปัจจุบันไปเฉย ๆ เพื่อไม่ให้รูปแบบ
   // ข้อมูลที่ส่งเปลี่ยน · ของเดิมดึงวันที่จากประวัติ ทำให้หน้านี้ต้องรอโหลดประวัติก่อน
@@ -271,7 +328,11 @@ function createTokenOnServer(token) {
       action: "create_token",
       token,
       userId: currentUserId,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      // รถที่ลูกค้าเลือก — แอดมินจะได้ไม่ต้องเดาเองตอนสแกน (ว่างได้)
+      vehicle: vehicle ? {
+        brand: vehicle.brand || '', model: vehicle.model || '', year: vehicle.year || ''
+      } : null
     })
   }).then(res => {
     if (!res.ok) throw new Error("create_token failed");
@@ -339,14 +400,17 @@ async function savePlateForMe(vehicle, plate, province) {
   return res.json();
 }
 
-async function askPlateIfMissing() {
+// target = รถคันที่ลูกค้ากดแสดง QR (ไม่ส่งมา = คันแรกที่ยังไม่มีทะเบียน)
+async function askPlateIfMissing(target) {
   try {
     if (!memberData || !Array.isArray(memberData.vehicles)) return;
     if (!memberTokens.id && !memberTokens.access) return;   // (ง)
     if (plateAskSkipped()) return;
 
-    const v = memberData.vehicles.find(x => !String(x.plate || '').trim());
-    if (!v) return;                                          // มีครบแล้ว ไม่ต้องถาม
+    // ถามเฉพาะคันที่กำลังจะแสดง QR เท่านั้น
+    // ไปถามคันอื่นที่ลูกค้าไม่ได้กด = งงว่าทำไมถามคันนี้ และไม่ช่วยงานตรงหน้า
+    const v = target || memberData.vehicles.find(x => !String(x.plate || '').trim());
+    if (!v || String(v.plate || '').trim()) return;          // มีแล้ว ไม่ต้องถาม
 
     const carName = [v.brand, v.model, v.year ? 'ปี ' + v.year : '']
       .filter(Boolean).map(esc).join(' ');
@@ -456,57 +520,38 @@ async function askPlateIfMissing() {
 }
 
 
-async function showQRSection() {
+// vehicleIndex = คันที่ลูกค้ากดปุ่มบนการ์ด (ไม่ส่งมา = คันแรก)
+async function showQRSection(vehicleIndex) {
 
   if (!document.getElementById('qrSection').classList.contains('hidden')) {
     return; // ถ้าแสดงอยู่แล้ว ไม่ต้องสร้างใหม่
   }
 
+  const list = (memberData && memberData.vehicles) || [];
+  const idx = Math.max(0, Math.min(list.length - 1, Number(vehicleIndex) || 0));
+  const vehicle = list[idx] || null;
+
   // ยังไม่มีทะเบียน -> ขอก่อน (ข้ามได้ ไม่บล็อกการแสดง QR)
-  // ⚠️ ต้องอยู่ก่อนการเช็คอายุ QR ที่เตรียมไว้ เพราะลูกค้าใช้เวลากรอกสักพัก
-  //    ถ้าเช็คอายุไปก่อนแล้วค่อยถาม ของที่เตรียมไว้อาจหมดอายุระหว่างกรอก
-  await askPlateIfMissing();
+  // ⚠️ ต้องอยู่ก่อนการขอ token เพราะลูกค้าใช้เวลากรอกสักพัก
+  //    ถ้าขอ token ไปก่อนแล้วค่อยถาม ของที่เตรียมไว้อาจหมดอายุระหว่างกรอก
+  await askPlateIfMissing(vehicle);
 
-  // ── มีของเตรียมไว้และยังสดอยู่ -> ขึ้นเลย ไม่แตะเน็ต ────────────────────
-  if (warmToken && warmTokenAgeSec() <= QR_PREWARM_MAX_AGE) {
-    const token = warmToken.token;
-    warmToken = null;                    // ใช้แล้วใช้ซ้ำไม่ได้
-    window.qrToken = token;
-    document.getElementById('qrSection').classList.remove('hidden');
-    generateQRCode(token, memberData);
-    startQRCountdown();
-    return;
-  }
-
-  // ── ไม่มีของ หรือของเก่าเกินไป -> ขอใหม่ (ทางเดิม) ─────────────────────
-  const btn = document.getElementById("qrBtn");
-  btn.disabled = true;
-  const originalText = btn.innerHTML;
-  btn.innerHTML = "⏳ กำลังสร้าง QR...";
+  const btn = document.querySelector(`.uqr[data-vi="${idx}"]`) ||
+              document.getElementById('qrBtn');
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ กำลังสร้าง QR...'; }
 
   try {
-    // ถ้ากำลังเตรียมอยู่พอดี รอตัวนั้นเลย จะได้ไม่ยิงซ้อนกัน 2 รอบ
-    const pending = warmPending ? await warmPending : null;
-
-    let token;
-    if (pending && (Date.now() - pending.at) / 1000 <= QR_PREWARM_MAX_AGE) {
-      token = pending.token;
-      warmToken = null;
-    } else {
-      token = generateToken();
-      await createTokenOnServer(token);
-    }
-
+    const token = await tokenForVehicle(vehicle);
     window.qrToken = token;
     document.getElementById('qrSection').classList.remove('hidden');
-    generateQRCode(token, memberData);
+    generateQRCode(token, memberData, vehicle);
     startQRCountdown();
   } catch (err) {
     console.error("❌ QR Creation Error:", err);  // 🔍 แสดง error จริงใน console
     Swal.fire("❌ ไม่สามารถสร้าง QR ได้", err.message, "error");
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalText;
+    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
   }
 }
 
@@ -577,7 +622,7 @@ function drawShopMark(canvas) {
   }
 }
 
-function generateQRCode(text, userInfo) {
+function generateQRCode(text, userInfo, vehicle) {
   const canvas = document.getElementById("qrCanvas");
   const qr = new QRious({
     element: canvas,
@@ -591,9 +636,16 @@ function generateQRCode(text, userInfo) {
   drawShopMark(canvas);
 
   // ชื่อเป็นบรรทัดเด่น คำอธิบายเป็นบรรทัดเล็กใต้ลงไป (อ่านง่ายกว่าต่อกันบรรทัดเดียว)
+  // บอกให้ชัดว่า QR ใบนี้เป็นของรถคันไหน — พนักงานเอาไปตรวจกับรถที่จอดอยู่ได้เลย
+  // และลูกค้าที่มีหลายคันจะเห็นว่ากดถูกคันไหม ก่อนยื่นให้พนักงาน
+  const carLine = vehicle
+    ? [vehicle.brand, vehicle.model].filter(Boolean).map(esc).join(' ') +
+      (String(vehicle.plate || '').trim() ? ' · ' + esc(vehicle.plate) : '')
+    : 'แจ้งรุ่นรถกับพนักงานได้เลยค่ะ';
+
   document.getElementById('qrUserInfo').innerHTML =
     `<span class="qr-name">${esc(userInfo.name)}</span>` +
-    `<span class="qr-hint">แจ้งรุ่นรถกับพนักงานได้เลยค่ะ</span>`;
+    `<span class="qr-hint">${carLine}</span>`;
   // ใช้ onclick ไม่ใช่ addEventListener เพราะฟังก์ชันนี้ถูกเรียกทุกครั้งที่เปิด QR
   // ถ้าใช้ addEventListener ตัวฟังจะซ้อนกันเรื่อย ๆ แล้วยิง delete_token หลายรอบ
   document.getElementById('closeQRBtn').onclick = closeQRSection;
@@ -645,6 +697,15 @@ function generateQRCode(text, userInfo) {
     }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // ปุ่ม QR อยู่ในการ์ดรถซึ่งถูกวาดใหม่ทุกครั้งที่ข้อมูลเปลี่ยน
+  // จึงดักที่กล่องแม่ครั้งเดียว (#memberInfo ไม่ได้ถูกแทนที่ เปลี่ยนแค่ข้างใน)
+  // ⚠️ ใช้ onclick = ไม่ใช่ addEventListener เพราะถ้าเผลอเรียกซ้ำ ตัวฟังจะทับถมกัน
+  memberInfoEl.onclick = (e) => {
+    const b = e.target.closest ? e.target.closest('.uqr') : null;
+    if (!b) return;
+    showQRSection(Number(b.dataset.vi) || 0);
+  };
+
   try {
     showLoadingOverlay();
     console.log("Start login line...");
@@ -798,9 +859,13 @@ function renderMember(data, isStale) {
     ? '<p class="bc-stale" id="staleNote">⏳ กำลังอัปเดตข้อมูลล่าสุด...</p>'
     : '';
 
+  // ลูกค้ามีรถคันเดียว = รู้แน่ว่า QR ใบนี้ของคันไหน ผูกให้ตั้งแต่ตอนนี้เลย
+  // ตอนกดปุ่มจะได้ไม่ต้องรอเน็ตอีกรอบ (คนส่วนใหญ่เป็นเคสนี้)
+  if (data.vehicles.length === 1) attachWarmVehicle(data.vehicles[0]);
+
   memberInfoEl.innerHTML = staleHtml
     + profileHtml
-    + data.vehicles.map(v => vehicleCardHtml(v, data.serviceHistory, noDupModel)).join('')
+    + data.vehicles.map((v, i) => vehicleCardHtml(v, data.serviceHistory, noDupModel, i)).join('')
     + expNoteHtml;
 
   // ── ประวัติการใช้บริการ ────────────────────────────────────────────

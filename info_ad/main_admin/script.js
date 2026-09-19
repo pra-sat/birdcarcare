@@ -992,8 +992,22 @@ class QRScanner {
     this.requestId = 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
     this.forceDuplicate = false;
   
+    // ── รถที่ลูกค้าเลือกมาเอง (20 ก.ย. 2569) ────────────────────────────
+    // ลูกค้ากดปุ่ม QR จากการ์ดของรถคันนั้นโดยตรง เซิร์ฟเวอร์จึงบอกมาได้ว่าคันไหน
+    //
+    // 🔴 เป็นแค่ "ค่าตั้งต้น" ไม่ใช่การตัดสินใจแทนแอดมิน — แตะการ์ดอื่นเปลี่ยนได้
+    //    ตลอดเวลาเหมือนเดิม เพราะคนที่เห็นรถจริงตรงหน้าคือแอดมินเท่านั้น
+    //    หน้าที่ของแอดมินเปลี่ยนจาก "เลือกเอง" เป็น "ตรวจว่าทะเบียนตรงกับรถที่มา"
+    //
+    // ⚠️ -1 = QR รุ่นก่อนหน้า หรือหารถไม่เจอ -> ใช้คันแรกเหมือนเดิม และห้ามขึ้น
+    //    ข้อความว่าลูกค้าเลือกมา ไม่งั้นแอดมินจะเชื่อข้อความที่ไม่จริง
+    const picked = Number(this.foundUser.pickedIndex);
+    const startIdx = (Number.isInteger(picked) && picked >= 0 &&
+                      picked < this.foundUser.vehicles.length) ? picked : 0;
+    this.pickedByCustomer = startIdx === picked;
+
     const vehicleOptions = this.foundUser.vehicles.map((v, i) =>
-      `<option value="${i}">${esc(v.Brand)} ${esc(v.Model)} (${esc(v.Year)}) - ${esc(v.point)} แต้ม</option>`
+      `<option value="${i}"${i === startIdx ? ' selected' : ''}>${esc(v.Brand)} ${esc(v.Model)} (${esc(v.Year)}) - ${esc(v.point)} แต้ม</option>`
     ).join('');
 
     Swal.fire({
@@ -1007,8 +1021,11 @@ class QRScanner {
         </div>
 
         <div class="fld">
-          <label class="fld-lbl">เลือกรถที่มาวันนี้${this.foundUser.vehicles.length > 1
+          <label class="fld-lbl">${this.pickedByCustomer ? 'รถที่ลูกค้าเลือกมา' : 'เลือกรถที่มาวันนี้'}${this.foundUser.vehicles.length > 1
             ? ` <span class="fld-sub">— มี ${this.foundUser.vehicles.length} คันในระบบ</span>` : ''}</label>
+          ${this.pickedByCustomer
+            ? '<div class="vpick-note">✅ ลูกค้าเลือกคันนี้มาเอง — ตรวจทะเบียนให้ตรงกับรถที่เข้ารับบริการ ถ้าไม่ตรงแตะเลือกคันอื่นได้</div>'
+            : ''}
           <div class="vpick-list" id="vpickList"></div>
           <!-- ⚠️ select ตัวนี้ถูกซ่อนไว้ ห้ามลบ
                collectForm() กับ updateCurrentPoint() อ่านค่าจาก #vehicleSelect

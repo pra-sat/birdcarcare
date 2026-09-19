@@ -195,6 +195,29 @@ body, h1, h2, h3, p, div, span, td, th, label, button, li { overflow-wrap: break
 #memberInfo .subline { font-size: 10.5px; color: #9BB0BA; line-height: 1.5; margin-top: 7px; }
 #memberInfo .subline b { color: #7B96A3; font-weight: 600; }
 
+/* ── ปุ่มแสดง QR ของรถแต่ละคัน (20 ก.ย. 2569) ──────────────────────────
+   ย้ายเข้ามาอยู่ในกรอบรถ ลูกค้าจะได้บอกได้ว่ารับแต้มให้คันไหน
+   ⚠️ เขียนนำด้วย #memberInfo (1,1,0) เพื่อชนะกฎปุ่มสีฟ้าของ theme.css
+      ที่เป็น button:not(...):not(...) = (0,2,1) + !important
+      ลดรูปเหลือ .uqr (0,1,0) เมื่อไหร่ ปุ่มจะกลายเป็นฟ้าทึบเต็มกรอบทันที */
+#memberInfo .uqr {
+  display: block; width: 100%;
+  margin: 0 !important;
+  padding: 12px 10px !important;
+  font-family: var(--bc-body) !important;
+  font-size: 14.5px !important; font-weight: 600 !important;
+  color: #fff !important;
+  background: var(--bc-water) !important;
+  background-color: var(--bc-water) !important;
+  background-image: none !important;
+  border: none !important;
+  border-radius: 0 !important;   /* .vunit เป็น overflow:hidden อยู่แล้ว มุมมนถูกตัดให้เอง */
+  box-shadow: none !important;
+  cursor: pointer;
+}
+#memberInfo .uqr:active { background-color: var(--bc-waterD) !important; transform: none; }
+#memberInfo .uqr[disabled] { opacity: .6; }
+
 /* ปุ่มของหน้าสมาชิก — QR คือการกระทำหลักของหน้านี้ ให้เด่นที่สุด
    ใช้ #id จึงชนะกฎปุ่มสีฟ้าด้านล่างเสมอ และมีเฉพาะหน้าสมาชิกหน้าเดียว */
 #qrBtn, #toggleHistory { display: block; width: 100%; margin: 6px 0 !important; }
