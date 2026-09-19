@@ -293,8 +293,14 @@ function drawPay(b) {
     : '<i class="st-pb u" style="width:100%"></i>';
 
   if (revenue > 0) {
+    // ⚠️ ปัดเศษแล้วได้ 0% ทั้งที่มีเงินจริง ต้องเขียน "<1%" ไม่ใช่ "0%"
+    //    ไม่งั้นในโหมดภาพรวมจะขึ้นว่า "เงินโอน 400 (0%)" ซึ่งอ่านแล้วเหมือนไม่มี
+    const pctText = v => {
+      const n = Math.round(pc(v));
+      return n === 0 && v > 0 ? '&lt;1%' : n + '%';
+    };
     const part = (cls, name, val) => val > 0
-      ? `<span><i class="st-sw ${cls}"></i>${name} ${baht(val)} (${Math.round(pc(val))}%)</span>` : '';
+      ? `<span><i class="st-sw ${cls}"></i>${name} ${baht(val)} (${pctText(val)})</span>` : '';
     $('payKey').innerHTML = part('t', 'เงินโอน', transfer) + part('c', 'เงินสด', cash) +
       part('u', 'ไม่ระบุ', unknown);
   } else {

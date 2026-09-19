@@ -118,29 +118,45 @@
       ยิงพื้นฟ้าทับปุ่มทุกตัวในทุกหน้า · กฎที่นี่จึงต้องนำหน้าด้วย
       .st-pickrow button.st-arrow ให้ได้ (0,2,1) เท่ากัน แล้วชนะเพราะไฟล์นี้โหลดทีหลัง
       ห้ามลดรูปเหลือ .st-arrow (0,1,0) เด็ดขาด — ปุ่มจะกลายเป็นสีฟ้าทึบทันที */
+/* 🔴 แก้ 20 ก.ย. 2569 — ของเดิมเป็นกล่องมีกรอบ 3 ใบเรียงกัน (ลูกศร·วันที่·ลูกศร)
+      วางอยู่ใต้แถบมุมมองที่มีกรอบอีกใบ เจ้าของร้านเห็นแล้วรู้สึกว่ากรอบซ้อนกันรก
+      เปลี่ยนเป็น "การ์ดใบเดียว" ตามดราฟต์ — ลูกศรกับช่องวันที่ไม่มีกรอบของตัวเอง
+      ⚠️ ห้ามใส่ border กลับเข้าไปที่ .st-arrow หรือ .st-dateinput อีก */
 .st-pickrow {
   display: grid; grid-template-columns: auto 1fr auto;
-  gap: 8px; align-items: stretch; margin-bottom: 7px;
+  gap: 4px; align-items: stretch; margin-bottom: 6px;
+  background: #fff; border: 1px solid var(--bc-line);
+  border-radius: 14px; padding: 5px;
 }
 .st-pickrow button.st-arrow {
   min-width: 46px; padding: 9px 0;
   font-size: 16px; font-weight: 700; line-height: 1;
-  background: var(--bc-foam) !important;
-  background-color: var(--bc-foam) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
   color: var(--bc-waterD) !important;
-  border: 1.5px solid var(--bc-line) !important;
-  box-shadow: none;
+  border: none !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
 }
 .st-pickrow button.st-arrow:hover { background-color: #EAF4FA !important; }
-.st-pickrow button.st-arrow[disabled] { opacity: .32; cursor: default; transform: none; }
+.st-pickrow button.st-arrow:active { background-color: #DCEDF7 !important; }
+.st-pickrow button.st-arrow[disabled] {
+  opacity: .28; cursor: default; transform: none;
+  background-color: transparent !important;
+}
 input.st-dateinput {
-  width: 100%; min-width: 0; padding: 8px 6px;
-  font-family: var(--bc-disp); font-weight: 500; font-size: 15px;
+  width: 100%; min-width: 0; padding: 7px 4px;
+  font-family: var(--bc-disp); font-weight: 500;
   color: var(--bc-deep); text-align: center;
   font-variant-numeric: tabular-nums;
-  background: var(--bc-foam); border: 1.5px solid var(--bc-line);
-  border-radius: 12px; cursor: pointer;
+  background: transparent; border: none;
+  border-radius: 10px; cursor: pointer;
 }
+/* ⚠️ อย่าลดต่ำกว่า 16px — iOS จะซูมหน้าจอเข้าเองตอนแตะช่องนี้
+      แล้วพนักงานต้องซูมออกเองทุกครั้ง (ดูหัวข้อกันซูมใน theme.css) */
+input.st-dateinput { font-size: 16px; }
+input.st-dateinput:focus { outline: 2px solid var(--bc-water); outline-offset: 1px; }
 .st-quick { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-bottom: 9px; }
 .st-quick button.st-q {
   padding: 8px 4px; font-size: 12.5px; font-weight: 600;
@@ -225,12 +241,18 @@ input.st-dateinput {
   font-size: 13px !important; font-weight: 600 !important;
   padding: 9px 4px !important; margin: 0 !important; width: auto !important;
   border: none !important; border-radius: 10px !important;
-  background: transparent !important; background-image: none !important;
+  background: transparent !important;
+  background-color: transparent !important;   /* เขียนคู่กับ shorthand เสมอ —
+      theme.css สั่ง background-color แยกไว้ด้วย ถ้าเขียนแค่ background
+      จะชนะเพราะลำดับไฟล์ ซึ่งถูกแต่เปราะ อ่านแล้วไม่รู้ว่าตั้งใจ */
+  background-image: none !important;
   color: var(--bc-ink2) !important;
   box-shadow: none !important; cursor: pointer;
 }
 .st-seg button.st-seg-b.is-on {
-  background: var(--bc-water) !important; background-image: none !important;
+  background: var(--bc-water) !important;
+  background-color: var(--bc-water) !important;
+  background-image: none !important;
   color: #fff !important;
 }
 .st-seg button.st-seg-b[disabled] { opacity: .35; cursor: default; }
