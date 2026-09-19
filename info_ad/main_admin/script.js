@@ -3,7 +3,12 @@ const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxdxUvmwLS3_nETwGL
 window.liffId = '2007421084-2OgzWbpV';
 
 document.addEventListener('DOMContentLoaded', () => {
+  // ⚠️ ต้องแขวนไว้บน window ด้วย (เหมือน window.scanner)
+  //    เพราะ QRScanner ต้องเรียก maybeAutoRefreshSession() ตอนกดปุ่มสแกน
+  //    ของเดิมเป็นตัวแปรเฉพาะในฟังก์ชันนี้ ข้างนอกมองไม่เห็น
+  //    ถ้าไม่แก้ การต่ออายุเซสชันอัตโนมัติจะไม่ทำงานโดยไม่มีอะไรฟ้อง
   const adminManager = new AdminManager();
+  window.adminManager = adminManager;
   adminManager.init();
 });
 
@@ -74,6 +79,54 @@ function bcTokenSecondsLeft(token) {
 function bcTokenNeedsRefresh(token) {
   const left = bcTokenSecondsLeft(token);
   return left !== null && left < TOKEN_MIN_LEFT_SEC;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ต่ออายุเซสชันเอง โดยพนักงานไม่ต้องรู้เรื่อง (19 ก.ย. 2569)
+//
+//  แอดมิน C สแกนไม่ได้เพราะเซสชันหมดอายุ และพนักงานไม่รู้ว่าต้องปิดแล้วเปิดใหม่
+//  บางทีก็เปิดหน้านั้นค้างไว้ทั้งวัน
+//
+//  ⚠️ อายุของ ID token เป็นของ LINE เราขยายเองไม่ได้
+//     แต่ "ความถี่ที่ต้องให้คนมาจัดการ" เราทำให้เป็นศูนย์ได้
+//     ด้วยการต่ออายุเองในจังหวะที่ไม่มีอะไรให้เสีย
+//
+//  liff.login() ไม่ใช่การให้ล็อกอินใหม่จริง ๆ ถ้ายังล็อกอิน LINE อยู่
+//  มันแค่วิ่งไปเอา token ใหม่แล้วกลับมา = เหมือนหน้ารีเฟรชตัวเอง
+//  จึงเรียกอัตโนมัติได้ ถ้าเลือกจังหวะให้ดี
+//
+//  จังหวะที่ปลอดภัย (ไม่มีงานค้างบนจอ)
+//    1. ตอนเปิดหน้า
+//    2. ตอนสลับกลับมาที่หน้านี้  <- เคสเปิดค้างไว้ทั้งวัน
+//    3. ทุก 1 นาทีระหว่างเปิดหน้าอยู่
+//    4. ตอนกดปุ่มสแกน (ก่อนเริ่มงาน)
+//
+//  🔴 ต้องมีตัวกันวนซ้ำ ถ้าต่ออายุแล้ว token ยังถูกมองว่าเก่าอยู่
+//     (เช่นนาฬิกาเครื่องเพี้ยน) หน้าจะรีโหลดวนไม่รู้จบจนใช้งานไม่ได้เลย
+// ═══════════════════════════════════════════════════════════════════════════
+const AUTO_RELOGIN_KEY = 'bcAutoRelogin';
+const AUTO_RELOGIN_COOLDOWN = 5 * 60 * 1000;   // ต่ออายุเองได้ทุก 5 นาทีเป็นอย่างมาก
+
+function bcCanAutoRelogin() {
+  try {
+    const t = Number(sessionStorage.getItem(AUTO_RELOGIN_KEY) || 0);
+    return Date.now() - t > AUTO_RELOGIN_COOLDOWN;
+  } catch (e) { return true; }
+}
+function bcMarkAutoRelogin() {
+  try { sessionStorage.setItem(AUTO_RELOGIN_KEY, String(Date.now())); } catch (e) {}
+}
+
+// มีงานค้างอยู่บนจอไหม — ถ้ามี ห้ามรีโหลดหน้าเด็ดขาด
+function bcWorkInProgress() {
+  try {
+    if (typeof Swal !== 'undefined' && Swal.isVisible()) return true;   // ป๊อปอัปเปิดอยู่
+    if (window.scanner && window.scanner.foundUser) return true;        // เลือกลูกค้าไว้แล้ว
+    const sec = document.getElementById('scanSection');
+    if (sec && !sec.classList.contains('hidden') &&
+        window.scanner && window.scanner.isScanning) return true;       // กำลังค้นหาอยู่
+  } catch (e) {}
+  return false;
 }
 
 // ── เก็บงานที่ค้างไว้ข้ามการล็อกอินใหม่ ──────────────────────────────────
@@ -188,17 +241,26 @@ class QRScanner {
     // 🔴 ต่ออายุเซสชันก่อนเริ่มงาน ไม่ใช่ตอนกดบันทึกไปแล้ว
     //    จังหวะนี้ยังไม่มีอะไรให้เสีย ต่อใหม่ตอนนี้ไม่มีใครเดือดร้อน
     //    ต่างจากตอนกดบันทึกซึ่งกรอกทุกอย่างเสร็จแล้วและลูกค้ายืนรออยู่
+    // ต่ออายุให้เองเงียบ ๆ ก่อน — พนักงานไม่ต้องรู้เรื่องและไม่ต้องตัดสินใจอะไร
+    // ตรงนี้ยังไม่ได้เลือกลูกค้า ยังไม่มีอะไรให้เสีย รีโหลดได้ปลอดภัย
+    if (window.adminManager && window.adminManager.maybeAutoRefreshSession('กดสแกน')) {
+      return;                        // หน้ากำลังจะโหลดใหม่
+    }
+
+    // ต่อเองไม่ได้ (เพิ่งต่อไปเมื่อกี้ = กันวนซ้ำ) ค่อยถาม
+    // เป็นทางสำรอง ปกติไม่ควรมาถึงตรงนี้
     if (bcTokenNeedsRefresh(this.token)) {
       const go = await Swal.fire({
-        icon: 'info',
-        title: '🔐 ต่ออายุเซสชันก่อน',
-        html: 'เซสชัน LINE ใกล้หมดอายุแล้ว<br>' +
-              'ต่ออายุตอนนี้เลยดีกว่า จะได้ไม่ติดตอนกดบันทึก',
+        icon: 'warning',
+        title: '🔐 เซสชันหมดอายุ',
+        html: 'ต้องต่ออายุก่อนถึงจะบันทึกได้<br>' +
+              'กดปุ่มด้านล่างได้เลย ใช้เวลาไม่กี่วินาที',
         showCancelButton: true,
         confirmButtonText: 'ต่ออายุเลย',
         cancelButtonText: 'ข้ามไปก่อน'
       });
       if (go.isConfirmed) {
+        bcMarkAutoRelogin();
         try { liff.login(); } catch (e) { location.reload(); }
         return;                      // หน้าจะโหลดใหม่ ไม่ต้องทำอะไรต่อ
       }
@@ -489,8 +551,23 @@ class QRScanner {
   // พนักงานจึงต้องกดสลับกล้องทุกครั้ง วันละหลายสิบครั้ง
   //
   // ไล่ 3 ชั้น ถ้าชั้นแรกไม่ได้ค่อยตกไปชั้นถัดไป ชั้นสุดท้ายคือพฤติกรรมเดิม จึงไม่มีทางแย่ลงกว่าเดิม
+  // กรอบสแกนต้องเป็นจัตุรัสเสมอ (แก้ 19 ก.ย. 2569 ตามที่แอดมินแจ้ง)
+  //
+  // 🔴 ของเดิมเขียน qrbox: 250 ซึ่งเป็นเลขตายตัว
+  //    ถ้าภาพจากกล้องแคบกว่า 250 จุด html5-qrcode จะย่อกรอบให้พอดีภาพ
+  //    ด้านที่แคบถูกบีบ ด้านที่กว้างไม่ถูกบีบ -> กลายเป็นสี่เหลี่ยมผืนผ้า
+  //    บนมือถือแนวตั้งจึงเห็นเป็นผืนผ้าเกือบตลอด
+  //
+  //    ใช้ฟังก์ชันคำนวณจากขนาดภาพจริงแทน จะได้จัตุรัสทุกเครื่องทุกขนาดจอ
+  //    (รูปแบบฟังก์ชันเป็น API ที่ไลบรารีรองรับอยู่แล้ว)
+  static squareQrBox(viewW, viewH) {
+    const side = Math.floor(Math.min(viewW, viewH) * 0.72);
+    const s = Math.max(160, side);          // เล็กกว่านี้เล็งยาก
+    return { width: s, height: s };
+  }
+
   async startCamera() {
-    const cfg = { fps: 10, qrbox: 250 };
+    const cfg = { fps: 10, qrbox: QRScanner.squareQrBox };
     const onOk = text => this.onScanSuccess(text);
 
     try {
@@ -534,7 +611,7 @@ class QRScanner {
       this.currentCameraIndex = (this.currentCameraIndex + 1) % this.cameraList.length;
       this.html5QrCode.start(
         this.cameraList[this.currentCameraIndex].id,
-        { fps: 10, qrbox: 250 },
+        { fps: 10, qrbox: QRScanner.squareQrBox },   // ต้องใช้ตัวเดียวกับ startCamera
         text => this.onScanSuccess(text)
       );
     });
@@ -1379,6 +1456,10 @@ class AdminManager {
       //    ผลคือกดสแกนแล้วช้าลง ทั้งที่เป็นแค่ฟีเจอร์เสริม
       try { Promise.resolve(this.resumePendingSave()).catch(e => console.warn('งานค้าง:', e)); }
       catch (e) { console.warn('งานค้าง:', e); }
+
+      // เฝ้าดูอายุเซสชัน + ต่อให้เองเมื่อปลอดภัย
+      // ⚠️ ต้องทำหลัง resumePendingSave เสมอ ไม่งั้นอาจรีโหลดทับงานที่เพิ่งกู้ขึ้นมา
+      try { this.watchSession(); } catch (e) { console.warn('เฝ้าเซสชัน:', e); }
       this.verifySessionQuietly();                 // ตรวจเซสชันเบื้องหลัง
       // อุ่นรายการบริการไว้ล่วงหน้า พอกดสแกนแล้วปุ่มบริการจะขึ้นทันที
       if (window.scanner?.loadServices) window.scanner.loadServices();
@@ -1386,6 +1467,57 @@ class AdminManager {
       // ทำหลังหน้าโผล่แล้ว จึงไม่หน่วงการเปิดหน้าเลย แต่พอกดสแกนก็พร้อมใช้ทันที
       ensureQrLibrary().catch(() => { /* กดสแกนแล้วค่อยลองใหม่ได้ */ });
     }
+  }
+
+  // ── ต่ออายุเซสชันเองถ้าปลอดภัยที่จะทำ ────────────────────────────────────
+  // คืน true = กำลังจะรีโหลดหน้า ผู้เรียกควรหยุดทำอย่างอื่นต่อ
+  maybeAutoRefreshSession(where) {
+    if (!bcTokenNeedsRefresh(this.token)) return false;   // ยังสดอยู่ ไม่ต้องทำอะไร
+    if (bcWorkInProgress()) return false;                 // มีงานบนจอ ห้ามรีโหลด
+    if (!bcCanAutoRelogin()) return false;                // เพิ่งต่อไป กันวนซ้ำ
+
+    bcMarkAutoRelogin();
+    console.log('ต่ออายุเซสชันอัตโนมัติ (' + (where || '-') + ')');
+    this.paintSession('refresh');
+    try { liff.login(); } catch (e) { location.reload(); }
+    return true;
+  }
+
+  // แสดงสถานะเซสชันให้พนักงานเห็น — เดิมไม่มีอะไรบอกเลยว่าใกล้หมดอายุ
+  // พนักงานจึงไม่มีทางรู้ตัวจนกดบันทึกไม่ได้ตอนลูกค้ายืนรอ
+  paintSession(state) {
+    const el = document.getElementById('sessionState');
+    if (!el) return;
+    el.classList.remove('hidden', 'is-warn', 'is-busy');
+    if (state === 'refresh') {
+      el.textContent = '🔄 กำลังต่ออายุเซสชัน...';
+      el.classList.add('is-busy');
+    } else if (state === 'warn') {
+      el.textContent = '⚠️ เซสชันใกล้หมดอายุ — แตะที่นี่เพื่อต่ออายุ';
+      el.classList.add('is-warn');
+      el.onclick = () => { bcMarkAutoRelogin(); try { liff.login(); } catch (e) { location.reload(); } };
+    } else {
+      el.classList.add('hidden');       // ปกติไม่ต้องโชว์อะไร ไม่ให้รกจอ
+      el.onclick = null;
+    }
+  }
+
+  // เฝ้าดูอายุเซสชันระหว่างเปิดหน้าอยู่
+  watchSession() {
+    if (this._sessionWatch) return;
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (this.maybeAutoRefreshSession('ตรวจตามรอบ')) return;
+      // ต่อเองไม่ได้ (มีงานค้าง หรือเพิ่งต่อไป) -> อย่างน้อยให้เห็นว่าต้องทำอะไร
+      this.paintSession(bcTokenNeedsRefresh(this.token) ? 'warn' : 'ok');
+    };
+    this._sessionWatch = setInterval(tick, 60 * 1000);
+
+    // สลับกลับมาที่หน้านี้ — เคสที่เปิดค้างไว้ทั้งวันแล้วกลับมาใช้
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') tick();
+    });
+    tick();
   }
 
   // ── งานที่ค้างไว้ตอนเซสชันหมดอายุ — เอากลับมาให้บันทึกต่อ ────────────────

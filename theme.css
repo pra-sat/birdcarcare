@@ -964,9 +964,18 @@ input#userId, input#name, input#phone { padding: 10px 12px; }
 /* จองพื้นที่กล้องไว้ล่วงหน้า จอจะได้ไม่กระตุกตอนกล้องขึ้น
    ตั้งใจแตะให้น้อยที่สุด ไม่ยุ่งกับขนาดของ video เพราะ html5-qrcode
    คำนวณกรอบสแกนจากขนาดจริงของ element ถ้าเราบังคับด้วย !important มันจะคำนวณเพี้ยน */
+/* กล่องกล้องต้องเป็นจัตุรัส
+   🔴 main_admin/style.css ตั้ง #reader { flex:1; height:100%; max-height:80vh }
+      ไว้ตั้งแต่โค้ดเก่า · theme.css โหลดทีหลังก็จริง แต่ไม่ได้สั่ง height ทับ
+      อีกฝั่งจึงยังมีผล แล้วไปทับ aspect-ratio (ถ้ามี height ชัดเจน
+      เบราว์เซอร์จะไม่ใช้ aspect-ratio คำนวณความสูง) -> กล่องกลายเป็นผืนผ้า
+      ต้องล้าง height/max-height/flex ของเก่าให้หมดตรงนี้ ไม่งั้นแก้ไม่ขึ้น */
 #reader, .camera-box {
   width: 100%;
   aspect-ratio: 1 / 1;
+  height: auto;
+  max-height: none;
+  flex: 0 0 auto;
   border-radius: 14px;
   overflow: hidden;
   background-color: #0E2A35;
@@ -1013,6 +1022,31 @@ body > .container > h2 { font-size: 1.28rem !important; margin: 0 0 10px !import
 .scan-section .input-field { margin-top: 10px; padding: 10px 12px; }
 .scan-controls { margin-top: 9px; }
 .scan-controls .btn { padding: 11px 8px; font-size: 14px; }
+
+/* ── สถานะเซสชันในหน้าแอดมิน ─────────────────────────────────────────
+   ปกติซ่อนไว้ โผล่เฉพาะตอนกำลังต่ออายุ หรือตอนที่ต้องให้คนกดเอง
+   ไม่สื่อด้วยสีอย่างเดียว มีข้อความกำกับเสมอ */
+.sess {
+  margin-top: 8px;
+  padding: 8px 11px;
+  border-radius: 11px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+.sess.is-busy {
+  background: var(--bc-foam);
+  border: 1px solid var(--bc-line);
+  color: var(--bc-ink2);
+}
+.sess.is-warn {
+  background: #FFF8E6;
+  border: 1px solid #F2DFA8;
+  color: #8A5A00;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sess.is-warn:active { background: #FDF0CF; }
 
 /* ── เมนูปุ่ม ───────────────────────────────────────────────────────── */
 .admin-buttons, .menu-buttons, .button-group { gap: 10px; }
