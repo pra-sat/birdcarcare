@@ -384,10 +384,31 @@ class QRScanner {
     const payWayText = payWay === 'cash' ? '💵 เงินสด'
                      : payWay === 'transfer' ? '📱 โอนจ่าย' : '';
 
+    // ── ด่านสุดท้ายก่อนบันทึก: ให้ตาแอดมินไปหยุดที่ป้ายทะเบียน ──────────
+    //
+    // ลูกค้าเป็นคนเลือกรถมาเองแล้ว (กดปุ่ม QR จากการ์ดของคันนั้น) แต่ระบบ
+    // ยืนยันแทนไม่ได้ว่าคันที่เลือกคือคันที่จอดอยู่จริง — กุญแจยังเป็น
+    // ยี่ห้อ+รุ่น+ปี ซึ่งรถสองคันที่เหมือนกันแยกไม่ออก
+    //
+    // คนเดียวที่ตรวจได้คือแอดมินที่ยืนอยู่หน้ารถ จึงต้องเอาป้ายขึ้นมาให้เด่น
+    // ตรงจังหวะที่เขากำลังจะกดยืนยัน ไม่ใช่ปนอยู่ในบรรทัดข้อมูลทั่วไป
+    const plateBadge = plateLine && typeof plateHtml === 'function'
+      ? plateHtml(plateLine, selectedVehicle.Province, false) : '';
+
+    const plateCheck = plateLine
+      ? `<div class="cf-plate">
+           <div class="cf-plate-ask">🔍 ป้ายตรงกับรถที่เข้ารับบริการไหม?</div>
+           <div class="cf-plate-badge">${plateBadge || esc(plateLine)}</div>
+         </div>`
+      : `<div class="cf-plate is-none">
+           <div class="cf-plate-ask">⚠️ รถคันนี้ยังไม่มีทะเบียนในระบบ</div>
+           <div class="cf-plate-sub">ตรวจให้แน่ใจว่าเลือกถูกคัน — เติมทะเบียนได้ที่หน้าก่อนหน้า</div>
+         </div>`;
+
     const confirmHtml = `
+      ${plateCheck}
       <p>ลูกค้า: ${esc(this.foundUser.Name)}</p>
-      <p>รถ: ${esc(selectedVehicle.Brand)} ${esc(selectedVehicle.Model)} (${esc(selectedVehicle.Year)})${
-        plateLine ? ' · ' + esc(plateLine) : ''}</p>
+      <p>รถ: ${esc(selectedVehicle.Brand)} ${esc(selectedVehicle.Model)} (${esc(selectedVehicle.Year)})</p>
       <p>บริการ: ${esc(name)}</p>
       <p>${esc(label)}</p>
       ${payWayText ? `<p>รับเงินทาง: ${esc(payWayText)}</p>` : ''}
@@ -1001,10 +1022,16 @@ class QRScanner {
     //
     // ⚠️ -1 = QR รุ่นก่อนหน้า หรือหารถไม่เจอ -> ใช้คันแรกเหมือนเดิม และห้ามขึ้น
     //    ข้อความว่าลูกค้าเลือกมา ไม่งั้นแอดมินจะเชื่อข้อความที่ไม่จริง
-    const picked = Number(this.foundUser.pickedIndex);
-    const startIdx = (Number.isInteger(picked) && picked >= 0 &&
-                      picked < this.foundUser.vehicles.length) ? picked : 0;
-    this.pickedByCustomer = startIdx === picked;
+    // ⚠️ ต้องเช็คว่าเป็น "จำนวนเต็มจริง ๆ" ไม่ใช่แปลงด้วย Number() แล้วเทียบ
+    //    Number(null) = 0 ซึ่งจะทำให้ระบบอ้างว่า "ลูกค้าเลือกคันแรกมา"
+    //    ทั้งที่ลูกค้าไม่ได้เลือกอะไรเลย (เทสต์จับได้)
+    const rawPicked = this.foundUser.pickedIndex;
+    const nCars = this.foundUser.vehicles.length;
+    const picked = (typeof rawPicked === 'number' && Number.isInteger(rawPicked) &&
+                    rawPicked >= 0 && rawPicked < nCars) ? rawPicked : -1;
+
+    const startIdx = picked >= 0 ? picked : 0;
+    this.pickedByCustomer = picked >= 0;
 
     const vehicleOptions = this.foundUser.vehicles.map((v, i) =>
       `<option value="${i}"${i === startIdx ? ' selected' : ''}>${esc(v.Brand)} ${esc(v.Model)} (${esc(v.Year)}) - ${esc(v.point)} แต้ม</option>`

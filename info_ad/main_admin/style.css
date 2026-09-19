@@ -182,3 +182,18 @@ input#manualPhone::placeholder {
   border: 1px solid #BFE6D2; border-radius: 11px;
   padding: 8px 11px; margin-bottom: 9px;
 }
+
+/* ── ด่านตรวจป้ายทะเบียนก่อนกดยืนยันบันทึก (20 ก.ย. 2569) ───────────────
+   ลูกค้าเลือกรถมาเองได้ แต่ระบบยืนยันแทนไม่ได้ว่าเป็นคันที่จอดอยู่จริง
+   คนเดียวที่ตรวจได้คือแอดมินที่ยืนอยู่หน้ารถ จึงต้องทำให้ตาไปหยุดตรงนี้ */
+.cf-plate {
+  display: grid; place-items: center; gap: 8px;
+  padding: 12px 10px; margin: 0 0 12px;
+  background: #FFF8E8; border: 1.5px solid #F0D9A0; border-radius: 14px;
+}
+.cf-plate-ask { font-size: 13.5px; font-weight: 700; color: #8A6212; }
+.cf-plate-badge { display: flex; justify-content: center; }
+.cf-plate.is-none { background: #FDF1F1; border-color: #F0C2C2; }
+.cf-plate.is-none .cf-plate-ask { color: #A43F3D; }
+.cf-plate-sub { font-size: 11.5px; line-height: 1.5; color: #8A6212; text-align: center; }
+.cf-plate.is-none .cf-plate-sub { color: #A43F3D; }

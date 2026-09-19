@@ -161,7 +161,7 @@ function vehicleCardHtml(vehicle, history, countable, index) {
       <!-- ปุ่ม QR อยู่ในกรอบของรถคันนี้ (20 ก.ย. 2569)
            ของเดิมเป็นปุ่มเดียวอยู่นอกการ์ด ลูกค้าที่มีรถหลายคันจึงบอกไม่ได้ว่า
            กำลังจะรับแต้มให้คันไหน แล้วแอดมินต้องมานั่งเดาเองตอนสแกน -->
-      <button type="button" class="uqr" data-vi="${index}">📱 แสดง QR รับแต้มคันนี้</button>
+      <button type="button" class="uqr" data-vi="${Number(index) || 0}">📱 แสดง QR รับแต้มคันนี้</button>
     </div>
   `;
 }
@@ -373,13 +373,31 @@ function deleteTokenOnServer(token) {
 //     จ. อะไรพังก็ห้ามลาก QR พังไปด้วย ครอบ try/catch ทั้งก้อน
 // ═══════════════════════════════════════════════════════════════════════════
 const memberTokens = { id: '', access: '' };
+// 🔴 ต้องจำเป็น "รายคัน" ไม่ใช่ทั้งหน้า (แก้ 20 ก.ย. 2569)
+//    ของเดิมเก็บเป็นธงใบเดียว พอลูกค้ากดข้ามที่รถคัน A แล้วไปกดแสดง QR
+//    ของคัน B ซึ่งยังไม่มีทะเบียนเหมือนกัน ระบบก็เงียบไปเลย ไม่ถามอะไร
+//    = รถคันที่สองไม่มีวันได้กรอกทะเบียนตลอดทั้งรอบ
 const PLATE_SKIP_KEY = 'bcPlateAskSkip';
 
-function plateAskSkipped() {
-  try { return sessionStorage.getItem(PLATE_SKIP_KEY) === '1'; } catch (e) { return false; }
+function plateSkipSet() {
+  try {
+    const raw = sessionStorage.getItem(PLATE_SKIP_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
 }
-function markPlateAskSkipped() {
-  try { sessionStorage.setItem(PLATE_SKIP_KEY, '1'); } catch (e) {}
+function plateAskSkipped(vehicle) {
+  const k = vehKeyOf(vehicle);
+  return !!k && plateSkipSet().indexOf(k) >= 0;
+}
+function markPlateAskSkipped(vehicle) {
+  const k = vehKeyOf(vehicle);
+  if (!k) return;
+  try {
+    const arr = plateSkipSet();
+    if (arr.indexOf(k) < 0) arr.push(k);
+    sessionStorage.setItem(PLATE_SKIP_KEY, JSON.stringify(arr));
+  } catch (e) {}
 }
 
 async function savePlateForMe(vehicle, plate, province) {
@@ -405,12 +423,11 @@ async function askPlateIfMissing(target) {
   try {
     if (!memberData || !Array.isArray(memberData.vehicles)) return;
     if (!memberTokens.id && !memberTokens.access) return;   // (ง)
-    if (plateAskSkipped()) return;
-
     // ถามเฉพาะคันที่กำลังจะแสดง QR เท่านั้น
     // ไปถามคันอื่นที่ลูกค้าไม่ได้กด = งงว่าทำไมถามคันนี้ และไม่ช่วยงานตรงหน้า
     const v = target || memberData.vehicles.find(x => !String(x.plate || '').trim());
     if (!v || String(v.plate || '').trim()) return;          // มีแล้ว ไม่ต้องถาม
+    if (plateAskSkipped(v)) return;                          // เคยกดข้ามคันนี้ไปแล้ว
 
     const carName = [v.brand, v.model, v.year ? 'ปี ' + v.year : '']
       .filter(Boolean).map(esc).join(' ');
@@ -447,7 +464,10 @@ async function askPlateIfMissing(target) {
       showCancelButton: true,
       confirmButtonText: '💾 บันทึกแล้วแสดง QR',
       cancelButtonText: 'ยังไม่สะดวกตอนนี้',
-      focusConfirm: false,
+      // 🔴 focusConfirm: false ทำให้ SweetAlert ไปโฟกัส "ช่องกรอกช่องแรก" แทน
+      //    ซึ่งคือสาเหตุที่คีย์บอร์ดเด้งขึ้นมาบังคำอธิบาย ทั้งที่เราเอา focus()
+      //    ของเราออกไปแล้ว · ให้โฟกัสปุ่มยืนยันแทน (ปุ่มไม่เรียกคีย์บอร์ด)
+      focusConfirm: true,
       // ⚠️ แตะโดนขอบนอกแล้วป๊อปอัปหายไปเฉย ๆ = ลูกค้าไม่รู้ว่าเกิดอะไรขึ้น
       //    และถ้านับว่า "ข้าม" ด้วย จะไม่ถามซ้ำทั้งรอบทั้งที่เขาไม่ได้ตั้งใจข้าม
       allowOutsideClick: false,
@@ -469,9 +489,15 @@ async function askPlateIfMissing(target) {
             : '<p class="pl-eg">พิมพ์แล้วจะขึ้นตัวอย่างป้ายให้ดูตรงนี้</p>';
         };
         head.oninput = draw; tail.oninput = draw; prov.onchange = draw;
-        // ⚠️ ห้าม focus() ให้เอง — คีย์บอร์ดจะเด้งขึ้นมาบังข้อความที่อธิบายว่า
-        //    ขอทะเบียนไปทำอะไร ซึ่งเป็นส่วนที่ทำให้ลูกค้าสบายใจพอจะกรอก
-        //    ให้ลูกค้าอ่านจบแล้วแตะช่องเอง
+
+        // ⚠️ ห้าม focus() ช่องกรอกเอง — คีย์บอร์ดจะเด้งขึ้นมาบังข้อความที่อธิบาย
+        //    ว่าขอทะเบียนไปทำอะไร ซึ่งเป็นส่วนที่ทำให้ลูกค้าสบายใจพอจะกรอก
+        //    และถ้ามีอะไรแอบโฟกัสให้ ก็ถอนออกทันที (กันไว้อีกชั้น)
+        setTimeout(() => {
+          const a = document.activeElement;
+          if (a && a !== document.body && typeof a.blur === 'function' &&
+              (a.tagName === 'INPUT' || a.tagName === 'SELECT')) a.blur();
+        }, 0);
       },
       // ⚠️ ที่นี่ทำได้แค่ "ตรวจ + ยิงบันทึก" ห้ามเปิดป๊อปอัปตัวใหม่เด็ดขาด
       //    SweetAlert เปิดได้ทีละอัน เปิดตัวใหม่ = ตัวนี้ถูกปิดทิ้งทันที
@@ -510,7 +536,7 @@ async function askPlateIfMissing(target) {
       // นับว่า "ข้าม" เฉพาะตอนกดปุ่มยังไม่สะดวกเท่านั้น
       // ปิดด้วยวิธีอื่น (เช่นกดปุ่มย้อนกลับของเครื่อง) ไม่ใช่การตัดสินใจข้าม
       // ครั้งหน้าที่กดแสดง QR ต้องถามอีก
-      markPlateAskSkipped();                                 // (ค)
+      markPlateAskSkipped(v);                                // (ค) จำเป็นรายคัน
     }
 
   } catch (err) {
@@ -536,10 +562,16 @@ async function showQRSection(vehicleIndex) {
   //    ถ้าขอ token ไปก่อนแล้วค่อยถาม ของที่เตรียมไว้อาจหมดอายุระหว่างกรอก
   await askPlateIfMissing(vehicle);
 
+  // ⚠️ ต้องขึ้นสถานะให้เห็นทันทีที่ป๊อปอัปปิด ไม่งั้นลูกค้าจะเห็นแค่
+  //    "กล่องหายไปเฉย ๆ" แล้ว QR โผล่มาทีหลังโดยไม่รู้ว่าระหว่างนั้นเกิดอะไร
   const btn = document.querySelector(`.uqr[data-vi="${idx}"]`) ||
               document.getElementById('qrBtn');
   const originalText = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ กำลังสร้าง QR...'; }
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ กำลังสร้าง QR...';
+    try { btn.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+  }
 
   try {
     const token = await tokenForVehicle(vehicle);
