@@ -364,8 +364,28 @@ class QRScanner {
     }
 
     let price = priceValue;
-    let point = Math.floor(priceValue * this.pointPerBaht);
-    let label = `ราคา: ${price} บาท · ลูกค้าได้แต้ม: +${point}`;
+    const fullPoint = Math.floor(priceValue * this.pointPerBaht);
+    let point = fullPoint;
+
+    // แต้มที่แอดมินแก้เอง (1 ต.ค. 2569) — ว่าง = 10% · ลดได้ · เกิน 10% ไม่ได้
+    const pointRaw = (document.getElementById('pointInput')?.value || '').trim();
+    if (!this.isRedeeming && pointRaw !== '') {
+      const typed = Number(pointRaw);
+      if (!Number.isFinite(typed) || typed < 0) {
+        Swal.showValidationMessage('แต้มต้องเป็นตัวเลข 0 ขึ้นไป');
+        return false;
+      }
+      if (Math.floor(typed) > fullPoint) {
+        Swal.showValidationMessage(`แต้มเกิน 10% ของราคา (ได้สูงสุด ${fullPoint} แต้ม)`);
+        return false;
+      }
+      point = Math.floor(typed);
+    }
+
+    // ได้น้อยกว่าปกติ -> บอกเลขปกติไว้ด้วย ให้แอดมินเห็นชัดตอนยืนยันว่าตั้งใจลด
+    let label = point < fullPoint
+      ? `ราคา: ${price} บาท · ลูกค้าได้แต้ม: +${point} (ปกติ ${fullPoint})`
+      : `ราคา: ${price} บาท · ลูกค้าได้แต้ม: +${point}`;
 
     if (this.isRedeeming) {
       if (price > availablePoint) {
@@ -425,6 +445,8 @@ class QRScanner {
       vehicleIndex: selectedIndex,
       serviceName: name,
       price: priceInputEl.value,
+      point: pointRaw,
+      pointTouched: !!this.pointTouched,
       note: note,
       isRedeeming: this.isRedeeming,
       payWay: payWay || 'transfer'
@@ -510,7 +532,7 @@ class QRScanner {
 
     if (result.success) {
       this.draft = null;   // บันทึกสำเร็จแล้ว ไม่ต้องเก็บร่างไว้
-      this.logAction('บันทึกบริการ', `✅ ${data.name} (${data.price} บาท)`);
+      this.logAction('บันทึกบริการ', `✅ ${data.name} (${data.price} บาท · ${result.point ?? data.point} แต้ม)`);
       return Swal.fire('✅ บันทึกสำเร็จ',
         `บริการ: ${esc(data.name)}<br>แต้ม: ${esc(result.point ?? data.point)}`, 'success')
         .then(() => liff.closeWindow());
@@ -1169,7 +1191,15 @@ class QRScanner {
         </div>
 
         <input type="number" id="priceInput" placeholder="ราคา (บาท)" class="swal2-input">
-        <p id="pointInfo">แต้มที่จะได้: <span id="pointPreview">0</span></p>
+        <!-- ช่องแต้ม (1 ต.ค. 2569) — เติม 10% ให้เองตามราคา ไม่ต้องกรอกทุกครั้ง
+             แก้ให้น้อยลงเฉพาะงานอะไหล่ เช่น ถ่ายน้ำมัน 1,500 บาท ให้ 30 แต้ม
+             เกิน 10% ไม่ได้ (เซิร์ฟเวอร์ตัดทิ้งอยู่แล้ว ตรงนี้แค่เตือนก่อน) -->
+        <div class="pt-row" id="pointRow">
+          <label class="pt-lbl" for="pointInput">แต้มที่ลูกค้าได้</label>
+          <input type="number" id="pointInput" class="swal2-input pt-input"
+                 inputmode="numeric" min="0" step="1">
+        </div>
+        <p id="pointInfo"></p>
         <input type="text" id="noteInput" placeholder="หมายเหตุ (ไม่บังคับ)" class="swal2-input">
       `,
       confirmButtonText: '✅ บันทึก',
@@ -1179,14 +1209,20 @@ class QRScanner {
       cancelButtonText: 'ยกเลิก',
       didOpen: () => {
         const priceInput = document.getElementById('priceInput');
-        const pointPreview = document.getElementById('pointPreview');
+        const pointInput = document.getElementById('pointInput');
+        const pointRow = document.getElementById('pointRow');
         const pointInfo = document.getElementById('pointInfo');
         const modeCash = document.getElementById('modeCash');
         const modePts = document.getElementById('modePts');
         const vehicleSelect = document.getElementById('vehicleSelect');
   
+        // pointTouched = แอดมินแก้ช่องแต้มเอง -> หยุดเติม 10% ทับให้
+        this.pointTouched = false;
+
         const updatePointDisplay = () => {
           const p = parseFloat(priceInput.value) || 0;
+          // แลกแต้มไม่มีแต้มเข้า ช่องนี้ไม่มีความหมาย ซ่อนไปเลย
+          pointRow.classList.toggle('hidden', this.isRedeeming);
           if (this.isRedeeming) {
             const remain = this.currentPoint - p;
             if (remain < 0) {
@@ -1201,12 +1237,39 @@ class QRScanner {
               pointInfo.style.color = 'black';
               Swal.getConfirmButton().disabled = false;
             }
-          } else {
-            pointPreview.textContent = Math.floor(p * this.pointPerBaht);
-            pointInfo.innerHTML = `แต้มที่จะได้: <span id="pointPreview">${Math.floor(p * this.pointPerBaht)}</span>`;
-            Swal.getConfirmButton().disabled = false;
+            return;
           }
+
+          const full = Math.floor(p * this.pointPerBaht);
+          // ⚠️ ห้ามเติมทับตอนแอดมินกำลังพิมพ์อยู่ในช่องแต้ม
+          //    ลบเลขเดิมทิ้งเพื่อพิมพ์ 30 แล้วถ้าเติม 150 กลับทันที จะกลายเป็น 15030
+          if (!this.pointTouched && document.activeElement !== pointInput) {
+            pointInput.value = p > 0 ? String(full) : '';
+          }
+
+          const typed = pointInput.value.trim();
+          // ยังไม่กรอกราคา ไม่ต้องฟ้องว่าเกิน (collectForm ฟ้องเรื่องราคาเองอยู่แล้ว)
+          if (p > 0 && typed !== '' && Math.floor(Number(typed)) > full) {
+            pointInfo.textContent = `❌ แต้มเกิน 10% ของราคา (ได้สูงสุด ${full} แต้ม)`;
+            pointInfo.style.color = 'red';
+            Swal.getConfirmButton().disabled = true;
+            return;
+          }
+
+          pointInfo.style.color = '';
+          pointInfo.textContent =
+              this.pointTouched && p > 0 ? `ปกติ ${full} แต้ม · ลบให้ว่างเพื่อกลับไปคิด 10%`
+            : typed === '' && p > 0      ? `เว้นว่าง = คิด 10% ให้ (${full} แต้ม)`
+            :                              'คิดให้ 10% อัตโนมัติ · งานอะไหล่แก้ให้น้อยลงได้';
+          Swal.getConfirmButton().disabled = false;
         };
+
+        pointInput.addEventListener('input', () => {
+          this.pointTouched = pointInput.value.trim() !== '';
+          updatePointDisplay();
+        });
+        // ลบว่างแล้วออกจากช่อง = กลับไปคิด 10% ให้เหมือนเดิม
+        pointInput.addEventListener('blur', updatePointDisplay);
   
         // เปลี่ยนคันรถ → อัปเดตแต้ม
         const updateCurrentPoint = () => {
@@ -1362,6 +1425,8 @@ class QRScanner {
           vehicleSelect.value = String(d.vehicleIndex || 0);
           serviceInput.value = d.serviceName || '';
           priceInput.value = d.price || '';
+          pointInput.value = d.point || '';
+          this.pointTouched = !!d.pointTouched;    // แต้มที่แก้เองไว้ต้องไม่ถูกเติม 10% ทับ
           const noteEl = document.getElementById('noteInput');
           if (noteEl) noteEl.value = d.note || '';
           this.renderVehiclePicks();

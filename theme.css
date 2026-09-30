@@ -328,6 +328,18 @@ body, h1, h2, h3, p, div, span, td, th, label, button, li { overflow-wrap: break
 .swal2-popup .fld .pay-seg { margin: 0; }
 .swal2-popup .fld-sub { font-weight: 400; color: #9BB0BA; }
 
+/* แถวแต้มที่ลูกค้าได้ — ป้ายซ้าย ช่องเลขเล็กขวา อยู่ใต้ช่องราคา
+   ช่องเล็กเพราะเลขแต้มไม่เกิน 3–4 หลัก และจะได้ไม่ดูเหมือนช่องราคาช่องที่สอง */
+.swal2-popup .pt-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 10px 0 0; padding: 0 2px;
+}
+.swal2-popup .pt-row.hidden { display: none; }
+.swal2-popup .pt-lbl { font-size: 14px; font-weight: 600; color: var(--bc-ink); text-align: left; }
+.swal2-popup .pt-row .swal2-input.pt-input {
+  width: 96px; margin: 0 !important; text-align: center; font-weight: 700;
+}
+
 /* หัวข้อมูลลูกค้าในป๊อปอัป */
 .swal2-popup .cust-head {
   text-align: left;
