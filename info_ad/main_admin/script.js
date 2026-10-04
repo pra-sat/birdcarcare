@@ -179,6 +179,13 @@ function ensureQrLibrary() {
 // แปลงอักขระพิเศษก่อนเอาไปต่อเข้า HTML
 // ชื่อลูกค้าเป็นข้อความที่ลูกค้าพิมพ์เองตอนสมัคร ถ้าพิมพ์เป็นแท็ก HTML มาแล้วเราต่อตรง ๆ
 // มันจะไปทำงานในหน้าจอของแอดมิน ซึ่งเป็นหน้าที่มีสิทธิ์บันทึกบริการ
+// ── งานอะไหล่ (5 ต.ค. 2569 — เจ้าของร้านเลือกแบบ "เติม 10% เหมือนเดิม แต่เตือนสีส้ม") ──
+// งานที่มีต้นทุนอะไหล่/ของเหลว กำไรต่ำ ร้านให้แต้มน้อยกว่า 10% (เช่น ถ่ายน้ำมัน 1,500 ให้ 30)
+// เคยมีคนลืมแก้แต้ม: ถ่ายน้ำมัน 1,000 บาท ได้ 100 แต้ม (3 ต.ค.)
+// ⚠️ จับจากชื่อบริการ — งานค่าแรงล้วน (ขัดไฟหน้า ซักเบาะ ล้างรถ) ห้ามโดนเตือน
+const PARTS_RE = /ถ่ายน้ำมัน|น้ำมันเครื่อง|กรองอากาศ|กรองแอร์|กรองน้ำมัน|กรองโซล่า|กรองเชื้อเพลิง|น้ำยาแอร์|อะไหล่|แบตเตอรี่|ผ้าเบรก|หัวเทียน|ใบปัดน้ำฝน|ยางรถ|เปลี่ยนยาง/;
+function isPartsService(name) { return PARTS_RE.test(String(name || '')); }
+
 function esc(v) {
   return String(v == null ? '' : v)
     .replace(/&/g, '&amp;')
@@ -383,6 +390,11 @@ class QRScanner {
       point = Math.floor(typed);
     }
 
+    // งานอะไหล่ แต่ยังให้แต้มเต็ม 10% จากการเติมอัตโนมัติ (ไม่ได้แก้ / เว้นว่าง) -> เตือนก่อนบันทึก
+    // ถ้าพิมพ์เลขเต็มเองตั้งใจ (pointTouched) ถือว่าตั้งใจ ไม่เตือนซ้ำ
+    const partsUnchecked = !this.isRedeeming && isPartsService(name) && fullPoint > 0 &&
+                           point === fullPoint && (!this.pointTouched || pointRaw === '');
+
     // ได้น้อยกว่าปกติ -> บอกเลขปกติไว้ด้วย ให้แอดมินเห็นชัดตอนยืนยันว่าตั้งใจลด
     let label = point < fullPoint
       ? `ราคา: ${price} บาท · ลูกค้าได้แต้ม: +${point} (ปกติ ${fullPoint})`
@@ -431,7 +443,13 @@ class QRScanner {
            <div class="cf-plate-sub">ตรวจให้แน่ใจว่าเลือกถูกคัน — เติมทะเบียนได้ที่หน้าก่อนหน้า</div>
          </div>`;
 
+    const partsWarnHtml = partsUnchecked
+      ? `<div class="parts-warn">⚠️ <b>งานอะไหล่ แต่ยังให้แต้มเต็ม 10% (+${point} แต้ม)</b><br>
+           ลืมแก้แต้มหรือเปล่า? ถ้าตั้งใจให้เท่านี้ กดยืนยันได้เลย · ถ้าลืม กด "กลับไปแก้"</div>`
+      : '';
+
     const confirmHtml = `
+      ${partsWarnHtml}
       ${plateCheck}
       <p>ลูกค้า: ${esc(this.foundUser.Name)}</p>
       <p>รถ: ${esc(selectedVehicle.Brand)} ${esc(selectedVehicle.Model)} (${esc(selectedVehicle.Year)})</p>
@@ -1249,6 +1267,8 @@ class QRScanner {
                  inputmode="numeric" min="0" step="1">
         </div>
         <p id="pointInfo"></p>
+        <!-- งานอะไหล่: เตือนสีส้มให้ตรวจแต้ม (ยังเติม 10% ให้เหมือนเดิม) -->
+        <div class="parts-warn hidden" id="partsWarn">⚠️ งานอะไหล่ — ตรวจแต้มก่อนบันทึก<br>ระบบเติม 10% ให้ ปกติร้านให้น้อยกว่านี้</div>
         <input type="text" id="noteInput" placeholder="หมายเหตุ (ไม่บังคับ)" class="swal2-input">
       `,
       confirmButtonText: '✅ บันทึก',
@@ -1273,6 +1293,8 @@ class QRScanner {
           // แลกแต้มไม่มีแต้มเข้า ช่องนี้ไม่มีความหมาย ซ่อนไปเลย
           pointRow.classList.toggle('hidden', this.isRedeeming);
           if (this.isRedeeming) {
+            const pw = document.getElementById('partsWarn');
+            if (pw) pw.classList.add('hidden');
             const remain = this.currentPoint - p;
             if (remain < 0) {
               // ⚠️ ข้อความนี้แอดมินเป็นคนอ่าน ไม่ใช่ลูกค้า
@@ -1303,6 +1325,14 @@ class QRScanner {
             pointInfo.style.color = 'red';
             Swal.getConfirmButton().disabled = true;
             return;
+          }
+
+          // งานอะไหล่ + ยังเป็นเลขที่ระบบเติมให้ (ไม่ได้แก้ / ว่าง) -> แถบส้ม · แก้แล้ว -> ซ่อน
+          const partsWarn = document.getElementById('partsWarn');
+          if (partsWarn) {
+            const svc = (document.getElementById('serviceName') || {}).value || '';
+            partsWarn.classList.toggle('hidden',
+              !(isPartsService(svc) && p > 0 && full > 0 && (!this.pointTouched || typed === '')));
           }
 
           pointInfo.style.color = '';
@@ -1443,6 +1473,7 @@ class QRScanner {
         serviceInput.addEventListener('input', () => {
           this.svcFilter = serviceInput.value;
           this.renderServiceChips();
+          updatePointDisplay();      // พิมพ์ชื่องานอะไหล่เอง ก็ต้องขึ้นแถบส้ม
         });
 
         // ใช้ตัวฟังตัวเดียวที่กล่องแม่ เพราะปุ่มถูกวาดใหม่ทุกครั้ง

@@ -369,6 +369,14 @@ body, h1, h2, h3, p, div, span, td, th, label, button, li { overflow-wrap: break
   margin: 10px 0 0; padding: 0 2px;
 }
 .swal2-popup .pt-row.hidden { display: none; }
+/* งานอะไหล่ยังให้แต้มเต็ม 10% — เตือนสีส้ม ทั้งใต้ช่องแต้มและในหน้ายืนยัน (5 ต.ค. 2569) */
+.swal2-popup .parts-warn {
+  margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; text-align: left;
+  background: #FFF1DE; color: #8A4B00; border-left: 4px solid #F08A00;
+  font-size: 13px; line-height: 1.55; font-weight: 600;
+}
+.swal2-popup .parts-warn b { color: #7A3E00; }
+.swal2-popup .parts-warn.hidden { display: none; }
 .swal2-popup .pt-lbl { font-size: 14px; font-weight: 600; color: var(--bc-ink); text-align: left; }
 .swal2-popup .pt-row .swal2-input.pt-input {
   width: 96px; margin: 0 !important; text-align: center; font-weight: 700;
