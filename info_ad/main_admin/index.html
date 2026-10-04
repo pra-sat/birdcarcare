@@ -37,19 +37,22 @@
 
     <div class="admin-buttons">
 <!--      <a class="btn hidden" data-menu="feedback" href="feedback/index.html">💬 ข้อเสนอแนะ</a> -->
-      <button class="btn hidden" id="scanBtn">🔍 สแกน QR</button>
+      <button class="btn hidden" id="scanBtn" data-tone="scan">🔍 สแกน QR</button>
       <!-- ตรวจว่าเครื่องนี้ยืนยันตัวตนกับ LINE ได้ครบไหม — ตรวจอย่างเดียว ไม่แก้ข้อมูล
            ใช้ก่อนเปิดโหมดบังคับใน security.gs · แตะครั้งเดียวต่อเครื่องก็พอ -->
-      <button class="btn outline hidden" id="secTestBtn">🔐 ตรวจความปลอดภัย</button>
+      <button class="btn outline hidden" id="secTestBtn" data-tone="sec">🔐 ตรวจความปลอดภัย</button>
       <!-- ไปดูหน้าข้อมูลร้าน (หน้าที่ลูกค้าเห็น)
            ส่ง ?stay=1 ไปด้วย ไม่งั้นหน้านั้นจะเด้งกลับมาที่นี่ทันทีที่รู้ว่าเป็นแอดมิน
            ตั้งใจให้ไปทางเดียว ไม่มีปุ่มกลับ — จะกลับมาหน้านี้ให้ปิดแล้วเปิดใหม่
            18 ก.ย. 2569 — จำกัดระดับ 3 ขึ้นไป ตามที่เจ้าของร้านสั่ง
            พนักงานหน้าร้านให้เห็นแค่ปุ่มสแกนกับปุ่มตรวจความปลอดภัยพอ -->
-      <a class="btn outline hidden" data-menu="shopinfo" id="shopInfoBtn" href="../info/index.html?stay=1">🏪 ดูข้อมูลร้าน</a>
+      <a class="btn outline hidden" data-menu="shopinfo" data-tone="shop" id="shopInfoBtn" href="../info/index.html?stay=1">🏪 ดูข้อมูลร้าน</a>
       <!-- เปิดใช้ 18 ก.ย. 2569 — applyAdmin() โชว์ให้เฉพาะระดับ 3 ขึ้นไป
            เพราะหน้านี้เห็นยอดขายทั้งร้านกับรายชื่อลูกค้า -->
-      <a class="btn outline hidden" data-menu="stats" href="stats/index.html">📊 สรุปยอด</a>
+      <a class="btn outline hidden" data-menu="stats" data-tone="stats" href="stats/index.html">📊 สรุปยอด</a>
+      <!-- 4 ต.ค. 2569 — แก้ชื่อ เบอร์ ทะเบียนรถของลูกค้า · ระดับ 3 ขึ้นไป
+           ⚠️ เกณฑ์ต้องตรงกับ CUST_MIN_LEVEL ใน customer_admin.gs (ด่านจริงอยู่ที่นั่น) -->
+      <a class="btn outline hidden" data-menu="customers" data-tone="customers" href="customers/index.html">👥 ข้อมูลลูกค้า</a>
 <!--      <a class="btn hidden" data-menu="settings" href="settings/index.html">⚙️ ตั้งค่า</a> -->
     </div>
     <button class="btn danger" type="button" onclick="logout()">🚪 ออกจากระบบ</button>

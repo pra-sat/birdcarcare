@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="th" data-tone="customers">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ข้อมูลลูกค้า</title>
+  <link rel="stylesheet" href="../../../theme.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="../../../plate_data.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="../../../theme.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <!-- สีประจำเมนูอยู่ที่ <html data-tone> (theme.css) ต้องตรงกับปุ่มเมนูหน้าผู้ดูแล -->
+  <div class="container">
+
+    <div class="cu-head">
+      <h2>👥 ข้อมูลลูกค้า</h2>
+      <p class="cu-sub">แก้ชื่อ เบอร์โทร และทะเบียนรถ</p>
+    </div>
+
+    <form class="cu-search" id="searchForm" autocomplete="off">
+      <input type="search" id="q" class="cu-q" placeholder="ค้นด้วยเบอร์ ชื่อ หรือทะเบียน" enterkeyhint="search">
+      <button type="submit" class="btn" id="searchBtn">ค้นหา</button>
+    </form>
+
+    <p class="cu-status" id="status">กำลังโหลด...</p>
+    <div class="cu-list" id="list"></div>
+
+    <a class="btn cu-back" href="../index.html">← กลับหน้าผู้ดูแล</a>
+
+  </div>
+</body>
+</html>

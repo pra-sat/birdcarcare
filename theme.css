@@ -1136,3 +1136,56 @@ select, textarea, .feedback-text, .input-field, .swal2-input,
 input.pk-input, input.pk-input-sm {
   font-size: 16px !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   สีประจำเมนูของผู้ดูแล (4 ต.ค. 2569 — เจ้าของร้านขอให้แต่ละเมนูสีไม่เหมือนกัน)
+
+   วิธีทำ: สลับ "ชุดสีหลัก" (--bc-water / --bc-waterD / --bc-deep / พื้นหลัง)
+   ตาม data-tone · ทุกอย่างในไฟล์นี้และใน style.css ของแต่ละหน้าอ่านจากตัวแปรชุดนี้อยู่แล้ว
+   ใส่ที่ <html data-tone="..."> = ทั้งหน้าเปลี่ยนสี รวมพื้นหลัง กราฟ และป๊อปอัป
+   ใส่ที่ปุ่มเมนูในหน้าผู้ดูแล = เฉพาะปุ่มนั้น บอกล่วงหน้าว่าเข้าไปแล้วจะเจอสีอะไร
+
+     scan      ฟ้า     สแกน QR / หน้าผู้ดูแล (สีเดิมของร้าน)
+     customers เขียว   ข้อมูลลูกค้า
+     stats     ม่วง    สรุปยอด
+     shop      ส้ม     ดูข้อมูลร้าน (แค่ปุ่ม — หน้านั้นลูกค้าก็เห็น ห้ามเปลี่ยนสี)
+     sec       เทา     ตรวจความปลอดภัย
+
+   ⚠️ สีเข้มพอให้ตัวหนังสือขาวอ่านออก (คอนทราสต์ ~4:1 ขึ้นไป) ห้ามทำอ่อนกว่านี้
+   ══════════════════════════════════════════════════════════════════════════ */
+[data-tone="scan"] {
+  --bc-water: #0B7FC7; --bc-waterD: #0A5E96; --bc-deep: #0A4F7A;
+}
+[data-tone="customers"] {
+  --bc-sky1: #E9F8F4; --bc-sky2: #BFE8DD;
+  --bc-water: #0B8A7B; --bc-waterD: #086A5E; --bc-deep: #07574D;
+}
+[data-tone="stats"] {
+  --bc-sky1: #F2EFFE; --bc-sky2: #D7CEF7;
+  --bc-water: #6A50DC; --bc-waterD: #5038B8; --bc-deep: #3E2A95;
+}
+[data-tone="shop"] {
+  --bc-water: #C2650A; --bc-waterD: #964D05; --bc-deep: #7A3F04;
+}
+[data-tone="sec"] {
+  --bc-water: #557482; --bc-waterD: #3F5B67; --bc-deep: #2F4954;
+}
+
+/* ปุ่มเมนูในหน้าผู้ดูแล — ทุกปุ่มเป็นสีทึบตามสีเมนู (ของเดิมมีแต่ปุ่มสแกนที่ทึบ ที่เหลือขาวหมด)
+   ⚠️ ต้องชนะ .btn.outline (0,2,0) ที่ใส่ !important → ใช้ .admin-buttons .btn[data-tone] (0,3,0) */
+.admin-buttons .btn[data-tone],
+.admin-buttons button.btn[data-tone] {
+  background: var(--bc-water) !important;
+  background-color: var(--bc-water) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 3px 0 var(--bc-waterD) !important;
+}
+.admin-buttons .btn[data-tone]:hover,
+.admin-buttons button.btn[data-tone]:hover { background-color: var(--bc-waterD) !important; }
+.admin-buttons .btn[data-tone]:active,
+.admin-buttons button.btn[data-tone]:active { box-shadow: 0 0 0 var(--bc-waterD) !important; }
+
+/* หัวหน้าของแต่ละเมนู — แถบสีด้านบนกรอบ ให้รู้ทันทีว่าอยู่หน้าไหน */
+html[data-tone] .container { border-top: 5px solid var(--bc-water) !important; }
+html[data-tone] .container h2 { color: var(--bc-deep) !important; }

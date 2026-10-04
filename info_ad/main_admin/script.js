@@ -1685,6 +1685,7 @@ class AdminManager {
     [
       { sel: '#scanBtn',                 min: 2 },   // งานหลักของพนักงานหน้าร้าน
       { sel: '[data-menu="stats"]',      min: 3 },
+      { sel: '[data-menu="customers"]',  min: 3 },   // ต้องตรงกับ CUST_MIN_LEVEL (customer_admin.gs)
       { sel: '[data-menu="shopinfo"]',   min: 3 },
       { sel: '[data-menu="feedback"]',   min: 3 },
       { sel: '[data-menu="settings"]',   min: 5 }
