@@ -205,6 +205,7 @@ class QRScanner {
     this.requestId = '';        // รหัสคำขอ กันบันทึกซ้ำ
     this.forceDuplicate = false;
     this.draft = null;          // ค่าที่กรอกไว้ เก็บตอนกดกลับไปแก้จากหน้ายืนยัน
+    this.carryDraft = null;     // ร่างที่ฝากข้ามการสแกนใหม่ ตอน QR ใช้ไม่ได้ { userId, draft }
 
     document.getElementById('manualPhone')?.addEventListener('keyup', (e) => {
       if (e.key === 'Enter') this.manualSearch();
@@ -569,6 +570,31 @@ class QRScanner {
         confirmButtonText: 'รับทราบ'
       });
       return this.resetToScan();
+    }
+
+    // (ค) QR ใช้ไม่ได้แล้ว (4 ต.ค. 2569)
+    //
+    // 🔴 ของเดิมตกไปที่ reopenForm() ด้านล่าง ซึ่งเปิดฟอร์มเดิมพร้อม QR ใบเดิม
+    //    กดบันทึกกี่รอบก็ไม่ผ่าน ต่อให้ลูกค้าสร้าง QR ใหม่แล้วก็ตาม
+    //    (4 ต.ค. แอดมินกดซ้ำ 6 รอบใน 3 นาที แล้วงานนั้นไม่ได้บันทึกเลย)
+    //    ทางเดียวที่ผ่านคือสแกน QR ใบใหม่ -> พากลับหน้าสแกนเลย
+    //    และฝากค่าที่กรอกไว้ ถ้าสแกนได้ลูกค้าคนเดิม ฟอร์มจะเติมกลับให้เอง ไม่ต้องกรอกใหม่
+    if (result.code === 'QR_USED') {
+      this.logAction('บันทึกบริการ', `❌ QR ใช้ไม่ได้: ${data.name}`);
+      const carry = this.draft && this.foundUser
+        ? { userId: this.foundUser.UserID, draft: this.draft } : null;
+      await Swal.fire({
+        icon: 'warning',
+        title: 'QR ใบนี้ใช้ไม่ได้แล้ว',
+        html: `<div class="lock-msg">${esc(result.message || '')}<br><br>` +
+              `ให้ลูกค้ากด <b>แสดง QR</b> ใหม่ แล้วสแกนอีกครั้ง<br>` +
+              `หรือค้นด้วยเบอร์โทรลูกค้าแทนก็ได้<br><br>` +
+              `ข้อมูลที่กรอกไว้จะเติมกลับให้เอง</div>`,
+        confirmButtonText: '📷 ไปสแกนใหม่'
+      });
+      await this.resetToScan();
+      this.carryDraft = carry;      // ตั้งหลัง resetToScan เพราะตัวนั้นล้างร่างทิ้ง
+      return;
     }
 
     // ── เซสชัน LINE หมดอายุ (เกิดได้ถ้าเปิดหน้าค้างไว้ทั้งวัน) ──────────────
@@ -1102,6 +1128,15 @@ class QRScanner {
   }
 
   showCustomerPopup() {
+    // ร่างที่ฝากไว้ตอน QR ใช้ไม่ได้ — ใช้เฉพาะเมื่อสแกนได้ลูกค้าคนเดิม
+    // ⚠️ คนละคนห้ามเติม ไม่งั้นบริการ/ราคาของคนก่อนจะไปโผล่ในฟอร์มคนใหม่
+    if (this.carryDraft) {
+      if (!this.draft && this.foundUser && this.carryDraft.userId === this.foundUser.UserID) {
+        this.draft = this.carryDraft.draft;
+      }
+      this.carryDraft = null;
+    }
+
     this.isRedeeming = false;
     this.currentPoint = 0;
     this.plateFormOpen = false;
