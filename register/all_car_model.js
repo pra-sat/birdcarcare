@@ -32,7 +32,9 @@ const carData = {
     th: ["อีซูซุ", "อีซุซุ", "อีซุซู", "อีซูซู", "อิซุซุ", "อีซูชุ", "อีซุชู", "อีสุสุ", "อีสุ", "อีซู", "isuzu", "izuzu", "izusu", "isusu"],
     models: {
       "D-Max": {
-        th: ["ดีแม็ก", "ดีแมค", "ดีแม็กซ์", "dmax", "d max", "วีครอส", "vcross", "v-cross", "ออลนิว", "ออนิว", "all new", "allnew"],
+        th: ["ดีแม็ก", "ดีแมค", "ดีแม็กซ์", "dmax", "d max", "วีครอส", "vcross", "v-cross", "ออลนิว", "ออนิว", "all new", "allnew",
+             // 4 ต.ค. 2569 — คำที่เจอในชีตจริง
+             "ดีแมก", "ดีแมกซ์", "x series", "xseries", "เอ็กซ์ซีรีส์", "ddi", "บลูพาวเวอร์", "blue power", "ไฮแลนเดอร์", "hi-lander", "hilander"],
         category: "Pickup",
         gens: [
           { code: "Gen1",        label: "ดีแม็ก ตัวแรก",              from: 2002, to: 2005 },
@@ -76,20 +78,27 @@ const carData = {
     th: ["โตโยต้า", "โตโยตา", "โตโยต้ะ", "toyota", "toyoto"],
     models: {
       "Hilux": {
-        th: ["ไฮลักซ์", "ไฮลัก", "hilux"],
+        // 4 ต.ค. 2569 — เติมชื่อโฉม/รุ่นย่อยที่คนไทยเรียกจริง ลูกค้าพิมพ์ "Rocko 2024" มาเพราะหาไม่เจอ
+        //   Revo/Rocco/Vigo/Tiger/Travo คือ Hilux ทั้งหมด แยกโฉมด้วยปี (gens) ไม่ใช่แยกเป็นรุ่น
+        //   ⚠️ เคยมีรุ่น "Vigo Champ" แยกต่างหาก -> ยุบรวมเข้ามาที่นี่แล้ว ไม่งั้นนับยอด Hilux ขาด
+        th: ["ไฮลักซ์", "ไฮลัก", "hilux",
+             "รีโว่", "รีโว้", "revo", "ร็อคโค่", "ร็อคโค", "rocco", "rocko", "ร็อกโก้",
+             "วีโก้", "vigo", "วีโก้แชมป์", "วีโก้แชม", "champ",
+             "ไทเกอร์", "tiger", "ทราโว่", "travo", "สปอร์ตไรเดอร์", "sport rider",
+             "z edition", "zedition", "แซทอีดีชั่น", "แซทอีดิชั่น", "แซดอีดิชั่น"],
         category: "Pickup",
         gens: [
           { code: "Tiger",      label: "ไทเกอร์",                  from: 1998, to: 2004 },
           { code: "Vigo",       label: "วีโก้",                    from: 2004, to: 2008 },
           { code: "Vigo FL",    label: "วีโก้ ไมเนอร์เชนจ์",        from: 2008, to: 2011 },
           { code: "Vigo Champ", label: "วีโก้ แชมป์",              from: 2011, to: 2015 },
-          { code: "Revo",       label: "รีโว่",                    from: 2015, to: 2020 },
-          { code: "Revo FL",    label: "รีโว่ ไมเนอร์เชนจ์",        from: 2020, to: 2024 },
+          { code: "Revo",       label: "รีโว่ (รวม ร็อคโค่)",                    from: 2015, to: 2020 },
+          { code: "Revo FL",    label: "รีโว่ ไมเนอร์เชนจ์ (รวม ร็อคโค่)",        from: 2020, to: 2024 },
           { code: "Travo",      label: "ทราโว่ (โฉมใหม่ล่าสุด)",    from: 2025, to: null }
         ]
       },
       "Fortuner": {
-        th: ["ฟอร์จูนเนอร์", "ฟอจูนเนอร์", "fortuner"],
+        th: ["ฟอร์จูนเนอร์", "ฟอจูนเนอร์", "fortuner", "fortune"],
         category: "SUV",
         gens: [
           { code: "Gen1",    label: "ฟอร์จูนเนอร์ ตัวแรก",   from: 2005, to: 2015 },
@@ -146,9 +155,9 @@ const carData = {
       "Sienta": { th: ["เซียนต้า", "sienta"], category: "MPV" },
       "Commuter": { th: ["คอมมิวเตอร์", "รถตู้", "commuter", "hiace", "ไฮเอซ"], category: "Van" },
       "Hiace": { th: ["ไฮเอซ", "hiace"], category: "Van" },
+      "Ventury": { th: ["เวนจูรี่", "เวฟจูรี่", "เวนจูรี", "ventury"], category: "Van" },
       "Alphard": { th: ["อัลพาร์ด", "alphard"], category: "MPV" },
       "Soluna": { th: ["โซลูน่า", "soluna"], category: "Sedan" },
-      "Vigo Champ": { th: ["วีโก้แชมป์"], category: "Pickup" },
       "bZ4X": { th: ["บีแซด", "bz4x"], category: "SUV", ev: true }
     }
   },
@@ -235,7 +244,7 @@ const carData = {
       "Click 125i": { th: ["คลิก125", "click 125"], category: "Motorcycle" },
       "Click 160": { th: ["คลิก160", "click 160", "คลิก"], category: "Motorcycle" },
       "Zoomer-X": { th: ["ซูมเมอร์", "zoomer"], category: "Motorcycle" },
-      "Giorno+": { th: ["จอร์โน่", "giorno"], category: "Motorcycle" },
+      "Giorno+": { th: ["จอร์โน่", "giorno", "จีออโน่", "จิออโน่"], category: "Motorcycle" },
       "Moove": { th: ["มูฟ", "moove"], category: "Motorcycle" },
       "Lead 125": { th: ["ลีด", "lead"], category: "Motorcycle" },
       "PCX 160": { th: ["พีซีเอ็กซ์", "pcx 160", "pcx"], category: "Motorcycle" },
@@ -293,7 +302,7 @@ const carData = {
       },
       "Attrage": { th: ["แอททราจ", "attrage"], category: "Sedan" },
       "Mirage": { th: ["มิราจ", "mirage"], category: "Hatchback" },
-      "Xpander": { th: ["เอ็กซ์แพนเดอร์", "xpander"], category: "MPV" },
+      "Xpander": { th: ["เอ็กซ์แพนเดอร์", "xpander", "xpender", "เอ็กซ์แพนเดอ"], category: "MPV" },
       "Xforce": { th: ["เอ็กซ์ฟอร์ซ", "xforce"], category: "SUV" },
       "Lancer": { th: ["แลนเซอร์", "lancer"], category: "Sedan" },
       "Space Wagon": { th: ["สเปซวากอน"], category: "MPV" }
@@ -431,7 +440,7 @@ const carData = {
           { code: "Gen2", label: "โคโลราโด โฉม 2",  from: 2012, to: 2020 }
         ]
       },
-      "Trailblazer": { th: ["เทรลเบลเซอร์", "trailblazer"], category: "SUV" },
+      "Trailblazer": { th: ["เทรลเบลเซอร์", "trailblazer", "เทลเบรเซอร์", "เทรลเบรเซอร์", "เทลเบลเซอร์"], category: "SUV" },
       "Captiva": { th: ["แคปติva", "captiva"], category: "SUV" },
       "Cruze": { th: ["ครูซ", "cruze"], category: "Sedan" },
       "Sonic": { th: ["โซนิค", "sonic"], category: "Hatchback" }
@@ -447,8 +456,8 @@ const carData = {
       "Atto 3": { th: ["แอตโต้", "atto"], category: "SUV", ev: true },
       "Dolphin": { th: ["ดอลฟิน", "dolphin"], category: "Hatchback", ev: true },
       "Seal": { th: ["ซีล", "seal"], category: "Sedan", ev: true },
-      "Sealion 6": { th: ["ซีไลอ้อน6", "sealion 6"], category: "SUV", ev: true },
-      "Sealion 7": { th: ["ซีไลอ้อน7", "sealion 7"], category: "SUV", ev: true },
+      "Sealion 6": { th: ["ซีไลอ้อน6", "sealion 6", "seallion 6", "saelion 6"], category: "SUV", ev: true },
+      "Sealion 7": { th: ["ซีไลอ้อน7", "sealion 7", "seallion 7", "saelion 7"], category: "SUV", ev: true },
       "Seal U": { th: ["ซีล ยู", "seal u"], category: "SUV", ev: true },
       "M6": { th: ["เอ็ม6", "byd m6"], category: "MPV", ev: true },
       "Tang": { th: ["ถัง", "tang"], category: "SUV", ev: true },
@@ -470,6 +479,15 @@ const carData = {
     models: {
       "Good Cat": { th: ["กู๊ดแคท", "แมวดี", "good cat"], category: "Hatchback", ev: true },
       "Ora 07": { th: ["โอร่า07", "ora 07"], category: "Sedan", ev: true }
+    }
+  },
+
+  // GWM ขายแบรนด์ TANK แยกจาก Haval ในไทย (เพิ่ม 4 ต.ค. 2569 — มีลูกค้าพิมพ์ "Tang 300")
+  "Tank": {
+    th: ["แท้งค์", "แทงค์", "แท้ง", "tank", "gwm tank", "tang"],
+    models: {
+      "Tank 300": { th: ["แท้งค์300", "แทงค์300", "tank300", "tang300", "tang 300"], category: "SUV" },
+      "Tank 500": { th: ["แท้งค์500", "แทงค์500", "tank500"], category: "SUV" }
     }
   },
 
@@ -654,6 +672,7 @@ const carData = {
     th: ["เมอร์เซเดส", "เบนซ์", "benz", "mercedes"],
     models: {
       "A-Class": { th: ["เอคลาส", "a class"], category: "Hatchback" },
+      "CLA": { th: ["ซีแอลเอ", "cla", "cla200", "cla250", "cla 250", "cla45"], category: "Sedan" },
       "C-Class": { th: ["ซีคลาส", "c class", "c200", "c250"], category: "Sedan" },
       "E-Class": { th: ["อีคลาส", "e class", "e200", "e300"], category: "Sedan" },
       "S-Class": { th: ["เอสคลาส", "s class", "s350"], category: "Sedan" },

@@ -230,8 +230,9 @@ let qrInterval = null;
 // ═══════════════════════════════════════════════════════════════════════════
 const QR_SERVER_LIFE_SEC = 600;   // อายุจริงฝั่งเซิร์ฟเวอร์ (verify_token.gs)
 const QR_SHOW_SEC        = 300;   // เวลานับถอยหลังที่โชว์ให้ลูกค้าเห็น
-const QR_SAFETY_SEC      = 30;    // เผื่อเวลาเดินทาง/นาฬิกาคลาดกัน
-const QR_PREWARM_MAX_AGE = QR_SERVER_LIFE_SEC - QR_SHOW_SEC - QR_SAFETY_SEC;  // 270
+const QR_SAFETY_SEC      = 60;    // เผื่อเวลาเดินทาง/นาฬิกาคลาดกัน (เดิม 30 · ขยาย 4 ต.ค. 2569)
+const QR_PREWARM_MAX_AGE = QR_SERVER_LIFE_SEC - QR_SHOW_SEC - QR_SAFETY_SEC;  // 240
+const QR_MAX_ROTATE      = 6;     // เปลี่ยน QR ใหม่อัตโนมัติได้กี่รอบ (6 × 5 นาที = 30 นาที) แล้วค่อยปิด
 const QR_REWARM_AGE      = 180;   // กลับมาที่หน้านี้แล้วของเก่าเกินเท่านี้ ให้ขอใหม่
 
 let warmToken = null;      // { token, at }
@@ -266,22 +267,27 @@ async function tokenForVehicle(vehicle) {
 
   if (fresh && warmVehKey === want) {
     const t = warmToken.token;
+    lastTokenBornAt = warmToken.at;        // อายุนับจากตอนเตรียมไว้ ไม่ใช่ตอนกด
     warmToken = null; warmVehKey = '';     // ใช้แล้วใช้ซ้ำไม่ได้
     return t;
   }
 
   if (fresh) {
     // มีของสดอยู่แต่ผูกไว้กับคันอื่น (หรือยังไม่ผูก) -> เขียนทับด้วย token เดิม
+    // (เซิร์ฟเวอร์ตั้งเวลาสร้างใหม่ให้ตอนเขียนทับ อายุจึงเริ่มนับใหม่)
     const t = warmToken.token;
     await createTokenOnServer(t, vehicle);
+    lastTokenBornAt = Date.now();
     warmToken = null; warmVehKey = '';
     return t;
   }
 
   const t = generateToken();
   await createTokenOnServer(t, vehicle);
+  lastTokenBornAt = Date.now();
   return t;
 }
+let lastTokenBornAt = 0;     // เวลาที่ token ล่าสุดถูกสร้างบนเซิร์ฟเวอร์ (ใช้คุมเวลาเปลี่ยน QR)
 
 // ขอ token เตรียมไว้ — ยิงแล้วไม่รอ ไม่รบกวนหน้าจอ ถ้าพลาดก็เงียบ ๆ
 function prewarmQRToken() {
@@ -576,6 +582,7 @@ async function showQRSection(vehicleIndex) {
   try {
     const token = await tokenForVehicle(vehicle);
     window.qrToken = token;
+    qrShow = { vehicle, rotations: 0, busy: false };
     document.getElementById('qrSection').classList.remove('hidden');
     generateQRCode(token, memberData, vehicle);
     startQRCountdown();
@@ -687,6 +694,8 @@ function generateQRCode(text, userInfo, vehicle) {
       document.getElementById('qrSection').classList.add('hidden');
       document.getElementById('qrUserInfo').innerText = '';
       clearInterval(qrInterval);
+      qrShow = null;
+      qrDim(false);
       deleteQRToken();
       // เตรียมของใหม่ไว้เลย เผื่อกดปิดพลาดแล้วกดเปิดใหม่ จะได้ไม่ต้องรออีก
       prewarmQRToken();
@@ -699,18 +708,71 @@ function generateQRCode(text, userInfo, vehicle) {
       return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    //  นับถอยหลังจาก "นาฬิกาจริง" + เปลี่ยน QR ใหม่ให้เองก่อนหมดอายุ (4 ต.ค. 2569)
+    //
+    //  🔴 ของเดิมนับด้วย count-- ทุก 1 วินาที ซึ่งหยุดเดินตอนจอดับ/สลับแอป
+    //     ลูกค้าเปิด QR รอล้างรถ ล็อกจอ 15 นาที กลับมาจอยังขึ้น "เหลือ 3:20"
+    //     แต่ฝั่งเซิร์ฟเวอร์หมดอายุไปแล้ว (10 นาทีนับจากสร้าง) -> สแกนแล้วไม่ผ่าน
+    //     ตอนนี้คิดเวลาที่เหลือจาก Date.now() ทุกครั้ง จอดับนานแค่ไหนก็ไม่คลาด
+    //
+    //  ครบเวลาแล้ว "เปลี่ยน QR ใหม่ให้เอง" แทนการปิดหน้า ลูกค้าไม่ต้องกดอะไร
+    //  ยื่นจอให้พนักงานได้เลยเสมอ · ระหว่างสร้างใหม่ทำ QR เก่าให้จาง กันพนักงานสแกนของที่กำลังจะหมด
+    //  เส้นตาย = เร็วกว่าในสองอย่าง: โชว์ครบ 5 นาที / เซิร์ฟเวอร์ใกล้หมดอายุ (เผื่อ 60 วิ)
+    // ═══════════════════════════════════════════════════════════════════════
+    let qrShow = null;       // { vehicle, rotations, busy, deadline }
+
+    function qrDeadline() {
+      const showEnd = Date.now() + QR_SHOW_SEC * 1000;
+      const born = lastTokenBornAt || Date.now();
+      const serverEnd = born + (QR_SERVER_LIFE_SEC - QR_SAFETY_SEC) * 1000;
+      return Math.min(showEnd, serverEnd);
+    }
+
     function startQRCountdown() {
-      let count = 300;
-      document.getElementById("qrCountdown").textContent = fmtCountdown(count);
-      qrInterval = setInterval(() => {
-        count--;
-        document.getElementById("qrCountdown").textContent = fmtCountdown(count);
-        if (count <= 0) {
-          clearInterval(qrInterval);
-          deleteQRToken();
-          closeQRSection();
-        }
-      }, 1000);
+      clearInterval(qrInterval);
+      if (qrShow) qrShow.deadline = qrDeadline();
+      qrTick();
+      qrInterval = setInterval(qrTick, 1000);
+    }
+
+    function qrTick() {
+      if (!qrShow) return;
+      const left = Math.ceil((qrShow.deadline - Date.now()) / 1000);
+      document.getElementById("qrCountdown").textContent = fmtCountdown(left);
+      if (left <= 0) rotateQR();
+    }
+
+    function qrDim(on) {
+      const c = document.getElementById('qrCanvas');
+      if (c) c.style.opacity = on ? '0.15' : '';
+      const lbl = document.querySelector('.qr-timer-lbl');
+      if (lbl) lbl.textContent = on ? 'กำลังสร้าง QR ใหม่…' : 'เปลี่ยน QR ใหม่ใน';
+    }
+
+    async function rotateQR() {
+      if (!qrShow || qrShow.busy) return;
+      if (qrShow.rotations >= QR_MAX_ROTATE) return closeQRSection();   // เปิดทิ้งไว้นานเกิน ปิดเลย
+      qrShow.busy = true;
+      clearInterval(qrInterval);
+      qrDim(true);
+      const old = window.qrToken;
+      try {
+        const t = await tokenForVehicle(qrShow.vehicle);
+        if (!qrShow) return;                 // ลูกค้ากดปิดไประหว่างรอ
+        window.qrToken = t;
+        generateQRCode(t, memberData, qrShow.vehicle);
+        if (old && old !== t) deleteTokenOnServer(old);   // ติดป้ายว่าปิดแล้ว (ไม่ได้ลบ ยังบันทึกได้)
+        qrShow.rotations++;
+        qrShow.busy = false;
+        qrDim(false);
+        startQRCountdown();
+      } catch (err) {
+        console.warn('เปลี่ยน QR ใหม่ไม่สำเร็จ:', err);
+        closeQRSection();
+        Swal.fire({ icon: 'info', title: 'QR หมดเวลาแล้ว',
+          text: 'กดปุ่มแสดง QR ใหม่อีกครั้งได้เลยค่ะ', confirmButtonText: 'ตกลง' });
+      }
     }
     
     
@@ -978,6 +1040,12 @@ function clearMemberCache(userId) {
 // ═══════════════════════════════════════════════════════════════════════════
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !currentUserId) return;
+
+  // กำลังโชว์ QR อยู่ -> เช็คเวลาทันที ไม่รอรอบถัดไป แล้วจบตรงนี้
+  // ปลดล็อกจอแล้วยื่นให้พนักงานเลย ต้องได้ QR ที่ยังใช้ได้ (เลยเวลาแล้วจะเปลี่ยนใหม่ให้ตรงนี้)
+  // ⚠️ ห้ามไปเตรียม QR สำรองต่อด้านล่าง ไม่งั้นได้ QR เกินมาอีกใบทุกครั้งที่ปลดล็อก
+  //    (ส่วนเช็คแต้มด้านล่างก็ข้ามตอนโชว์ QR อยู่แล้ว)
+  if (qrShow) { qrTick(); return; }
 
   // QR ที่เตรียมไว้เก่าเกินไปแล้ว -> ขอใหม่เงียบ ๆ
   if (warmTokenAgeSec() > QR_REWARM_AGE) prewarmQRToken();

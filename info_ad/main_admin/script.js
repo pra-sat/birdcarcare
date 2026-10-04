@@ -828,7 +828,21 @@ class QRScanner {
     Swal.close();
 
     if (!result || !result.success) {
-      Swal.fire('QR ไม่ถูกต้อง', '', 'error');
+      // 4 ต.ค. 2569 — บอกเหตุผลและทางไปต่อ ของเดิมขึ้น "QR ไม่ถูกต้อง" อย่างเดียวทุกกรณี
+      // พนักงานไม่รู้ว่าต้องทำอะไร ลูกค้ายืนรอ (เซิร์ฟเวอร์ส่ง code มาจาก verify_token.gs)
+      const why = {
+        QR_EXPIRED:     'QR นี้หมดอายุแล้ว',
+        QR_USED:        'QR นี้ใช้บันทึกไปแล้ว',
+        QR_NOT_FOUND:   'ไม่พบ QR นี้ในระบบ',
+        USER_NOT_FOUND: 'ไม่พบข้อมูลลูกค้าของ QR นี้'
+      }[result && result.code] || 'QR ไม่ถูกต้อง';
+      await Swal.fire({
+        icon: 'warning',
+        title: why,
+        html: '<div class="lock-msg">ให้ลูกค้ากด <b>แสดง QR</b> ใหม่ แล้วสแกนอีกครั้ง<br>' +
+              'หรือพิมพ์เบอร์โทรลูกค้าในช่องด้านล่างกล้องแทนก็ได้</div>',
+        confirmButtonText: 'สแกนใหม่'
+      });
       this.isScanning = false;
       this.startCamera(); // รีสตาร์ทกล้องใหม่
       return;
