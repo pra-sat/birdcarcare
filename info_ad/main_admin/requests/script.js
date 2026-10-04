@@ -148,8 +148,13 @@ function readFinal(i) {
   const f = k => card.querySelector(`[data-f="${k}"]`).value.trim();
   const car = readers[i] ? readers[i]() : { brand: '', model: '', year: '' };
   const head = f('ph'), tail = f('pt');
-  const chk = typeof plateValidate === 'function' ? plateValidate(head, tail, { required: false }) : { ok: true };
-  const plate = typeof platePretty === 'function' ? platePretty(head, tail) : (head + ' ' + tail).trim();
+  // ตรวจรูปแบบเฉพาะเมื่อทะเบียนต่างจากของเดิมในระบบ — ทะเบียนเก่ารูปแบบแปลก ๆ ต้องไม่ขวางการอนุมัติเรื่องอื่น
+  const cur = ((pending[i] || {}).before || {}).car || {};
+  const o = splitPlate(cur.plate);
+  const plateSame = head === o.head && tail === o.tail;
+  const chk = plateSame || typeof plateValidate !== 'function' ? { ok: true } : plateValidate(head, tail, { required: false });
+  const plate = plateSame ? String(cur.plate || '').trim()
+    : (typeof platePretty === 'function' ? platePretty(head, tail) : (head + ' ' + tail).trim());
   return {
     err: !f('name') ? 'ชื่อว่างไม่ได้'
        : !/^0\d{8,9}$/.test(f('phone').replace(/\D/g, '')) ? 'เบอร์โทรไม่ถูกต้อง'

@@ -184,12 +184,19 @@ function collectEdit(c) {
     const v = c.cars[Number(row.dataset.k)];
     const head = row.querySelector('.cu-ph').value.trim();
     const tail = row.querySelector('.cu-pt').value.trim();
-    const chk = plateValidate(head, tail, { required: false });
-    if (!chk.ok) {
-      Swal.showValidationMessage(`${carTitle(v)}: ${chk.warn}`);
-      return false;
+    // ตรวจรูปแบบเฉพาะคันที่แก้ทะเบียน (5 ต.ค. 2569)
+    // 🔴 ของเดิมตรวจทุกคัน -> ลูกค้าที่มีทะเบียนเก่ารูปแบบแปลก ๆ อยู่คันหนึ่ง (เช่น "3ok 557")
+    //    แก้ชื่อ/เบอร์/คันอื่นไม่ได้เลย ทั้งที่ไม่ได้แตะคันนั้น (เจอตอนทดสอบบนระบบจริง)
+    const orig = splitPlate(v.plate);
+    const plateSame = head === orig.head && tail === orig.tail;
+    if (!plateSame) {
+      const chk = plateValidate(head, tail, { required: false });
+      if (!chk.ok) {
+        Swal.showValidationMessage(`${carTitle(v)}: ${chk.warn}`);
+        return false;
+      }
     }
-    const plate = platePretty(head, tail);
+    const plate = plateSame ? String(v.plate || '').trim() : platePretty(head, tail);
     const province = plate ? row.querySelector('.cu-prov').value : '';
     cars.push({ brand: v.brand, model: v.model, year: v.year, plate, province });
     if (plate !== (v.plate || '') || province !== (v.province || '')) {

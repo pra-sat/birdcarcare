@@ -43,8 +43,10 @@ async function erOpenMenu(i) {
 
 
 // ── ฟอร์มขอแก้ไข ───────────────────────────────────────────────────────────
+let erCurPlate = '';      // ทะเบียนเดิมในระบบของรถที่กำลังขอแก้ (ไว้ดูว่าลูกค้าแก้ทะเบียนไหม)
 async function erOpenForm(i, draft) {
   const v = memberData.vehicles[i];
+  erCurPlate = v.plate || '';
   Swal.fire({ title: '⏳ กำลังโหลดรายชื่อรุ่นรถ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
   const hasCat = await carPickLoad('../register/all_car_model.js');
   Swal.close();
@@ -125,11 +127,15 @@ function erCollect() {
   if (!brand) { Swal.showValidationMessage('กรุณาเลือกยี่ห้อรถ'); return false; }
   if (!model) { Swal.showValidationMessage('กรุณาเลือกรุ่นรถ'); return false; }
   if (!year) { Swal.showValidationMessage('กรุณาเลือกปีรถ'); return false; }
-  if (typeof plateValidate === 'function') {
+  // ตรวจรูปแบบเฉพาะเมื่อแก้ทะเบียน — ทะเบียนเก่ารูปแบบแปลก ๆ ต้องไม่ขวางการขอแก้ชื่อ/เบอร์ (5 ต.ค. 2569)
+  const orig = erSplitPlate(erCurPlate);
+  const plateSame = head === orig.head && tail === orig.tail;
+  if (!plateSame && typeof plateValidate === 'function') {
     const chk = plateValidate(head, tail, { required: false });
     if (!chk.ok) { Swal.showValidationMessage(chk.warn); return false; }
   }
-  const plate = typeof platePretty === 'function' ? platePretty(head, tail) : (head + ' ' + tail).trim();
+  const plate = plateSame ? String(erCurPlate || '').trim()
+    : (typeof platePretty === 'function' ? platePretty(head, tail) : (head + ' ' + tail).trim());
   return { name, phone, brand, model, year, plate, province: plate ? $('erProv').value : '', note: $('erNote').value.trim() };
 }
 
