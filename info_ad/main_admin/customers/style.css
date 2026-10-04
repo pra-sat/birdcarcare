@@ -55,7 +55,7 @@
 }
 .cu-car i { color: var(--bc-ink2); }
 
-.cu-back { display: block; text-align: center; margin-top: 16px; }
+.cu-back { display: block; text-align: center; margin-top: 16px; padding: 12px 14px; text-decoration: none !important; }
 
 /* ── ฟอร์มแก้ไข (อยู่ในป๊อปอัป SweetAlert ซึ่งอยู่นอก .container) ───────── */
 .cu-ecar {
