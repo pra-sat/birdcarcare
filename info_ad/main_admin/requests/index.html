@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="th" data-tone="requests">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>คำขอแก้ไข</title>
+  <link rel="stylesheet" href="../../../theme.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="../../../plate_data.js"></script>
+  <script src="../../../car_display.js"></script>
+  <script src="../../../car_picker.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="../../../theme.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <!-- สีประจำเมนูอยู่ที่ <html data-tone> (theme.css) ต้องตรงกับปุ่มเมนูหน้าผู้ดูแล -->
+  <div class="container">
+
+    <div class="rq-head">
+      <h2>📝 คำขอแก้ไขข้อมูล</h2>
+      <p class="rq-sub">ลูกค้าส่งมาจากปุ่ม ⋯ ในหน้าสมาชิก · ตรวจแล้วกดอนุมัติ ข้อมูลถึงจะเปลี่ยน</p>
+    </div>
+
+    <p class="rq-status" id="status">กำลังโหลด...</p>
+    <div id="list"></div>
+
+    <details class="rq-done" id="doneBox">
+      <summary>ตรวจแล้วล่าสุด</summary>
+      <div id="doneList"></div>
+    </details>
+
+    <button class="btn outline" id="reloadBtn" type="button">🔄 โหลดใหม่</button>
+    <a class="btn rq-back" href="../index.html">← กลับหน้าผู้ดูแล</a>
+  </div>
+</body>
+</html>

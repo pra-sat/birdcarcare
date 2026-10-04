@@ -80,6 +80,23 @@ function historyOf(vehicle, history) {
   );
 }
 
+// ชื่อรถแบบมีรุ่นย่อย (5 ต.ค. 2569 — เจ้าของร้านขอ "Toyota Corolla เน้น Altis แล้วก็ปี")
+//   Toyota / Corolla **Altis** / ปี 2010 · ตาหยี
+//   Toyota / Hilux **Revo** / ปี 2024 · ไมเนอร์เชนจ์
+// ข้อมูลรุ่นย่อย/โฉมมาจาก ../car_display.js (สร้างจากฐานข้อมูลรถหน้าสมัคร)
+// ไฟล์นั้นโหลดไม่ขึ้น หรือรุ่นที่ไม่รู้จัก -> แสดงแบบเดิม ยี่ห้อ / รุ่น / ปี
+function carNameHtml(vehicle) {
+  const d = (typeof carDisplay === 'function')
+    ? carDisplay(vehicle.brand, vehicle.model, vehicle.year)
+    : { brand: vehicle.brand, family: vehicle.model, sub: '', year: vehicle.year, nick: '' };
+  const year = String(d.year || vehicle.year || '').trim();
+  return `<div class="ubrand">${esc(d.brand || vehicle.brand || '-')}</div>` +
+    `<div class="umodel">${esc(d.family || vehicle.model || '-')}` +
+      (d.sub ? ` <span class="usub">${esc(d.sub)}</span>` : '') + `</div>` +
+    `<div class="uyear">${year ? 'ปี ' + esc(year) : ''}` +
+      (d.nick ? `<span class="unick"> · ${esc(d.nick)}</span>` : '') + `</div>`;
+}
+
 // สร้างการ์ดรถ 1 คัน — รถกับแต้มอยู่กรอบเดียวกัน เพื่อให้แยกคันได้ง่ายเวลามีหลายคัน
 // countable = false เมื่อมีรถ ยี่ห้อ+รุ่น ซ้ำกัน จะซ่อนจำนวนครั้งไว้ ดีกว่าโชว์เลขผิด
 function vehicleCardHtml(vehicle, history, countable, index) {
@@ -139,11 +156,11 @@ function vehicleCardHtml(vehicle, history, countable, index) {
 
   return `
     <div class="vunit">
+      <!-- ⋯ ตัวเลือกเพิ่มเติม -> ส่งคำขอแก้ไขข้อมูลให้ร้าน (member/edit_request.js) -->
+      <button type="button" class="umore" data-vi="${Number(index) || 0}" aria-label="ตัวเลือกเพิ่มเติม">⋯</button>
       <div class="uhead">
         <div class="uname">
-          <div class="ubrand">${esc(vehicle.brand || '-')}</div>
-          <div class="umodel">${esc(vehicle.model || '-')}</div>
-          <div class="uyear">${vehicle.year ? 'ปี ' + esc(vehicle.year) : ''}</div>
+          ${carNameHtml(vehicle)}
         </div>
         ${plateBadge}
       </div>
@@ -157,6 +174,7 @@ function vehicleCardHtml(vehicle, history, countable, index) {
         <div class="row"><span class="lbl">แต้มใช้ได้ถึง</span><span class="val small${expClass}">${esc(vehicle.expirationDate || '-')}</span></div>
         ${lastDate ? `<div class="row"><span class="lbl">ใช้บริการล่าสุด</span><span class="val small">${esc(lastDate)}</span></div>` : ''}
         ${bits.length ? `<div class="subline">${bits.join(' · ')}</div>` : ''}
+        ${vehicle.editPending ? '<div class="uedit">⏳ ส่งคำขอแก้ไขแล้ว รอร้านตรวจ</div>' : ''}
       </div>
       <!-- ปุ่ม QR อยู่ในกรอบของรถคันนี้ (20 ก.ย. 2569)
            ของเดิมเป็นปุ่มเดียวอยู่นอกการ์ด ลูกค้าที่มีรถหลายคันจึงบอกไม่ได้ว่า
@@ -677,8 +695,10 @@ function generateQRCode(text, userInfo, vehicle) {
   // ชื่อเป็นบรรทัดเด่น คำอธิบายเป็นบรรทัดเล็กใต้ลงไป (อ่านง่ายกว่าต่อกันบรรทัดเดียว)
   // บอกให้ชัดว่า QR ใบนี้เป็นของรถคันไหน — พนักงานเอาไปตรวจกับรถที่จอดอยู่ได้เลย
   // และลูกค้าที่มีหลายคันจะเห็นว่ากดถูกคันไหม ก่อนยื่นให้พนักงาน
+  const cd = vehicle && typeof carDisplay === 'function'
+    ? carDisplay(vehicle.brand, vehicle.model, vehicle.year) : null;
   const carLine = vehicle
-    ? [vehicle.brand, vehicle.model].filter(Boolean).map(esc).join(' ') +
+    ? (cd ? [cd.brand, cd.family, cd.sub] : [vehicle.brand, vehicle.model]).filter(Boolean).map(esc).join(' ') +
       (String(vehicle.plate || '').trim() ? ' · ' + esc(vehicle.plate) : '')
     : 'แจ้งรุ่นรถกับพนักงานได้เลยค่ะ';
 

@@ -16,6 +16,10 @@
 //
 //   ถ้ารุ่นไหนไม่มี gens ให้ฟอร์มแสดงช่วงปีกว้าง ๆ แทน
 //
+// ⚠️ ชื่อโฉม (label) ห้ามใช้คำที่หมดอายุได้ เช่น "ใหม่" "ล่าสุด" "ปัจจุบัน" (5 ต.ค. 2569 เจ้าของร้านสั่ง)
+//    พอมีโฉมถัดไปออกมา คำพวกนี้จะผิดทันทีโดยไม่มีใครรู้ -> ใช้ "โฉมปี YYYY" ซึ่งถูกตลอดไป
+//    มีเทสต์ตรวจ (test_car_display.js)
+//
 // ระดับความมั่นใจของข้อมูล
 //   ✅ ตรวจจากเว็บแล้ว : Toyota Hilux, Isuzu D-Max, และรุ่นขายดีของร้าน
 //   ⚠️ best-effort     : ยี่ห้อหรู / แบรนด์ที่เพิ่งเข้าไทย — ปีอาจคลาดเคลื่อน ±1
@@ -41,7 +45,7 @@ const carData = {
           { code: "Gen1 FL",     label: "ดีแม็ก ไมเนอร์เชนจ์ (ตาหวาน)", from: 2006, to: 2011 },
           { code: "Gen2",        label: "ออลนิว ดีแม็ก",              from: 2012, to: 2015 },
           { code: "Gen2 Blue",   label: "ดีแม็ก บลูพาวเวอร์",          from: 2016, to: 2019 },
-          { code: "Gen3",        label: "ออลนิว ดีแม็ก (โฉมปัจจุบัน)",  from: 2020, to: 2023 },
+          { code: "Gen3",        label: "ออลนิว ดีแม็ก (โฉมปี 2020)",  from: 2020, to: 2023 },
           { code: "Gen3 FL",     label: "ดีแม็ก ไมเนอร์เชนจ์ 2024",    from: 2024, to: null }
         ]
       },
@@ -88,13 +92,13 @@ const carData = {
              "z edition", "zedition", "แซทอีดีชั่น", "แซทอีดิชั่น", "แซดอีดิชั่น"],
         category: "Pickup",
         gens: [
-          { code: "Tiger",      label: "ไทเกอร์",                  from: 1998, to: 2004 },
-          { code: "Vigo",       label: "วีโก้",                    from: 2004, to: 2008 },
-          { code: "Vigo FL",    label: "วีโก้ ไมเนอร์เชนจ์",        from: 2008, to: 2011 },
-          { code: "Vigo Champ", label: "วีโก้ แชมป์",              from: 2011, to: 2015 },
-          { code: "Revo",       label: "รีโว่ (รวม ร็อคโค่)",                    from: 2015, to: 2020 },
-          { code: "Revo FL",    label: "รีโว่ ไมเนอร์เชนจ์ (รวม ร็อคโค่)",        from: 2020, to: 2024 },
-          { code: "Travo",      label: "ทราโว่ (โฉมใหม่ล่าสุด)",    from: 2025, to: null }
+          { code: "Tiger",      sub: "Tiger",      label: "ไทเกอร์",                  from: 1998, to: 2004 },
+          { code: "Vigo",       sub: "Vigo",       label: "วีโก้",                    from: 2004, to: 2008 },
+          { code: "Vigo FL",    sub: "Vigo",       label: "วีโก้ ไมเนอร์เชนจ์",        from: 2008, to: 2011 },
+          { code: "Vigo Champ", sub: "Vigo Champ", label: "วีโก้ แชมป์",              from: 2011, to: 2015 },
+          { code: "Revo",       sub: "Revo",       label: "รีโว่ (รวม ร็อคโค่)",                    from: 2015, to: 2020 },
+          { code: "Revo FL",    sub: "Revo",       label: "รีโว่ ไมเนอร์เชนจ์ (รวม ร็อคโค่)", from: 2020, to: 2025 },
+          { code: "Travo",      sub: "Travo",      label: "ทราโว่ (โฉมปี 2026)", from: 2026, to: null }   // เปิดตัวในไทย 10 พ.ย. 2025
         ]
       },
       "Fortuner": {
@@ -102,8 +106,8 @@ const carData = {
         category: "SUV",
         gens: [
           { code: "Gen1",    label: "ฟอร์จูนเนอร์ ตัวแรก",   from: 2005, to: 2015 },
-          { code: "Gen2",    label: "ฟอร์จูนเนอร์ โฉมใหม่",  from: 2015, to: 2020 },
-          { code: "Gen2 FL", label: "ฟอร์จูนเนอร์ ลีเจนเดอร์", from: 2020, to: null }
+          { code: "Gen2",    label: "ฟอร์จูนเนอร์ โฉมปี 2015",  from: 2015, to: 2020 },
+          { code: "Gen2 FL", label: "ฟอร์จูนเนอร์ ไมเนอร์เชนจ์ (มีรุ่น Legender)", from: 2020, to: null }
         ]
       },
       "Vios": {
@@ -113,7 +117,7 @@ const carData = {
           { code: "Gen1", label: "วีออส ตัวแรก",  from: 2002, to: 2007 },
           { code: "Gen2", label: "วีออส โฉม 2",   from: 2007, to: 2013 },
           { code: "Gen3", label: "วีออส โฉม 3",   from: 2013, to: 2022 },
-          { code: "Gen4", label: "ยาริส เอทีฟ / วีออส ใหม่", from: 2023, to: null }
+          { code: "Gen4", label: "วีออส โฉมปี 2023 (ขายในชื่อ ยาริส เอทีฟ)", from: 2023, to: null }
         ]
       },
       "Yaris": {
@@ -122,10 +126,14 @@ const carData = {
         gens: [
           { code: "Gen1", label: "ยาริส ตัวแรก", from: 2006, to: 2013 },
           { code: "Gen2", label: "ยาริส โฉม 2",  from: 2013, to: 2022 },
-          { code: "Gen3", label: "ยาริส ใหม่",   from: 2023, to: null }
+          { code: "Gen3", label: "ยาริส โฉมปี 2023",   from: 2023, to: null }
         ]
       },
-      "Yaris Ativ": { th: ["ยาริส เอทีฟ", "ativ", "เอทีฟ"], category: "Sedan" },
+      "Yaris Ativ": { th: ["ยาริส เอทีฟ", "ativ", "เอทีฟ"], category: "Sedan",
+        gens: [
+          { code: "Gen1", label: "ยาริส เอทีฟ ตัวแรก", from: 2017, to: 2022 },
+          { code: "Gen2", label: "ยาริส เอทีฟ โฉมปี 2022 (แทนวีออส)", from: 2022, to: null }
+        ] },
       "Yaris Cross": { th: ["ยาริส ครอส", "yaris cross"], category: "SUV" },
       "Corolla Altis": {
         th: ["อัลติส", "โคโรลล่า", "altis", "corolla"],
@@ -134,26 +142,38 @@ const carData = {
           { code: "Gen9",  label: "อัลติส ตาเหยี่ยว", from: 2001, to: 2007 },
           { code: "Gen10", label: "อัลติส ตาหยี",     from: 2008, to: 2013 },
           { code: "Gen11", label: "อัลติส เอสโป",     from: 2014, to: 2018 },
-          { code: "Gen12", label: "อัลติส โฉมปัจจุบัน", from: 2019, to: null }
+          { code: "Gen12", label: "อัลติส โฉมปี 2019", from: 2019, to: null }
         ]
       },
-      "Corolla Cross": { th: ["โคโรลล่า ครอส", "corolla cross"], category: "SUV" },
+      "Corolla Cross": { th: ["โคโรลล่า ครอส", "corolla cross"], category: "SUV",
+        gens: [
+          { code: "Gen1", label: "โคโรลล่า ครอส ตัวแรก", from: 2020, to: 2023 },
+          { code: "Gen1 FL", label: "โคโรลล่า ครอส ไมเนอร์เชนจ์", from: 2024, to: null }
+        ] },
       "Camry": {
+        subFromCode: true,   // คนไทยเรียกรุ่นนี้ด้วยรหัสโฉม แสดงรหัสเป็นรุ่นย่อย
         th: ["แคมรี่", "แคมรี", "camry"],
         category: "Sedan",
         gens: [
           { code: "ACV40", label: "แคมรี่ โฉมปี 2006", from: 2006, to: 2011 },
           { code: "XV50",  label: "แคมรี่ โฉมปี 2012", from: 2012, to: 2018 },
           { code: "XV70",  label: "แคมรี่ โฉมปี 2019", from: 2019, to: 2024 },
-          { code: "XV80",  label: "แคมรี่ ใหม่",       from: 2025, to: null }
+          { code: "XV80",  label: "แคมรี่ โฉมปี 2025 (ไฮบริด)",       from: 2025, to: null }
         ]
       },
       "C-HR": { th: ["ซีเอชอาร์", "chr", "c hr"], category: "SUV" },
-      "Veloz": { th: ["เวลอซ", "veloz"], category: "MPV" },
+      "Veloz": { th: ["เวลอซ", "veloz"], category: "MPV",
+        gens: [
+          { code: "Gen1", label: "เวลอซ (แทนอแวนซ่า)", from: 2022, to: null }
+        ] },
       "Avanza": { th: ["อแวนซ่า", "avanza"], category: "MPV" },
       "Innova": { th: ["อินโนว่า", "innova", "ครอสต้า", "crysta"], category: "MPV" },
       "Sienta": { th: ["เซียนต้า", "sienta"], category: "MPV" },
-      "Commuter": { th: ["คอมมิวเตอร์", "รถตู้", "commuter", "hiace", "ไฮเอซ"], category: "Van" },
+      "Commuter": { th: ["คอมมิวเตอร์", "รถตู้", "commuter", "hiace", "ไฮเอซ"], category: "Van", subFromCode: true,
+        gens: [
+          { code: "H200", label: "คอมมิวเตอร์ หลังคาสูง รุ่นเก่า", from: 2005, to: 2018 },
+          { code: "H300", label: "คอมมิวเตอร์ หน้ายาว โฉมปี 2019", from: 2019, to: null }
+        ] },
       "Hiace": { th: ["ไฮเอซ", "hiace"], category: "Van" },
       "Ventury": { th: ["เวนจูรี่", "เวฟจูรี่", "เวนจูรี", "ventury"], category: "Van" },
       "Alphard": { th: ["อัลพาร์ด", "alphard"], category: "MPV" },
@@ -169,6 +189,7 @@ const carData = {
     th: ["ฮอนด้า", "ฮ้อนด้า", "ฮอนดา", "honda"],
     models: {
       "Civic": {
+        subFromCode: true,   // คนไทยเรียกรุ่นนี้ด้วยรหัสโฉม แสดงรหัสเป็นรุ่นย่อย
         th: ["ซีวิค", "ซิวิค", "civic"],
         category: "Sedan",
         gens: [
@@ -181,6 +202,7 @@ const carData = {
         ]
       },
       "City": {
+        subFromCode: true,   // คนไทยเรียกรุ่นนี้ด้วยรหัสโฉม แสดงรหัสเป็นรุ่นย่อย
         th: ["ซิตี้", "city"],
         category: "Sedan",
         gens: [
@@ -191,6 +213,7 @@ const carData = {
         ]
       },
       "Jazz": {
+        subFromCode: true,   // คนไทยเรียกรุ่นนี้ด้วยรหัสโฉม แสดงรหัสเป็นรุ่นย่อย
         th: ["แจ๊ส", "แจส", "jazz"],
         category: "Hatchback",
         gens: [
@@ -200,19 +223,29 @@ const carData = {
         ]
       },
       "CR-V": {
+        subFromCode: true,   // คนไทยเรียกรุ่นนี้ด้วยรหัสโฉม แสดงรหัสเป็นรุ่นย่อย
         th: ["ซีอาร์วี", "crv", "cr v"],
         category: "SUV",
         gens: [
           { code: "G3", label: "ซีอาร์วี โฉมปี 2007", from: 2007, to: 2012 },
           { code: "G4", label: "ซีอาร์วี โฉมปี 2013", from: 2013, to: 2016 },
           { code: "G5", label: "ซีอาร์วี โฉมปี 2017", from: 2017, to: 2023 },
-          { code: "G6", label: "ซีอาร์วี ใหม่",       from: 2024, to: null }
+          { code: "G6", label: "ซีอาร์วี โฉมปี 2024",       from: 2024, to: null }
         ]
       },
-      "HR-V": { th: ["เอชอาร์วี", "hrv", "hr v"], category: "SUV" },
-      "BR-V": { th: ["บีอาร์วี", "brv", "br v"], category: "MPV" },
+      "HR-V": { th: ["เอชอาร์วี", "hrv", "hr v"], category: "SUV",
+        gens: [
+          { code: "Gen1", label: "เอชอาร์วี ตัวแรก", from: 2014, to: 2021 },
+          { code: "Gen2", label: "เอชอาร์วี e:HEV", from: 2022, to: null }
+        ] },
+      "BR-V": { th: ["บีอาร์วี", "brv", "br v"], category: "MPV",
+        gens: [
+          { code: "Gen1", label: "บีอาร์วี ตัวแรก", from: 2016, to: 2021 },
+          { code: "Gen2", label: "บีอาร์วี โฉมปี 2022", from: 2022, to: null }
+        ] },
       "WR-V": { th: ["ดับเบิลยูอาร์วี", "wrv", "wr v"], category: "SUV" },
       "Accord": {
+        subFromCode: true,   // คนไทยเรียกรุ่นนี้ด้วยรหัสโฉม แสดงรหัสเป็นรุ่นย่อย
         th: ["แอคคอร์ด", "accord"],
         category: "Sedan",
         gens: [
@@ -222,7 +255,10 @@ const carData = {
           { code: "G10", label: "แอคคอร์ด โฉมปี 2020", from: 2020, to: null }
         ]
       },
-      "Mobilio": { th: ["โมบิลิโอ", "mobilio"], category: "MPV" },
+      "Mobilio": { th: ["โมบิลิโอ", "mobilio"], category: "MPV",
+        gens: [
+          { code: "Gen1", label: "โมบิลิโอ", from: 2014, to: 2020 }
+        ] },
       "Brio": { th: ["บริโอ", "brio"], category: "Hatchback" },
       "Brio Amaze": { th: ["อเมซ", "amaze"], category: "Sedan" },
       "Freed": { th: ["ฟรีด", "freed"], category: "MPV" },
@@ -297,12 +333,20 @@ const carData = {
         gens: [
           { code: "Gen1", label: "ปาเจโร่ สปอร์ต ตัวแรก", from: 2008, to: 2015 },
           { code: "Gen2", label: "ปาเจโร่ สปอร์ต โฉม 2",  from: 2015, to: 2019 },
-          { code: "Gen3", label: "ปาเจโร่ สปอร์ต ใหม่",   from: 2020, to: null }
+          { code: "Gen3", label: "ปาเจโร่ สปอร์ต โฉมปี 2020",   from: 2020, to: null }
         ]
       },
-      "Attrage": { th: ["แอททราจ", "attrage"], category: "Sedan" },
+      "Attrage": { th: ["แอททราจ", "attrage"], category: "Sedan",
+        gens: [
+          { code: "Gen1", label: "แอททราจ ตัวแรก", from: 2013, to: 2019 },
+          { code: "Gen1 FL", label: "แอททราจ ไมเนอร์เชนจ์", from: 2020, to: null }
+        ] },
       "Mirage": { th: ["มิราจ", "mirage"], category: "Hatchback" },
-      "Xpander": { th: ["เอ็กซ์แพนเดอร์", "xpander", "xpender", "เอ็กซ์แพนเดอ"], category: "MPV" },
+      "Xpander": { th: ["เอ็กซ์แพนเดอร์", "xpander", "xpender", "เอ็กซ์แพนเดอ"], category: "MPV",
+        gens: [
+          { code: "Gen1", label: "เอ็กซ์แพนเดอร์ ตัวแรก", from: 2018, to: 2021 },
+          { code: "Gen1 FL", label: "เอ็กซ์แพนเดอร์ ไมเนอร์เชนจ์", from: 2022, to: null }
+        ] },
       "Xforce": { th: ["เอ็กซ์ฟอร์ซ", "xforce"], category: "SUV" },
       "Lancer": { th: ["แลนเซอร์", "lancer"], category: "Sedan" },
       "Space Wagon": { th: ["สเปซวากอน"], category: "MPV" }
@@ -357,7 +401,7 @@ const carData = {
           { code: "BK", label: "มาสด้า3 ตัวแรก",    from: 2005, to: 2010 },
           { code: "BL", label: "มาสด้า3 โฉม 2",     from: 2011, to: 2014 },
           { code: "BM", label: "มาสด้า3 สกายแอคทีฟ", from: 2014, to: 2019 },
-          { code: "BP", label: "มาสด้า3 ใหม่",      from: 2019, to: null }
+          { code: "BP", label: "มาสด้า3 โฉมปี 2019",      from: 2019, to: null }
         ]
       },
       "BT-50": {
@@ -382,6 +426,7 @@ const carData = {
     th: ["นิสสัน", "นิสัน", "นิดสัน", "nissan"],
     models: {
       "Navara": {
+        subFromCode: true,   // คนไทยเรียกรุ่นนี้ด้วยรหัสโฉม แสดงรหัสเป็นรุ่นย่อย
         th: ["นาวารา", "navara", "np300"],
         category: "Pickup",
         gens: [
@@ -398,7 +443,10 @@ const carData = {
           { code: "Gen2", label: "อัลเมร่า เทอร์โบ", from: 2020, to: null }
         ]
       },
-      "March": { th: ["มาร์ช", "march"], category: "Hatchback" },
+      "March": { th: ["มาร์ช", "march"], category: "Hatchback",
+        gens: [
+          { code: "K13", label: "มาร์ช อีโคคาร์", from: 2010, to: 2022 }
+        ] },
       "Sylphy": { th: ["ซิลฟี่", "sylphy"], category: "Sedan" },
       "Teana": { th: ["เทียน่า", "teana"], category: "Sedan" },
       "X-Trail": { th: ["เอ็กซ์เทรล", "xtrail"], category: "SUV" },
@@ -416,7 +464,11 @@ const carData = {
     th: ["เอ็มจี", "mg"],
     models: {
       "MG3": { th: ["เอ็มจี3", "mg 3"], category: "Hatchback" },
-      "MG5": { th: ["เอ็มจี5", "mg 5"], category: "Sedan" },
+      "MG5": { th: ["เอ็มจี5", "mg 5"], category: "Sedan",
+        gens: [
+          { code: "Gen1", label: "เอ็มจี5 ตัวแรก", from: 2015, to: 2020 },
+          { code: "Gen2", label: "เอ็มจี5 โฉมปี 2021", from: 2021, to: null }
+        ] },
       "MG ZS": { th: ["แซดเอส", "zs"], category: "SUV" },
       "MG HS": { th: ["เอชเอส", "hs"], category: "SUV" },
       "MG Extender": { th: ["เอ็กซ์เทนเดอร์", "extender"], category: "Pickup" },
@@ -594,7 +646,12 @@ const carData = {
   "Suzuki": {
     th: ["ซูซูกิ", "ซุซุกิ", "suzuki"],
     models: {
-      "Swift": { th: ["สวิฟท์", "swift"], category: "Hatchback" },
+      "Swift": { th: ["สวิฟท์", "swift"], category: "Hatchback",
+        gens: [
+          { code: "Gen2", label: "สวิฟท์ อีโคคาร์", from: 2012, to: 2017 },
+          { code: "Gen3", label: "สวิฟท์ โฉมปี 2018", from: 2018, to: 2023 },
+          { code: "Gen4", label: "สวิฟท์ ไฮบริด โฉมปี 2024", from: 2024, to: null }
+        ] },
       "Ciaz": { th: ["เซียส", "ciaz"], category: "Sedan" },
       "Celerio": { th: ["เซเลริโอ", "celerio"], category: "Hatchback" },
       "Ertiga": { th: ["เออร์ติก้า", "ertiga"], category: "MPV" },
@@ -655,7 +712,13 @@ const carData = {
     models: {
       "1 Series": { th: ["ซีรี่ส์1", "116", "118"], category: "Hatchback" },
       "2 Series": { th: ["ซีรี่ส์2", "220"], category: "Coupe" },
-      "3 Series": { th: ["ซีรี่ส์3", "320", "330", "320d"], category: "Sedan" },
+      "3 Series": { th: ["ซีรี่ส์3", "320", "330", "320d"], category: "Sedan", subFromCode: true,
+        gens: [
+          { code: "E46", label: "ซีรี่ส์3 E46", from: 1998, to: 2005 },
+          { code: "E90", label: "ซีรี่ส์3 E90", from: 2005, to: 2012 },
+          { code: "F30", label: "ซีรี่ส์3 F30", from: 2012, to: 2019 },
+          { code: "G20", label: "ซีรี่ส์3 G20", from: 2019, to: null }
+        ] },
       "4 Series": { th: ["ซีรี่ส์4", "430"], category: "Coupe" },
       "5 Series": { th: ["ซีรี่ส์5", "520", "530", "520d"], category: "Sedan" },
       "7 Series": { th: ["ซีรี่ส์7", "730", "740"], category: "Sedan" },

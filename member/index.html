@@ -10,6 +10,10 @@
   <link rel="stylesheet" href="../theme.css">
   <!-- ตัวช่วยวาดป้ายทะเบียน ใช้ร่วมกับหน้าแอดมิน ต้องมาก่อน script.js -->
   <script src="../plate_data.js"></script>
+  <!-- ชื่อรุ่นย่อย/โฉมของรถ (Corolla Altis · Hilux Revo) ต้องมาก่อน script.js — ไม่มีก็ยังแสดงชื่อเดิมได้ -->
+  <script src="../car_display.js"></script>
+  <!-- ตัวเลือก ยี่ห้อ/รุ่น/ปี ของฟอร์มขอแก้ไข (ฐานข้อมูลเต็มโหลดตอนเปิดฟอร์มเท่านั้น) -->
+  <script src="../car_picker.js"></script>
   <script src="../theme.js" defer></script>
 </head>
 <body>
@@ -62,6 +66,8 @@
   </div>
 
   <script src="script.js"></script>
+  <!-- ปุ่ม ⋯ บนการ์ดรถ -> ส่งคำขอแก้ไขข้อมูล (ต้องมาหลัง script.js) -->
+  <script src="edit_request.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
   
 </body>

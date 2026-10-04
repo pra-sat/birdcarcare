@@ -1700,6 +1700,7 @@ class AdminManager {
       { sel: '#scanBtn',                 min: 2 },   // งานหลักของพนักงานหน้าร้าน
       { sel: '[data-menu="stats"]',      min: 3 },
       { sel: '[data-menu="customers"]',  min: 3 },   // ต้องตรงกับ CUST_MIN_LEVEL (customer_admin.gs)
+      { sel: '[data-menu="requests"]',   min: 3 },   // edit_request.gs ใช้ CUST_MIN_LEVEL ตัวเดียวกัน
       { sel: '[data-menu="shopinfo"]',   min: 3 },
       { sel: '[data-menu="feedback"]',   min: 3 },
       { sel: '[data-menu="settings"]',   min: 5 }
@@ -1747,6 +1748,29 @@ class AdminManager {
       // ทำหลังหน้าโผล่แล้ว จึงไม่หน่วงการเปิดหน้าเลย แต่พอกดสแกนก็พร้อมใช้ทันที
       ensureQrLibrary().catch(() => { /* กดสแกนแล้วค่อยลองใหม่ได้ */ });
     }
+
+    // ตัวเลขคำขอแก้ไขที่รอตรวจ บนปุ่ม 📝 (5 ต.ค. 2569) — เฉพาะคนที่เห็นเมนูนี้
+    if (level >= 3 && !this._reqCountAsked) {
+      this._reqCountAsked = true;
+      this.loadRequestCount();
+    }
+  }
+
+  // ถามจำนวนคำขอรอตรวจ (ด่านสิทธิ์อยู่ที่เซิร์ฟเวอร์) · ถามไม่ได้ก็แค่ไม่ขึ้นตัวเลข
+  async loadRequestCount() {
+    const badge = document.getElementById('reqBadge');
+    if (!badge) return;
+    try {
+      const res = await fetch(GAS_ENDPOINT + '?action=edit_req', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'edit_req', op: 'count', adminUserId: this.userId, idToken: this.token })
+      });
+      const data = await res.json();
+      const n = data && data.status === 'success' ? Number(data.pending) || 0 : 0;
+      badge.textContent = n;
+      badge.classList.toggle('hidden', n === 0);
+    } catch (e) { /* ไม่ขึ้นตัวเลขก็ไม่เป็นไร */ }
   }
 
   // ── ต่ออายุเซสชันเองถ้าปลอดภัยที่จะทำ ────────────────────────────────────

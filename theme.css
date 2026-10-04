@@ -165,6 +165,40 @@ body, h1, h2, h3, p, div, span, td, th, label, button, li { overflow-wrap: break
   color: var(--bc-deep); margin-top: 2px; word-break: break-word;
 }
 #memberInfo .uyear { font-size: 12.5px; color: var(--bc-ink2); margin-top: 3px; }
+/* รุ่นย่อยตัวเด่น (Altis / Revo / FC) — หนากว่าและสีสดกว่าชื่อครอบครัวรถ */
+#memberInfo .usub { font-weight: 600; color: var(--bc-water); }
+#memberInfo .unick { color: var(--bc-ink2); }
+
+/* ปุ่ม ⋯ มุมขวาบนของการ์ดรถ (ขอแก้ไขข้อมูล) — ต้องชนะกฎปุ่มสีฟ้าทึบ (0,2,1) จึงเขียน #id ... button.umore */
+#memberInfo .vunit { position: relative; }
+#memberInfo .vunit button.umore {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 34px; height: 30px; padding: 0 !important; line-height: 1;
+  font-size: 20px; letter-spacing: 1px;
+  background: transparent !important; background-color: transparent !important;
+  color: var(--bc-ink2) !important; border: none !important; box-shadow: none !important;
+  border-radius: 10px !important;
+}
+#memberInfo .vunit button.umore:hover,
+#memberInfo .vunit button.umore:active { background-color: rgba(10, 79, 122, .08) !important; transform: none; }
+/* ป้ายทะเบียนอยู่ขวาบนเหมือนกัน -> เว้นที่ให้ปุ่ม ⋯ */
+#memberInfo .vunit .uhead { padding-right: 40px; }
+#memberInfo .uedit {
+  margin-top: 8px; padding: 6px 10px; border-radius: 10px;
+  background: #FFF6E5; color: #8A5A00; font-size: 12.5px; font-weight: 600;
+}
+
+/* ฟอร์มขอแก้ไขข้อมูล (ป๊อปอัป อยู่นอก #memberInfo) */
+.swal2-popup .er-sel {
+  width: 100%; padding: 10px; border: 1px solid #d9d9d9; border-radius: 8px;
+  background: #fff; color: var(--bc-ink); font-family: var(--bc-body);
+}
+.swal2-popup .er-sel + .swal2-input { margin-top: 6px !important; }
+.swal2-popup .er-plate { display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px; margin-bottom: 6px; }
+.swal2-popup .er-plate .swal2-input { width: 100%; margin: 0 !important; box-sizing: border-box; }
+.swal2-popup .er-hint { font-size: 12.5px; line-height: 1.6; color: var(--bc-ink2); margin: 12px 2px 0; }
+.swal2-popup .er-diff { text-align: left; margin: 0 auto; padding-left: 20px; font-size: 14px; line-height: 1.7; }
+.swal2-popup .hidden { display: none !important; }
 #memberInfo .uyear:empty { display: none; }
 
 #memberInfo .upts {
@@ -1150,6 +1184,7 @@ input.pk-input, input.pk-input-sm {
      stats     ม่วง    สรุปยอด
      shop      ส้ม     ดูข้อมูลร้าน (แค่ปุ่ม — หน้านั้นลูกค้าก็เห็น ห้ามเปลี่ยนสี)
      sec       เทา     ตรวจความปลอดภัย
+     requests  ชมพูเข้ม คำขอแก้ไขข้อมูลจากลูกค้า (5 ต.ค. 2569)
 
    ⚠️ สีเข้มพอให้ตัวหนังสือขาวอ่านออก (คอนทราสต์ ~4:1 ขึ้นไป) ห้ามทำอ่อนกว่านี้
    ══════════════════════════════════════════════════════════════════════════ */
@@ -1166,6 +1201,10 @@ input.pk-input, input.pk-input-sm {
 }
 [data-tone="shop"] {
   --bc-water: #C2650A; --bc-waterD: #964D05; --bc-deep: #7A3F04;
+}
+[data-tone="requests"] {
+  --bc-sky1: #FCF0F6; --bc-sky2: #F1CFE0;
+  --bc-water: #A8336F; --bc-waterD: #842555; --bc-deep: #6B1D45;
 }
 [data-tone="sec"] {
   --bc-water: #557482; --bc-waterD: #3F5B67; --bc-deep: #2F4954;
@@ -1185,6 +1224,14 @@ input.pk-input, input.pk-input-sm {
 .admin-buttons button.btn[data-tone]:hover { background-color: var(--bc-waterD) !important; }
 .admin-buttons .btn[data-tone]:active,
 .admin-buttons button.btn[data-tone]:active { box-shadow: 0 0 0 var(--bc-waterD) !important; }
+
+/* ตัวเลขบนปุ่มเมนู (คำขอรอตรวจ) */
+.admin-buttons .mbadge {
+  display: inline-block; min-width: 20px; padding: 1px 7px; margin-left: 6px;
+  border-radius: 999px; background: #fff; color: var(--bc-water);
+  font-size: 12.5px; font-weight: 700; line-height: 1.5; text-align: center;
+}
+.admin-buttons .mbadge.hidden { display: none; }
 
 /* หัวหน้าของแต่ละเมนู — แถบสีด้านบนกรอบ ให้รู้ทันทีว่าอยู่หน้าไหน */
 html[data-tone] .container { border-top: 5px solid var(--bc-water) !important; }
