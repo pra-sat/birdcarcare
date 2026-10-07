@@ -883,19 +883,45 @@ class QRScanner {
     if (!phone) return;
     Swal.fire({ title: '🔍 กำลังค้นหา...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-    let result;
-    try {
-      // ห่อ try/catch เพิ่ม — ของเดิมถ้าเน็ตหลุดระหว่างค้นหา
-      // หน้าจอจะค้างที่ "กำลังค้นหา..." ตลอดไป ปิดไม่ได้ ต้องปิดแอปทิ้ง
-      const res = await fetch(`${GAS_ENDPOINT}?action=search_phone&phone=${encodeURIComponent(phone)}`);
-      result = await res.json();
-    } catch (err) {
-      Swal.close();
-      return Swal.fire('❌ ค้นหาไม่สำเร็จ', 'เช็คสัญญาณเน็ตแล้วลองใหม่อีกครั้ง', 'error');
+    // 🔴 8 ต.ค. 2569 — ค้นเบอร์ต้องยืนยันตัวแอดมิน (เดิม GET เปิดให้ใครก็ได้ = ข้อมูลลูกค้ารั่ว)
+    //    ส่งแบบ POST พร้อม token เหมือนการบันทึกงาน · ค้นซ้ำได้ไม่มีผลข้างเคียง จึงลองส่งใหม่เอง 1 รอบถ้าไม่รู้ผล
+    let result = null;
+    for (let attempt = 1; attempt <= 2 && !result; attempt++) {
+      try {
+        // ห่อ try/catch เพิ่ม — ของเดิมถ้าเน็ตหลุดระหว่างค้นหา
+        // หน้าจอจะค้างที่ "กำลังค้นหา..." ตลอดไป ปิดไม่ได้ ต้องปิดแอปทิ้ง
+        const res = await fetch(`${GAS_ENDPOINT}?action=search_phone`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'search_phone', phone,
+            adminUserId: this.adminUserId || (window.adminInfo || {}).userId || '',
+            idToken: this.token || (window.adminInfo || {}).token || '', accessToken: bcAccessToken()
+          })
+        });
+        const r = await res.json();
+        if (r && typeof r.success === 'boolean' && r.code !== 'NEED_POST') result = r;
+      } catch (err) { /* เน็ตหลุด ลองอีกรอบ */ }
     }
     Swal.close();
+    if (!result) return Swal.fire('❌ ค้นหาไม่สำเร็จ', 'เช็คสัญญาณเน็ตแล้วลองใหม่อีกครั้ง', 'error');
 
-    if (!result || !result.success) return Swal.fire('ไม่พบข้อมูลลูกค้า', '', 'error');
+    if (result.code === 'IDTOKEN_INVALID') {
+      const relog = await Swal.fire({
+        icon: 'warning', title: '🔐 เซสชันหมดอายุ',
+        html: bcInLineApp() ? 'ปิดหน้านี้แล้วเปิดเมนูแอดมินใน LINE ใหม่' : 'ต้องเข้าสู่ระบบ LINE ใหม่ก่อนค้นหา',
+        showCancelButton: true,
+        confirmButtonText: bcInLineApp() ? 'ปิดหน้านี้' : 'เข้าสู่ระบบใหม่', cancelButtonText: 'ไว้ก่อน'
+      });
+      if (relog.isConfirmed) {
+        if (bcInLineApp()) { try { liff.closeWindow(); } catch (e) { location.reload(); } }
+        else bcRelogin();
+      }
+      return;
+    }
+    // ด่านสิทธิ์ไม่ผ่าน (ไม่ใช่แอดมิน / หน้าเว็บรุ่นเก่า) -> บอกเหตุผลจริง ไม่ใช่ "ไม่พบข้อมูล"
+    if (!result.success && result.code) return Swal.fire('ค้นหาไม่ได้', esc(result.message || ''), 'error');
+    if (!result.success) return Swal.fire('ไม่พบข้อมูลลูกค้า', '', 'error');
     this.foundUser = result.data;
     this.scanToken = '';        // ค้นด้วยเบอร์ ไม่มี QR เกี่ยวข้อง
     this.closePopup();
