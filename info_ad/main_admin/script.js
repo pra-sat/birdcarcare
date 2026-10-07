@@ -232,6 +232,15 @@ function ensureQrLibrary() {
 const PARTS_RE = /ถ่ายน้ำมัน|น้ำมันเครื่อง|กรองอากาศ|กรองแอร์|กรองน้ำมัน|กรองโซล่า|กรองเชื้อเพลิง|น้ำยาแอร์|อะไหล่|แบตเตอรี่|ผ้าเบรก|หัวเทียน|ใบปัดน้ำฝน|ยางรถ|เปลี่ยนยาง/;
 function isPartsService(name) { return PARTS_RE.test(String(name || '')); }
 
+// ประเภทรถจากคอลัมน์ Category ของลูกค้า -> 'moto' | 'car' | '' (ไม่รู้)
+// ข้อมูลเก่ามีคำไทยปนอยู่ (เหมือน bcDecayPerMonth_ ฝั่งเซิร์ฟเวอร์)
+const BC_MOTO_RE = /มอเตอร์ไซ|บิ๊กไบค์|motorcycle|big ?bike/i;
+function bcVehicleKind(v) {
+  const c = String((v && v.Category) || '').trim();
+  if (!c || /^unknown$/i.test(c)) return '';
+  return BC_MOTO_RE.test(c) ? 'moto' : 'car';
+}
+
 function esc(v) {
   return String(v == null ? '' : v)
     .replace(/&/g, '&amp;')
@@ -1024,9 +1033,18 @@ class QRScanner {
     const nameEl = document.getElementById('serviceName');
     const chosen = nameEl ? nameEl.value.trim() : '';
     const q = String(this.svcFilter || '').trim().toLowerCase();
+
+    // ── เมนูตามประเภทรถ (8 ต.ค. 2569 — เจ้าของร้าน: รถกระบะเลือก "ล้างสีมอเตอร์ไซค์" ได้ งง) ──
+    // ใช้คอลัมน์ "ประเภทรถ" ใน Service_List (vehicleType) · รถยนต์ไม่เห็นเมนูของมอเตอร์ไซค์
+    // มอเตอร์ไซค์เห็นเมนูของตัวเองขึ้นก่อน · ประเภทรถไม่รู้ (Unknown/ว่าง) = เห็นทุกเมนู
+    // ⚠️ ซ่อนได้อย่างเดียว ห้ามเปลี่ยนราคา — ราคาพิมพ์เองทุกครั้ง (13 ก.ย. 2569)
+    const kind = bcVehicleKind(this.selectedVehicle());
+    const motoSvc = s => BC_MOTO_RE.test(String(s.vehicleType || ''));
     const list = this.serviceList.filter(s =>
-      !q || String(s.name || '').toLowerCase().includes(q)
+      (!q || String(s.name || '').toLowerCase().includes(q)) &&
+      (kind !== 'car' || !motoSvc(s) || String(s.name || '') === chosen)
     );
+    if (kind === 'moto') list.sort((a, b) => (motoSvc(b) ? 1 : 0) - (motoSvc(a) ? 1 : 0));
 
     if (!list.length) {
       box.innerHTML = '<span class="svc-empty">ไม่พบบริการนี้ในรายการ — พิมพ์เองได้เลย</span>';
@@ -1047,6 +1065,14 @@ class QRScanner {
       ? '<div class="svc-note">แตะปุ่มอื่นเพื่อเปลี่ยนบริการ · แตะปุ่มเดิมซ้ำเพื่อยกเลิก</div>'
       : '';
     box.innerHTML = chips + hint;
+  }
+
+  // รถคันที่เลือกอยู่ในฟอร์ม (ยังไม่เปิดฟอร์ม = คันที่ลูกค้าเลือกมา / คันแรก)
+  selectedVehicle() {
+    const vs = (this.foundUser && this.foundUser.vehicles) || [];
+    const sel = document.getElementById('vehicleSelect');
+    const idx = sel ? Number(sel.value) || 0 : 0;
+    return vs[idx] || vs[0] || null;
   }
 
   // ── การ์ดเลือกรถ ────────────────────────────────────────────────────────
@@ -1450,6 +1476,7 @@ class QRScanner {
           this.plateFormOpen = false;      // เปลี่ยนคันแล้วปิดฟอร์มทะเบียนที่ค้างไว้
           this.renderVehiclePicks();
           this.renderPlateBox();
+          this.renderServiceChips();       // รถยนต์/มอเตอร์ไซค์เห็นเมนูไม่เหมือนกัน
           updateCurrentPoint();            // อัปเดตแต้มของคันที่เลือกใหม่
         });
 
