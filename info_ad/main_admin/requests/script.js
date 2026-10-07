@@ -31,11 +31,17 @@ function splitPlate(p) {
   return m ? { head: m[1].replace(/\s+/g, ''), tail: m[2] } : { head: String(p || '').replace(/\s+/g, ''), tail: '' };
 }
 
+// access token = ทางสำรองเมื่อ ID token (อายุ 1 ชม.) หมด · เซิร์ฟเวอร์ใช้แทนให้เอง (7 ต.ค. 2569)
+function accessTok() {
+  try { return (typeof liff !== 'undefined' && liff.getAccessToken && liff.getAccessToken()) || ''; }
+  catch (e) { return ''; }
+}
+
 async function call(body) {
   const res = await fetch(`${GAS_ENDPOINT}?action=edit_req`, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ adminUserId, idToken }, body))
+    body: JSON.stringify(Object.assign({ adminUserId, idToken, accessToken: accessTok() }, body))
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();

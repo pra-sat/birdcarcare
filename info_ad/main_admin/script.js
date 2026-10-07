@@ -87,6 +87,49 @@ function bcTokenNeedsRefresh(token) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  🔴 แก้ 7 ต.ค. 2569 — ต่ออายุเองในแอป LINE ไม่เคยได้ผลเลย
+//
+//  เอกสาร LIFF: "You can't use liff.login() in a LIFF browser"
+//  ID token อายุ 1 ชม. · access token อายุ 12 ชม.
+//  งานคุณ Nicky หาย 12:16 — หน้ารีโหลดเอง 12:14:54 · 12:16:40 · 12:17:16
+//  ได้ ID token ใบเดิมที่หมดอายุกลับมาทุกรอบ (Security_Log "IdToken expired")
+//
+//  ตอนนี้: ส่ง access token ไปด้วยทุกคำขอ เซิร์ฟเวอร์ใช้แทนเมื่อ ID token หมด
+//  (security.gs bcVerifyLineUser_) · ในแอป LINE เลิกรีโหลดหน้าเอง เพราะไม่ช่วยอะไร
+//  ถ้าหมดทั้งคู่ (เปิดค้างเกิน 12 ชม.) ทางเดียวคือปิดแล้วเปิดใหม่จากเมนู LINE
+// ═══════════════════════════════════════════════════════════════════════════
+function bcAccessToken() {
+  try {
+    return (typeof liff !== 'undefined' && liff.getAccessToken && liff.getAccessToken()) || '';
+  } catch (e) { return ''; }
+}
+
+function bcInLineApp() {
+  try {
+    return typeof liff !== 'undefined' && typeof liff.isInClient === 'function' && liff.isInClient();
+  } catch (e) { return false; }
+}
+
+// ขอ token ใหม่ · นอกแอป LINE = liff.login() (ได้ผลจริง) · ในแอป = ปิดหน้า ให้เปิดใหม่จากเมนู
+// งานที่ฝากไว้ (bcSavePending) อยู่ใน localStorage จึงยังอยู่หลังเปิดหน้าใหม่
+async function bcRelogin() {
+  bcMarkAutoRelogin();
+  if (!bcInLineApp()) {
+    try { liff.login(); } catch (e) { location.reload(); }
+    return;
+  }
+  try {
+    await Swal.fire({
+      icon: 'info',
+      title: 'ปิดแล้วเปิดใหม่จากเมนู LINE',
+      html: 'กดปุ่มด้านล่าง หน้านี้จะปิดเอง<br>แล้วเปิดเมนูแอดมินใน LINE อีกครั้ง',
+      confirmButtonText: 'ปิดหน้านี้'
+    });
+  } catch (e) {}
+  try { liff.closeWindow(); } catch (e) { location.reload(); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  ต่ออายุเซสชันเอง โดยพนักงานไม่ต้องรู้เรื่อง (19 ก.ย. 2569)
 //
 //  แอดมิน C สแกนไม่ได้เพราะเซสชันหมดอายุ และพนักงานไม่รู้ว่าต้องปิดแล้วเปิดใหม่
@@ -99,6 +142,7 @@ function bcTokenNeedsRefresh(token) {
 //  liff.login() ไม่ใช่การให้ล็อกอินใหม่จริง ๆ ถ้ายังล็อกอิน LINE อยู่
 //  มันแค่วิ่งไปเอา token ใหม่แล้วกลับมา = เหมือนหน้ารีเฟรชตัวเอง
 //  จึงเรียกอัตโนมัติได้ ถ้าเลือกจังหวะให้ดี
+//  ⚠️ จริงเฉพาะนอกแอป LINE (เช่น Chrome) — ในแอป LINE ใช้ไม่ได้ ดูหมายเหตุ 7 ต.ค. 2569 ด้านบน
 //
 //  จังหวะที่ปลอดภัย (ไม่มีงานค้างบนจอ)
 //    1. ตอนเปิดหน้า
@@ -137,16 +181,18 @@ function bcWorkInProgress() {
 // ── เก็บงานที่ค้างไว้ข้ามการล็อกอินใหม่ ──────────────────────────────────
 // liff.login() โหลดหน้าใหม่ ทุกอย่างใน memory หายหมด
 // ต้องฝากไว้ก่อน แล้วค่อยหยิบกลับมาหลังกลับเข้าหน้า
-// ใช้ sessionStorage เพราะเป็นงานเฉพาะรอบนี้ ไม่ควรค้างข้ามวัน
+// ⚠️ ใช้ localStorage (เดิม sessionStorage · เปลี่ยน 7 ต.ค. 2569)
+//    ในแอป LINE ทางเดียวที่ได้ token ใหม่คือปิดหน้าแล้วเปิดใหม่ ซึ่ง sessionStorage หายไปด้วย
+//    ไม่ค้างข้ามวันเพราะ bcTakePending ทิ้งงานที่เก่าเกิน 30 นาที
 const PENDING_KEY = 'bcPendingSave';
 function bcSavePending(obj) {
-  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ at: Date.now(), ...obj })); }
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify({ at: Date.now(), ...obj })); }
   catch (e) { /* เก็บไม่ได้ก็ยังทำงานต่อได้ แค่ต้องกรอกใหม่ */ }
 }
 function bcTakePending() {
   try {
-    const raw = sessionStorage.getItem(PENDING_KEY);
-    sessionStorage.removeItem(PENDING_KEY);
+    const raw = localStorage.getItem(PENDING_KEY);
+    localStorage.removeItem(PENDING_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw);
     // เกิน 30 นาทีถือว่าเลิกแล้ว อย่าเอากลับมาให้งง
@@ -262,7 +308,8 @@ class QRScanner {
 
     // ต่อเองไม่ได้ (เพิ่งต่อไปเมื่อกี้ = กันวนซ้ำ) ค่อยถาม
     // เป็นทางสำรอง ปกติไม่ควรมาถึงตรงนี้
-    if (bcTokenNeedsRefresh(this.token)) {
+    // ในแอป LINE ไม่ต้องถาม — ID token หมดก็บันทึกได้ด้วย access token (7 ต.ค. 2569)
+    if (!bcInLineApp() && bcTokenNeedsRefresh(this.token)) {
       const go = await Swal.fire({
         icon: 'warning',
         title: '🔐 เซสชันหมดอายุ',
@@ -273,8 +320,7 @@ class QRScanner {
         cancelButtonText: 'ข้ามไปก่อน'
       });
       if (go.isConfirmed) {
-        bcMarkAutoRelogin();
-        try { liff.login(); } catch (e) { location.reload(); }
+        bcRelogin();
         return;                      // หน้าจะโหลดใหม่ ไม่ต้องทำอะไรต่อ
       }
     }
@@ -520,34 +566,59 @@ class QRScanner {
       // ── ด่านตรวจใน security.gs ใช้ทั้ง 4 ช่องนี้ ──
       adminUserId: this.adminUserId,   // ใครเป็นคนกดบันทึก
       idToken: this.token,             // LINE ID token ยืนยันว่าเป็นคนนั้นจริง
+      accessToken: bcAccessToken(),    // ทางสำรองเมื่อ ID token หมดอายุ (อายุ 12 ชม.)
       scanToken: this.scanToken || '', // QR ที่สแกนมา (ว่างได้ถ้าค้นด้วยเบอร์)
       requestId: this.requestId,       // กันกดซ้ำ/เน็ตสะดุดแล้วยิงซ้ำ
       force: !!this.forceDuplicate     // แอดมินยืนยันแล้วว่าตั้งใจบันทึกซ้ำ
     };
 
-    let result;
-    try {
-      const res = await fetch(GAS_ENDPOINT + '?action=record_service', {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      });
-      result = await res.json();
-    } catch (err) {
-      Swal.close();
-      // เน็ตหลุดตอนนี้ = ไม่รู้ว่าเซิร์ฟเวอร์บันทึกไปแล้วหรือยัง
-      // แต่ requestId เดิมทำให้กดซ้ำได้อย่างปลอดภัย ไม่เกิดรายการซ้ำ
+    // ══════════════════════════════════════════════════════════════════
+    //  ส่งแล้ว "ไม่รู้ผล" -> ส่งซ้ำเองด้วย requestId เดิม (7 ต.ค. 2569)
+    //
+    //  🔴 14:11 คุณ AOM: เซิร์ฟเวอร์บันทึกสำเร็จแล้ว (doPost 14:11:18)
+    //     แต่คำขอไปโผล่เป็น doGet อีกรอบ (14:11:38) หน้านี้ได้ "Invalid action" กลับมา
+    //     พนักงานเห็น ❌ เลยกดซ้ำ 3 รอบ (QR ถูกใช้แล้ว / ไม่รู้ผลอีก)
+    //  คำตอบที่ไม่มี success เป็น true/false (เช่น Invalid action) หรือ NEED_POST
+    //  หรือเน็ตหลุด = ยังไม่รู้ผล · ส่งซ้ำด้วย requestId เดิมปลอดภัย เพราะเซิร์ฟเวอร์
+    //  ตรวจ requestId ก่อนด่านอื่น (bcSeenRequest_) ถ้าสำเร็จไปแล้วจะได้ผลเดิมกลับมา
+    // ══════════════════════════════════════════════════════════════════
+    const SEND_TRIES = 3;
+    let result = null;
+    for (let attempt = 1; attempt <= SEND_TRIES && !result; attempt++) {
+      if (attempt > 1) {
+        try {
+          Swal.update({ title: `⏳ สัญญาณสะดุด กำลังส่งอีกครั้ง (${attempt}/${SEND_TRIES})` });
+          Swal.showLoading();
+        } catch (e) {}
+        await new Promise(r => setTimeout(r, 1500 * (attempt - 1)));
+      }
+      payload.accessToken = bcAccessToken();   // ดึงสดทุกรอบ
+      try {
+        const res = await fetch(GAS_ENDPOINT + '?action=record_service', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        const r = await res.json();
+        if (r && typeof r.success === 'boolean' && r.code !== 'NEED_POST') result = r;
+      } catch (err) { /* เน็ตหลุด = ยังไม่รู้ผล ลองรอบถัดไป */ }
+    }
+    Swal.close();
+
+    if (!result) {
+      this.logAction('บันทึกบริการ', `⚠️ ไม่รู้ผล ส่ง ${SEND_TRIES} รอบ: ${data.name}`);
       const retry = await Swal.fire({
-        icon: 'error',
-        title: '❌ ส่งข้อมูลไม่สำเร็จ',
-        text: 'เช็คสัญญาณเน็ตแล้วลองบันทึกอีกครั้งได้เลย ระบบกันบันทึกซ้ำให้แล้ว',
+        icon: 'warning',
+        title: '⚠️ ยังไม่รู้ว่าบันทึกสำเร็จหรือยัง',
+        html: 'สัญญาณเน็ตสะดุด ระบบยังไม่ตอบกลับ<br>' +
+              '<b>กด "ลองอีกครั้ง" ได้เลย</b> ถ้ารอบก่อนสำเร็จไปแล้ว<br>' +
+              'จะขึ้นว่าบันทึกสำเร็จ ไม่บันทึกซ้ำ ไม่บวกแต้มซ้ำ',
         showCancelButton: true,
         confirmButtonText: 'ลองอีกครั้ง',
         cancelButtonText: 'กลับไปแก้'
       });
       return retry.isConfirmed ? this.confirmAndSave(data, true) : this.reopenForm();
     }
-    Swal.close();
 
     if (result.success) {
       this.draft = null;   // บันทึกสำเร็จแล้ว ไม่ต้องเก็บร่างไว้
@@ -632,17 +703,22 @@ class QRScanner {
         scanToken: this.scanToken || '',
         requestId: this.requestId
       });
+      // ในแอป LINE ต้องปิดแล้วเปิดใหม่ (liff.login() ใช้ไม่ได้) · มาถึงตรงนี้ได้ก็ต่อเมื่อ
+      // access token หมดด้วย = เปิดหน้าค้างเกิน 12 ชม. หรือหน้าเว็บรุ่นเก่าที่ยังไม่ส่ง access token
+      const inApp = bcInLineApp();
       const relog = await Swal.fire({
         icon: 'warning',
         title: '🔐 เซสชันหมดอายุ',
-        html: 'ต้องเข้าสู่ระบบ LINE ใหม่ก่อนครับ<br>' +
-              '<b>รายการนี้ถูกเก็บไว้ให้แล้ว</b> กลับมาจะขึ้นให้บันทึกต่อได้ทันที',
+        html: (inApp ? 'ต้อง<b>ปิดหน้านี้</b> แล้วเปิดเมนูแอดมินใน LINE ใหม่<br>'
+                     : 'ต้องเข้าสู่ระบบ LINE ใหม่ก่อนครับ<br>') +
+              '<b>รายการนี้ถูกเก็บไว้ให้แล้ว</b> เปิดหน้าใหม่จะขึ้นให้บันทึกต่อได้ทันที',
         showCancelButton: true,
-        confirmButtonText: 'เข้าสู่ระบบใหม่',
+        confirmButtonText: inApp ? 'ปิดหน้านี้' : 'เข้าสู่ระบบใหม่',
         cancelButtonText: 'ไว้ก่อน'
       });
       if (relog.isConfirmed) {
-        try { liff.login(); } catch (e) { location.reload(); }
+        if (inApp) { try { liff.closeWindow(); } catch (e) { location.reload(); } }
+        else bcRelogin();
         return;
       }
       return this.reopenForm();
@@ -1099,7 +1175,8 @@ class QRScanner {
           admin: this.adminName,
           // ── ข้อมูลยืนยันตัวตนคนที่กดแก้ (ด่านตรวจใน security.gs ใช้) ──
           adminUserId: this.adminUserId,
-          idToken: this.token
+          idToken: this.token,
+          accessToken: bcAccessToken()
         })
       });
       const out = await res.json();
@@ -1114,7 +1191,7 @@ class QRScanner {
           confirmButtonText: 'เข้าสู่ระบบใหม่',
           cancelButtonText: 'ไว้ก่อน'
         });
-        if (relog.isConfirmed) { try { liff.login(); } catch (e) { location.reload(); } }
+        if (relog.isConfirmed) bcRelogin();
         btn.disabled = false;
         btn.textContent = label;
         return;
@@ -1795,7 +1872,8 @@ class AdminManager {
       const res = await fetch(GAS_ENDPOINT + '?action=edit_req', {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'edit_req', op: 'count', adminUserId: this.userId, idToken: this.token })
+        body: JSON.stringify({ action: 'edit_req', op: 'count', adminUserId: this.userId,
+                               idToken: this.token, accessToken: bcAccessToken() })
       });
       const data = await res.json();
       const n = data && data.status === 'success' ? Number(data.pending) || 0 : 0;
@@ -1807,14 +1885,16 @@ class AdminManager {
   // ── ต่ออายุเซสชันเองถ้าปลอดภัยที่จะทำ ────────────────────────────────────
   // คืน true = กำลังจะรีโหลดหน้า ผู้เรียกควรหยุดทำอย่างอื่นต่อ
   maybeAutoRefreshSession(where) {
+    // 🔴 ในแอป LINE ห้ามรีโหลด — liff.login() ใช้ไม่ได้ รีโหลดแล้วได้ ID token ใบเดิม (7 ต.ค. 2569)
+    //    เซิร์ฟเวอร์ใช้ access token แทนให้เอง ไม่ต้องทำอะไร
+    if (bcInLineApp()) return false;
     if (!bcTokenNeedsRefresh(this.token)) return false;   // ยังสดอยู่ ไม่ต้องทำอะไร
     if (bcWorkInProgress()) return false;                 // มีงานบนจอ ห้ามรีโหลด
     if (!bcCanAutoRelogin()) return false;                // เพิ่งต่อไป กันวนซ้ำ
 
-    bcMarkAutoRelogin();
     console.log('ต่ออายุเซสชันอัตโนมัติ (' + (where || '-') + ')');
     this.paintSession('refresh');
-    try { liff.login(); } catch (e) { location.reload(); }
+    bcRelogin();
     return true;
   }
 
@@ -1830,7 +1910,7 @@ class AdminManager {
     } else if (state === 'warn') {
       el.textContent = '⚠️ เซสชันใกล้หมดอายุ — แตะที่นี่เพื่อต่ออายุ';
       el.classList.add('is-warn');
-      el.onclick = () => { bcMarkAutoRelogin(); try { liff.login(); } catch (e) { location.reload(); } };
+      el.onclick = () => bcRelogin();
     } else {
       el.classList.add('hidden');       // ปกติไม่ต้องโชว์อะไร ไม่ให้รกจอ
       el.onclick = null;
@@ -1844,7 +1924,8 @@ class AdminManager {
       if (document.visibilityState !== 'visible') return;
       if (this.maybeAutoRefreshSession('ตรวจตามรอบ')) return;
       // ต่อเองไม่ได้ (มีงานค้าง หรือเพิ่งต่อไป) -> อย่างน้อยให้เห็นว่าต้องทำอะไร
-      this.paintSession(bcTokenNeedsRefresh(this.token) ? 'warn' : 'ok');
+      // ในแอป LINE ไม่เตือน — ID token หมดก็บันทึกได้ (access token) แตะเตือนไปก็ทำอะไรไม่ได้
+      this.paintSession(!bcInLineApp() && bcTokenNeedsRefresh(this.token) ? 'warn' : 'ok');
     };
     this._sessionWatch = setInterval(tick, 60 * 1000);
 
@@ -1937,7 +2018,8 @@ class AdminManager {
         body: JSON.stringify({
           action: 'security_selftest',
           adminUserId: this.userId,
-          idToken: this.token
+          idToken: this.token,
+          accessToken: bcAccessToken()
         })
       });
       const r = await res.json();
@@ -1962,7 +2044,7 @@ class AdminManager {
         confirmButtonText: 'เข้าสู่ระบบใหม่',
         cancelButtonText: 'ใช้งานต่อ'
       });
-      if (relog.isConfirmed) { try { liff.login(); } catch (e) { location.reload(); } }
+      if (relog.isConfirmed) bcRelogin();
 
     } catch (err) {
       // ตรวจไม่ได้ก็ไม่เป็นไร ไม่ควรรบกวนการทำงาน
@@ -1994,7 +2076,8 @@ class AdminManager {
         body: JSON.stringify({
           action: 'security_selftest',
           adminUserId: this.userId,
-          idToken: this.token
+          idToken: this.token,
+          accessToken: bcAccessToken()
         })
       });
       const r = await res.json();

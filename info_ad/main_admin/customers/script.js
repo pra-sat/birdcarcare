@@ -40,11 +40,17 @@ function carTitle(v) {
 
 // ── เรียกเซิร์ฟเวอร์ ─────────────────────────────────────────────────────
 // คืน data เมื่อสำเร็จ · ถ้าโดนด่านสิทธิ์ จัดการให้เองแล้วคืน null
+// access token = ทางสำรองเมื่อ ID token (อายุ 1 ชม.) หมด · เซิร์ฟเวอร์ใช้แทนให้เอง (7 ต.ค. 2569)
+function accessTok() {
+  try { return (typeof liff !== 'undefined' && liff.getAccessToken && liff.getAccessToken()) || ''; }
+  catch (e) { return ''; }
+}
+
 async function call(body) {
   const res = await fetch(`${GAS_ENDPOINT}?action=cust_admin`, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ adminUserId, idToken }, body))
+    body: JSON.stringify(Object.assign({ adminUserId, idToken, accessToken: accessTok() }, body))
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();

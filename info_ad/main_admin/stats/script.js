@@ -70,11 +70,17 @@ function clearCache() {
 // ยิงขอเป็นส่วน ๆ — core มาก่อนแล้ววาดเลย ไม่ต้องรอ deep
 //   core = ยอดวันนี้ / เดือนนี้ / กราฟรายวัน  (ของที่ดูทุกวัน)
 //   deep = อันดับบริการ / รายเดือน / ภาพรวม / ลูกค้า   (ช้ากว่ามาก เพราะอ่านอีกชีต)
+// access token = ทางสำรองเมื่อ ID token (อายุ 1 ชม.) หมด · เซิร์ฟเวอร์ใช้แทนให้เอง (7 ต.ค. 2569)
+function accessTok() {
+  try { return (typeof liff !== 'undefined' && liff.getAccessToken && liff.getAccessToken()) || ''; }
+  catch (e) { return ''; }
+}
+
 async function fetchPart(part) {
   const res = await fetch(`${GAS_ENDPOINT}?action=stats`, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ adminUserId, idToken, part })
+    body: JSON.stringify({ adminUserId, idToken, accessToken: accessTok(), part })
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
