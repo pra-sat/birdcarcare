@@ -115,6 +115,32 @@ function modelIsMoto(brandName, modelName) {
   return !!(m && m.category === 'Motorcycle');
 }
 
+// ── พิมพ์ "ยี่ห้อ + รุ่น" ต่อกันในช่องยี่ห้อ (13 ต.ค. 2569 — เจ้าของร้านเจอลูกค้าพิมพ์ "โตโยต้า รีโว้") ──
+// เดิมได้แค่ชิป "Toyota" แล้วต้องพิมพ์รุ่นซ้ำอีกรอบ · ตอนนี้ขึ้นชิป "Toyota Hilux" ให้แตะทีเดียวจบ
+// ขึ้นเฉพาะเมื่อคำที่พิมพ์ชี้รุ่นได้ชัด (รุ่นที่ตรงไม่เกิน 3 ต่อยี่ห้อ) กันชิปท่วมจอตอนพิมพ์แค่ชื่อยี่ห้อ
+function brandModelCombos(q, brands, wantMoto) {
+  if (!String(q || '').trim()) return [];
+  const out = [];
+  brands.forEach(b => {
+    // ตัดชื่อยี่ห้อออกก่อนค้นรุ่น: "จีลี่ ex2" -> "ex2" (รุ่นชื่อสั้น ≤3 ตัวจับได้เฉพาะแบบตรงตัว)
+    const rest = stripBrandWords(b, q);
+    const found = searchModels(b, rest !== String(q).trim() ? rest : q);
+    const ms = found.filter(m => modelIsMoto(b, m) === !!wantMoto);
+    if (ms.length && ms.length <= 3) ms.forEach(m => out.push([b, m]));
+  });
+  return out.slice(0, 6);
+}
+
+// รุ่นที่พิมพ์เอง: ตัดคำที่เป็นชื่อยี่ห้อที่เลือกไว้แล้วออก ("โตโยต้า เวฟจูรี่" -> "เวฟจูรี่")
+// ไม่งั้นชีตได้ Toyota | "โตโยต้า เวฟจูรี่" · ตัดเฉพาะคำที่แยกด้วยช่องว่าง เหลือว่างให้คงของเดิม
+function stripBrandWords(brand, text) {
+  const raw = String(text || '').trim();
+  const b = carData[brand];
+  const keys = [brand].concat((b && b.th) || []).map(normalizeKey).filter(Boolean);
+  const kept = raw.split(/\s+/).filter(w => keys.indexOf(normalizeKey(w)) < 0);
+  return kept.join(' ').trim() || raw;
+}
+
 function setupCarPicker(els) {
   const box = document.getElementById('carPicker');
   const btnCar = document.getElementById('tyCar');
@@ -141,15 +167,20 @@ function setupCarPicker(els) {
     }
   }
 
-  // ── ปีรถจัดกลุ่มตามโฉม ──────────────────────────────────────────────
+  // ── ปีรถ: รายการเดียว ใหม่ -> เก่า ──────────────────────────────────────
+  // 13 ต.ค. 2569 เจ้าของร้านสั่ง "โฉมไม่ต้องใส่" — เดิมจัดกลุ่มปีใต้หัวข้อชื่อโฉม
+  // ตอนนี้รวมปีของทุกโฉมเป็นรายการเดียว (ชื่อโฉมยังใช้ค้นหาในขั้นรุ่นได้เหมือนเดิม)
   function yearGroups() {
     const gens = getGenerations(st.brand, st.model);
+    let ys = [];
     if (gens.length) {
-      // gens เก็บเรียงจากเก่าไปใหม่ กลับด้านให้โฉมล่าสุดอยู่บน (ลูกค้าส่วนใหญ่รถใหม่)
-      return gens.slice().reverse().map(g => ({ label: g.label || '', years: getYearsForGen(g) }));
+      const seen = {};
+      gens.forEach(g => getYearsForGen(g).forEach(y => { if (!seen[y]) { seen[y] = 1; ys.push(y); } }));
+    } else {
+      const m = carData[st.brand] && carData[st.brand].models[st.model];
+      ys = (m && m.years) ? m.years.slice() : [];
     }
-    const m = carData[st.brand] && carData[st.brand].models[st.model];
-    const ys = (m && m.years) ? m.years.slice().reverse() : [];
+    ys.sort((a, b) => b - a);                  // ลูกค้าส่วนใหญ่รถใหม่ ปีล่าสุดขึ้นก่อน
     return ys.length ? [{ label: '', years: ys }] : [];
   }
 
@@ -206,12 +237,15 @@ function setupCarPicker(els) {
     } else {
       const hits = searchBrands(st.qBrand).filter(b => brandHasType(b, st.moto));
       const shown = hits.slice(0, 24);
+      const combos = brandModelCombos(st.qBrand, hits, st.moto);
       html += `<div class="pk-step now">
         ${stepHead('1', 'ยี่ห้อ — พิมพ์เพื่อค้นหา', 'now')}
         <div class="pk-body">
           <input type="text" class="pk-input" id="pkBrandQ" autocomplete="off"
                  placeholder="เช่น อีซูซุ / isuzu / ${st.moto ? 'ฮอนด้า' : 'โตโยต้า'}"
                  value="${escHtml(st.qBrand)}">
+          ${combos.length ? `<div class="pk-chips pk-combos">${combos.map(c =>
+              chip(c[0] + ' ' + c[1], `data-brand="${escHtml(c[0])}" data-combo="${escHtml(c[1])}"`, false)).join('')}</div>` : ''}
           <div class="pk-chips">${shown.map(b => chip(b, `data-brand="${escHtml(b)}"`, false)).join('')}</div>
           ${hits.length > shown.length ? `<div class="pk-hint">มี ${hits.length} ยี่ห้อที่ตรง — พิมพ์เพิ่มเพื่อกรองให้แคบลง</div>` : ''}
           ${(!hits.length && st.qBrand.trim())
@@ -243,7 +277,7 @@ function setupCarPicker(els) {
           ${stepHead('2', st.moto ? 'รุ่น — เห็นเฉพาะมอเตอร์ไซค์' : 'รุ่น — พิมพ์เพื่อค้นหา', 'now')}
           <div class="pk-body">
             <input type="text" class="pk-input" id="pkModelQ" autocomplete="off"
-                   placeholder="พิมพ์ชื่อรุ่น หรือชื่อโฉมที่คนเรียกกัน" value="${escHtml(st.qModel)}">
+                   placeholder="พิมพ์ชื่อรุ่น เช่น รีโว่ / วีโก้ / ดีแม็ก" value="${escHtml(st.qModel)}">
             <div class="pk-chips">${shown.map(m => chip(m, `data-model="${escHtml(m)}"`, false)).join('')}</div>
             ${hits.length > shown.length ? `<div class="pk-hint">มี ${hits.length} รุ่นที่ตรง — พิมพ์เพิ่มเพื่อกรองให้แคบลง</div>` : ''}
             ${(!hits.length && st.qModel.trim())
@@ -282,9 +316,7 @@ function setupCarPicker(els) {
             <input type="text" inputmode="numeric" id="pkYearOwn" class="pk-input pk-input-sm"
                    placeholder="เช่น 2015" value="${escHtml(st.year)}">
           </div>
-          <div class="pk-hint">${head.length
-            ? 'ชื่อโฉมเป็นแค่หัวข้อช่วยหา ระบบเก็บแค่ “ปี”'
-            : 'รุ่นนี้ยังไม่มีข้อมูลปีในระบบ — พิมพ์ปีรถได้เลย'}</div>
+          ${head.length ? '' : '<div class="pk-hint">รุ่นนี้ยังไม่มีข้อมูลปีในระบบ — พิมพ์ปีรถได้เลย</div>'}
         </div>
       </div>`;
     }
@@ -303,10 +335,11 @@ function setupCarPicker(els) {
     const t = ev.target.closest('button');
     if (!t) return;
 
-    if (t.dataset.brand)      { st.brand = t.dataset.brand; st.qBrand = ''; st.model = ''; st.year = ''; st.qModel = ''; st._focus = 'pkModelQ'; }
+    if (t.dataset.combo)      { st.brand = t.dataset.brand; st.model = t.dataset.combo; st.qBrand = ''; st.qModel = ''; st.year = ''; st._focus = null; }
+    else if (t.dataset.brand) { st.brand = t.dataset.brand; st.qBrand = ''; st.model = ''; st.year = ''; st.qModel = ''; st._focus = 'pkModelQ'; }
     else if (t.dataset.ownbrand) { st.brand = st.qBrand.trim(); st.qBrand = ''; st.model = ''; st.year = ''; st._focus = 'pkModelQ'; }
     else if (t.dataset.model) { st.model = t.dataset.model; st.qModel = ''; st.year = ''; st._focus = null; }
-    else if (t.dataset.ownmodel) { st.model = st.qModel.trim(); st.qModel = ''; st.year = ''; st._focus = null; }
+    else if (t.dataset.ownmodel) { st.model = stripBrandWords(st.brand, st.qModel); st.qModel = ''; st.year = ''; st._focus = null; }
     else if (t.dataset.year)  { st.year = t.dataset.year; st._focus = null; }
     else if (t.dataset.clear === 'brand') { st.brand = ''; st.model = ''; st.year = ''; st.qBrand = ''; st.qModel = ''; st._focus = 'pkBrandQ'; }
     else if (t.dataset.clear === 'model') { st.model = ''; st.year = ''; st.qModel = ''; st._focus = 'pkModelQ'; }

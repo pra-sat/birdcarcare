@@ -56,7 +56,7 @@ function carPickModelOptions(brand, sel) {
     '<option value="' + CAR_PICK_OTHER + '"' + (sel && models.indexOf(sel) < 0 ? ' selected' : '') + '>อื่น ๆ (พิมพ์เอง)</option>';
 }
 
-// ปีของรุ่นนั้น (ใหม่ไปเก่า) พร้อมรุ่นย่อย/โฉม ให้เลือกถูก เช่น "2024 · Revo ไมเนอร์เชนจ์"
+// ปีของรุ่นนั้น (ใหม่ไปเก่า) พร้อมรุ่นย่อย ให้เลือกถูก เช่น "2024 · Revo"
 function carPickYearOptions(brand, model, sel) {
   var cat = carPickCat();
   var M = cat && cat[brand] && cat[brand].models && cat[brand].models[model];
@@ -67,7 +67,7 @@ function carPickYearOptions(brand, model, sel) {
   if (sel && years.indexOf(Number(sel)) < 0) years.unshift(Number(sel));
   return '<option value="">— เลือกปี —</option>' + years.map(function (y) {
     var d = typeof carDisplay === 'function' ? carDisplay(brand, model, y) : null;
-    var tag = d ? [d.sub, d.nick].filter(Boolean).join(' ') : '';
+    var tag = d ? d.sub : '';   // รุ่นย่อยเท่านั้น ไม่ใส่ชื่อโฉม (13 ต.ค. 2569)
     return '<option value="' + y + '"' + (String(y) === String(sel) ? ' selected' : '') + '>' + y + (tag ? ' · ' + carPickEsc(tag) : '') + '</option>';
   }).join('');
 }

@@ -81,8 +81,8 @@ function historyOf(vehicle, history) {
 }
 
 // ชื่อรถแบบมีรุ่นย่อย (5 ต.ค. 2569 — เจ้าของร้านขอ "Toyota Corolla เน้น Altis แล้วก็ปี")
-//   Toyota / Corolla **Altis** / ปี 2010 · ตาหยี
-//   Toyota / Hilux **Revo** / ปี 2024 · ไมเนอร์เชนจ์
+//   Toyota / Corolla **Altis** / ปี 2010
+//   Toyota / Hilux **Revo** / ปี 2024
 // ข้อมูลรุ่นย่อย/โฉมมาจาก ../car_display.js (สร้างจากฐานข้อมูลรถหน้าสมัคร)
 // ไฟล์นั้นโหลดไม่ขึ้น หรือรุ่นที่ไม่รู้จัก -> แสดงแบบเดิม ยี่ห้อ / รุ่น / ปี
 function carNameHtml(vehicle) {
@@ -93,8 +93,8 @@ function carNameHtml(vehicle) {
   return `<div class="ubrand">${esc(d.brand || vehicle.brand || '-')}</div>` +
     `<div class="umodel">${esc(d.family || vehicle.model || '-')}` +
       (d.sub ? ` <span class="usub">${esc(d.sub)}</span>` : '') + `</div>` +
-    `<div class="uyear">${year ? 'ปี ' + esc(year) : ''}` +
-      (d.nick ? `<span class="unick"> · ${esc(d.nick)}</span>` : '') + `</div>`;
+    // ไม่แสดงชื่อโฉม (13 ต.ค. 2569 เจ้าของร้านสั่ง "โฉมไม่ต้องใส่") เหลือ ยี่ห้อ · รุ่น · รุ่นย่อย · ปี
+    `<div class="uyear">${year ? 'ปี ' + esc(year) : ''}</div>`;
 }
 
 // สร้างการ์ดรถ 1 คัน — รถกับแต้มอยู่กรอบเดียวกัน เพื่อให้แยกคันได้ง่ายเวลามีหลายคัน
@@ -341,28 +341,52 @@ function vehKeyOf(v) {
     .map(x => String(x == null ? '' : x).trim()).join('|') : '';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  ส่งซ้ำเองเมื่อ "ไม่รู้ผล" (13 ต.ค. 2569)
+//
+//  12 ต.ค. 17:05 มือถือลูกค้ากดเปิด QR แล้วคำขอไปถึงเซิร์ฟเวอร์แบบไม่มีข้อมูล 3 รอบ
+//  (Security_Log GET_FOR_POST — POST กลายเป็น GET ระหว่างทาง แบบเดียวกับหน้าแอดมิน 7 ต.ค.)
+//  ไม่ใช่ระบบช้า เซิร์ฟเวอร์ตอบทันทีว่า NEED_POST แต่หน้านี้ไม่ส่งซ้ำ ลูกค้าเลยต้องกดเอง
+//  ใช้กับคำขอที่ส่งซ้ำได้ปลอดภัยเท่านั้น:
+//    create_token  token เดิม = เขียนทับแถวเดิม (และไม่ยอมเขียนทับ QR ที่ใช้แล้ว)
+//    set_own_plate เขียนได้เฉพาะช่องที่ยังว่าง
+//  isDone(json) = คำตอบนี้ "รู้ผลแล้ว" (สำเร็จหรือถูกปฏิเสธจริง) ไม่ต้องส่งซ้ำ
+// ═══════════════════════════════════════════════════════════════════════════
+async function postWithRetry(action, body, isDone, tries) {
+  const max = tries || 3;
+  let last = null;
+  for (let i = 1; i <= max; i++) {
+    if (i > 1) await new Promise(r => setTimeout(r, 600 * (i - 1)));
+    try {
+      const res = await fetch(GAS_ENDPOINT + '?action=' + action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ action }, body))
+      });
+      const json = await res.json();
+      if (json && json.code !== 'NEED_POST' && isDone(json)) return json;
+      last = json;
+    } catch (e) { last = null; /* เน็ตหลุด / ได้หน้า HTML แทน JSON = ยังไม่รู้ผล */ }
+  }
+  return last;
+}
+
 function createTokenOnServer(token, vehicle) {
   // createdAt: ฝั่ง Apps Script ไม่ได้ใช้ค่านี้เลย (token.gs ใช้ new Date() ของตัวเอง
   // เป็นเวลาสร้าง QR เสมอ ซึ่งถูกแล้ว) ส่งเวลาปัจจุบันไปเฉย ๆ เพื่อไม่ให้รูปแบบ
   // ข้อมูลที่ส่งเปลี่ยน · ของเดิมดึงวันที่จากประวัติ ทำให้หน้านี้ต้องรอโหลดประวัติก่อน
-  return fetch(GAS_ENDPOINT + '?action=create_token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action: "create_token",
-      token,
-      userId: currentUserId,
-      createdAt: new Date().toISOString(),
-      // รถที่ลูกค้าเลือก — แอดมินจะได้ไม่ต้องเดาเองตอนสแกน (ว่างได้)
-      vehicle: vehicle ? {
-        brand: vehicle.brand || '', model: vehicle.model || '', year: vehicle.year || ''
-      } : null
-    })
-  }).then(res => {
-    if (!res.ok) throw new Error("create_token failed");
-    return res.json();
-  }).then(result => {
-    if (result.status !== 'success') throw new Error(result.message || "QR สร้างไม่สำเร็จ");
+  return postWithRetry('create_token', {
+    token,
+    userId: currentUserId,
+    createdAt: new Date().toISOString(),
+    // รถที่ลูกค้าเลือก — แอดมินจะได้ไม่ต้องเดาเองตอนสแกน (ว่างได้)
+    vehicle: vehicle ? {
+      brand: vehicle.brand || '', model: vehicle.model || '', year: vehicle.year || ''
+    } : null
+  }, j => j.status === 'success' || (j.status === 'error' && !!j.message)).then(result => {
+    if (!result || result.status !== 'success') {
+      throw new Error((result && result.message) || "QR สร้างไม่สำเร็จ");
+    }
     return result;
   });
 }
@@ -425,21 +449,17 @@ function markPlateAskSkipped(vehicle) {
 }
 
 async function savePlateForMe(vehicle, plate, province) {
-  const res = await fetch(GAS_ENDPOINT + '?action=set_own_plate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({
-      action: 'set_own_plate',
-      idToken: memberTokens.id,
-      accessToken: memberTokens.access,
-      brand: vehicle.brand || '',
-      model: vehicle.model || '',
-      year: vehicle.year || '',
-      plate: plate,
-      province: province
-    })
-  });
-  return res.json();
+  // ส่งซ้ำได้ปลอดภัย (เขียนเฉพาะช่องที่ยังว่าง) · ไม่รู้ผลจริง ๆ คืน error ให้ผู้เรียกจัดการแบบเดิม
+  const r = await postWithRetry('set_own_plate', {
+    idToken: memberTokens.id,
+    accessToken: memberTokens.access,
+    brand: vehicle.brand || '',
+    model: vehicle.model || '',
+    year: vehicle.year || '',
+    plate: plate,
+    province: province
+  }, j => ['success', 'exists', 'error'].indexOf(j.status) >= 0);
+  return r || { status: 'error', message: 'เช็คสัญญาณเน็ตแล้วลองใหม่อีกครั้ง' };
 }
 
 // target = รถคันที่ลูกค้ากดแสดง QR (ไม่ส่งมา = คันแรกที่ยังไม่มีทะเบียน)

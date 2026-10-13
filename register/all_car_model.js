@@ -517,6 +517,18 @@ const carData = {
     }
   },
 
+  // เพิ่ม 13 ต.ค. 2569 — ลูกค้าสมัครเป็น "Geely | Ex2" (ไม่มีในรายการ ต้องพิมพ์เอง)
+  // EX2 เปิดตัวไทยงาน Motor Expo ธ.ค. 2025 · EX5 ขายในไทยปี 2025 — ปีเริ่ม 2025 ทั้งคู่
+  "Geely": {
+    th: ["จีลี่", "จีลี", "geely"],
+    models: {
+      "EX2": { th: ["อีเอ็กซ์2", "ex2", "ex 2"], category: "Hatchback", ev: true,
+               gens: [{ code: "", label: "", from: 2025, to: null }] },
+      "EX5": { th: ["อีเอ็กซ์5", "ex5", "ex 5"], category: "SUV", ev: true,
+               gens: [{ code: "", label: "", from: 2025, to: null }] }
+    }
+  },
+
   "Neta": {
     th: ["เนต้า", "เนตา", "neta"],
     models: {

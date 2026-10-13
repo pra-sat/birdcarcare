@@ -785,6 +785,11 @@ input.pk-input-sm { font-size: 14px; padding: 8px 11px; }
   cursor: pointer;
 }
 .pk-chips button.pk-chip:hover { background-color: #E7F4FC !important; }
+/* ยี่ห้อ+รุ่นในชิปเดียว (13 ต.ค. 2569) — แตะทีเดียวได้ทั้งคู่ จึงเน้นให้เห็นก่อนชิปยี่ห้อ */
+.pk-chips.pk-combos button.pk-chip {
+  border: 1.5px solid var(--bc-water) !important;
+  font-weight: 600;
+}
 .pk-chips button.pk-chip:active { transform: scale(.96); }
 .pk-chips button.pk-chip.is-on {
   background: var(--bc-water) !important;
