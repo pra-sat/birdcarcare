@@ -30,7 +30,10 @@ async function initLIFF() {
         // }
 
         profile = await liff.getProfile();
-        await silentlyUpdateLineProfile(profile);
+        // ไม่รอ (13 ต.ค. 2569) — เดิม await ทำให้ userId ยังไม่ถูกตั้งจนกว่าอัปเดตโปรไฟล์จะเสร็จ
+        // ซึ่งเคยใช้ถึง 34 วิ (7 ต.ค.) ลูกค้ากดส่งก่อน = "Could not get LINE user profile"
+        // หน้านี้ไม่ได้ใช้ผลลัพธ์ของมันเลย ปล่อยวิ่งเบื้องหลัง
+        silentlyUpdateLineProfile(profile);
 
         async function silentlyUpdateLineProfile(profile) {
           try {
@@ -141,6 +144,61 @@ function stripBrandWords(brand, text) {
   return kept.join(' ').trim() || raw;
 }
 
+// ── พิมพ์ผิดนิดหน่อยก็ยังเจอ (13 ต.ค. 2569 — ลดรุ่นที่ลูกค้าพิมพ์เองผิด ๆ) ──────────
+// ค้นปกติไม่เจอ -> หาคำในฐานข้อมูลที่ต่างจากที่พิมพ์ไม่เกิน 1-2 ตัวอักษร แล้วถาม "หมายถึง..."
+// ก่อนให้กด "ใช้ตามที่พิมพ์" เช่น "เรนเขอร" -> Ranger · "สปาค" -> D-Max Spark
+// เทียบหลังตัดวรรณยุกต์/ช่องว่างแล้ว (normalizeKey) · คำสั้นกว่า 3 ตัวไม่เดา (จับผิดง่าย)
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  let prev = [], cur = [];
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+function fuzzyLimit(len) { return len < 3 ? -1 : (len <= 5 ? 1 : 2); }
+function fuzzyPick(q, entries) {        // entries: [[ชื่อที่จะคืน, [คำค้น...]], ...]
+  const k = normalizeKey(q);
+  const lim = fuzzyLimit(k.length);
+  if (lim < 0) return [];
+  const scored = [];
+  entries.forEach(([name, keys]) => {
+    let best = 99;
+    keys.forEach(x => { const d = editDistance(k, normalizeKey(x)); if (d < best) best = d; });
+    if (best <= lim) scored.push([best, name]);
+  });
+  return scored.sort((a, b) => a[0] - b[0]).slice(0, 3).map(x => x[1]);
+}
+function fuzzyBrands(q, wantMoto) {
+  return fuzzyPick(q, Object.keys(carData)
+    .filter(b => brandHasType(b, wantMoto))
+    .map(b => [b, [b].concat(carData[b].th || [])]));
+}
+function fuzzyModels(brand, q, wantMoto) {
+  const b = carData[brand];
+  if (!b) return [];
+  return fuzzyPick(stripBrandWords(brand, q), Object.keys(b.models || {})
+    .filter(m => modelIsMoto(brand, m) === !!wantMoto)
+    .map(m => [m, [m].concat(modelSearchKeys(b.models[m]))]));
+}
+
+// ปีที่พิมพ์เอง: ลูกค้าไทยพิมพ์ พ.ศ. บ่อย ("2565") -> แปลงเป็น ค.ศ. ให้เลย ไม่ใช่ขึ้นว่าผิด
+// คืน { year, note } · note ว่าง = ไม่ได้แปลง
+function normalizeYearInput(raw) {
+  const y = String(raw || '').replace(/\D/g, '').slice(0, 4);
+  const n = parseInt(y, 10);
+  if (y.length === 4 && n >= 2400 && n <= 2700) {
+    return { year: String(n - 543), note: `แปลง พ.ศ. ${n} เป็น ค.ศ. ${n - 543} ให้แล้ว` };
+  }
+  return { year: y, note: '' };
+}
+
 function setupCarPicker(els) {
   const box = document.getElementById('carPicker');
   const btnCar = document.getElementById('tyCar');
@@ -248,6 +306,11 @@ function setupCarPicker(els) {
               chip(c[0] + ' ' + c[1], `data-brand="${escHtml(c[0])}" data-combo="${escHtml(c[1])}"`, false)).join('')}</div>` : ''}
           <div class="pk-chips">${shown.map(b => chip(b, `data-brand="${escHtml(b)}"`, false)).join('')}</div>
           ${hits.length > shown.length ? `<div class="pk-hint">มี ${hits.length} ยี่ห้อที่ตรง — พิมพ์เพิ่มเพื่อกรองให้แคบลง</div>` : ''}
+          ${(!hits.length && st.qBrand.trim()) ? (() => {
+              const near = fuzzyBrands(st.qBrand, st.moto);
+              return near.length ? `<div class="pk-hint">หมายถึงยี่ห้อนี้หรือเปล่า?</div>
+                <div class="pk-chips pk-combos">${near.map(b => chip(b, `data-brand="${escHtml(b)}"`, false)).join('')}</div>` : '';
+            })() : ''}
           ${(!hits.length && st.qBrand.trim())
             ? `<button type="button" class="pk-own" data-ownbrand="1">➕ ใช้ “${escHtml(st.qBrand.trim())}” ตามที่พิมพ์</button>
                <div class="pk-hint">ไม่พบยี่ห้อนี้ในรายการ — กรอกเองได้ ทางร้านจะเพิ่มเข้าระบบให้ภายหลัง</div>`
@@ -280,6 +343,11 @@ function setupCarPicker(els) {
                    placeholder="พิมพ์ชื่อรุ่น เช่น รีโว่ / วีโก้ / ดีแม็ก" value="${escHtml(st.qModel)}">
             <div class="pk-chips">${shown.map(m => chip(m, `data-model="${escHtml(m)}"`, false)).join('')}</div>
             ${hits.length > shown.length ? `<div class="pk-hint">มี ${hits.length} รุ่นที่ตรง — พิมพ์เพิ่มเพื่อกรองให้แคบลง</div>` : ''}
+            ${(!hits.length && st.qModel.trim()) ? (() => {
+                const near = fuzzyModels(st.brand, st.qModel, st.moto);
+                return near.length ? `<div class="pk-hint">หมายถึงรุ่นนี้หรือเปล่า?</div>
+                  <div class="pk-chips pk-combos">${near.map(m => chip(m, `data-model="${escHtml(m)}"`, false)).join('')}</div>` : '';
+              })() : ''}
             ${(!hits.length && st.qModel.trim())
               ? `<button type="button" class="pk-own" data-ownmodel="1">➕ ใช้ “${escHtml(st.qModel.trim())}” ตามที่พิมพ์</button>
                  <div class="pk-hint">ไม่พบรุ่นนี้ในรายการ — กรอกเองได้เลย</div>`
@@ -314,7 +382,8 @@ function setupCarPicker(els) {
           <div class="pk-own-year">
             <label for="pkYearOwn">ไม่มีปีที่ต้องการ? พิมพ์เอง</label>
             <input type="text" inputmode="numeric" id="pkYearOwn" class="pk-input pk-input-sm"
-                   placeholder="เช่น 2015" value="${escHtml(st.year)}">
+                   placeholder="ปี ค.ศ. เช่น 2015" value="${escHtml(st.year)}">
+            <div class="pk-hint" id="pkYearNote"></div>
           </div>
           ${head.length ? '' : '<div class="pk-hint">รุ่นนี้ยังไม่มีข้อมูลปีในระบบ — พิมพ์ปีรถได้เลย</div>'}
         </div>
@@ -356,8 +425,11 @@ function setupCarPicker(els) {
     else if (id === 'pkModelQ') { st.qModel = ev.target.value; st._focus = id; }
     else if (id === 'pkYearOwn') {
       // ปีพิมพ์เอง — รับแค่ตัวเลข 4 หลัก ไม่ต้องวาดจอใหม่ระหว่างพิมพ์
-      st.year = ev.target.value.replace(/\D/g, '').slice(0, 4);
+      const ny = normalizeYearInput(ev.target.value);      // พิมพ์ พ.ศ. มา -> แปลงเป็น ค.ศ. ให้
+      st.year = ny.year;
       if (ev.target.value !== st.year) ev.target.value = st.year;
+      const note = document.getElementById('pkYearNote');
+      if (note) note.textContent = ny.note;
       commit();
       return;
     }
@@ -616,9 +688,10 @@ form.addEventListener('submit', async event => {
     }
 
     const currentYear = new Date().getFullYear();
-    const yearNum = parseInt(year, 10);
+    let yearNum = parseInt(year, 10);
+    if (yearNum >= 2400 && yearNum <= 2700) yearNum -= 543;     // พ.ศ. -> ค.ศ. (กันพลาดอีกชั้น)
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear) {
-        Swal.fire('ปีรถไม่ถูกต้อง', `กรุณาเลือกหรือกรอกปีระหว่าง 1900 - ${currentYear}`, 'warning');
+        Swal.fire('ปีรถไม่ถูกต้อง', `กรุณาเลือกหรือกรอกปี ค.ศ. ระหว่าง 1900 - ${currentYear}`, 'warning');
         return;
     }
 
@@ -636,7 +709,7 @@ form.addEventListener('submit', async event => {
         name: name.trim(),
         brand: brand.trim(),
         model: model.trim(),
-        year: year.trim(),
+        year: String(yearNum),
         category,
         channel,
         // เพิ่ม 13 ก.ย. 2569 — Apps Script รุ่นเก่าที่ยังไม่รู้จัก 2 ช่องนี้จะเมินไปเอง
@@ -666,7 +739,7 @@ form.addEventListener('submit', async event => {
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'check_duplicate',
-                userId, phone, brand, model, year,
+                userId, phone, brand, model, year: payload.year,
                 plate: payload.plate, province: payload.province
             })
         });
@@ -728,61 +801,75 @@ form.addEventListener('submit', async event => {
         }
     });
 
-        console.log("Preparing to send payload:", payload);
+    // ═══════════════════════════════════════════════════════════════════
+    //  ส่งสมัคร: ไม่รู้ผล -> ส่งซ้ำเองด้วย regId เดิม (13 ต.ค. 2569)
+    //
+    //  🔴 เดิมเน็ตสะดุด/คำขอถึงเซิร์ฟเวอร์แบบไม่มีข้อมูล (POST กลายเป็น GET — เจอจริงหลายครั้ง)
+    //     = ขึ้น "Registration Failed" + ปิดหน้า + ล้างฟอร์ม ทั้งที่เซิร์ฟเวอร์อาจบันทึกไปแล้ว
+    //     ลูกค้าเปิดใหม่ กรอกใหม่ สมัครซ้ำ -> รถซ้ำ 2 แถวแต้มแยกกัน
+    //  regId ผูกกับข้อมูลที่กรอก: แก้รถ/ทะเบียน/เบอร์ = รหัสใหม่ (ไม่เอาผลของการสมัครครั้งก่อนมาตอบ)
+    //  เซิร์ฟเวอร์จำ regId ที่สำเร็จไว้ 6 ชม. ส่งซ้ำ = ได้ "สำเร็จ" เดิม ไม่เพิ่มแถว
+    //  ไม่สำเร็จ = ไม่ล้างฟอร์ม ไม่ปิดหน้า แก้แล้วกดส่งใหม่ได้ทันที
+    // ═══════════════════════════════════════════════════════════════════
+    const regKey = [payload.phone, payload.brand, payload.model, payload.year, payload.plate, payload.province].join('|');
+    if (window.__bcRegKey !== regKey) {
+        window.__bcRegKey = regKey;
+        window.__bcRegId = 'g' + Date.now() + Math.random().toString(36).slice(2, 8);
+    }
+    payload.regId = window.__bcRegId;
 
-    try {
-        const response = await fetch(GAS_ENDPOINT + '?action=register', {
-            redirect: "follow",
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload)
-        });
-
-        const textData = await response.text();
-        console.log('Full Response:', textData);
-
-        if (!response.ok) {
-            throw new Error(`Server returned ${response.status}: ${textData}`);
-        }
-
-        let data;
+    let data = null;
+    for (let attempt = 1; attempt <= 3 && !data; attempt++) {
+        if (attempt > 1) await new Promise(r => setTimeout(r, 800 * (attempt - 1)));
         try {
-            data = JSON.parse(textData);
-        } catch (parseError) {
-            throw new Error(`Invalid JSON response: ${textData}`);
+            const response = await fetch(GAS_ENDPOINT + '?action=register', {
+                redirect: "follow",
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(payload)
+            });
+            const textData = await response.text();
+            let j = null;
+            try { j = JSON.parse(textData); } catch (parseError) { j = null; }   // หน้า HTML = ไม่รู้ผล
+            if (j && j.code !== 'NEED_POST' &&
+                (j.status === 'success' || (j.status === 'error' && j.message))) data = j;
+        } catch (netErr) {
+            console.warn('ส่งสมัครไม่ถึง (รอบ ' + attempt + '):', netErr);
         }
-
-        if (data.status === "success") {
-          await Swal.fire("✅ สมัครสมาชิกสำเร็จ", "แตะ 'OK' เพื่อดูข้อมูลสมาชิกของคุณ", "success");
-          submitBtn.textContent = "✅Submit";
-          liff.openWindow({
-            url: 'https://liff.line.me/2007421084-WXmXrzZY',
-            external: false
-          });
-          return;
-        } else {
-            throw new Error(data.message || "Registration failed");
-        }
-
-    } catch (error) {
-        console.error("Error during fetch:", error);
-        await Swal.fire({
-            icon: 'error',
-            title: '❗️Registration Failed',
-            text: error.message,
-            confirmButtonText: confirmText
-        });
-        liff.closeWindow();
     }
 
-    finally {
-            form.reset();
-            if (typeof window.resetCarPicker === 'function') window.resetCarPicker();
-            if (typeof window.resetPlateFields === 'function') window.resetPlateFields();
-            // form.reset() ล้างเฉพาะช่องในฟอร์ม ไม่แตะตัวแปร userId
-            // จึงไม่ต้องเขียนคืนอะไรตรงนี้แล้ว (เดิมเขียนคืนเพราะมีช่องโชว์ UID อยู่)
-            // document.getElementById('name').focus();
-            submitBtn.disabled = false;
-        }
+    if (data && data.status === "success") {
+        window.__bcRegKey = null; window.__bcRegId = null;
+        form.reset();
+        if (typeof window.resetCarPicker === 'function') window.resetCarPicker();
+        if (typeof window.resetPlateFields === 'function') window.resetPlateFields();
+        submitBtn.disabled = false;
+        await Swal.fire("✅ สมัครสมาชิกสำเร็จ", "แตะ 'OK' เพื่อดูข้อมูลสมาชิกของคุณ", "success");
+        submitBtn.textContent = "✅Submit";
+        liff.openWindow({
+            url: 'https://liff.line.me/2007421084-WXmXrzZY',
+            external: false
+        });
+        return;
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = "✅Submit";
+    if (data) {
+        // เซิร์ฟเวอร์ตอบชัดว่าไม่ได้ (เช่น ทะเบียนนี้มีในระบบแล้ว) -> บอกเหตุผล ข้อมูลที่กรอกยังอยู่ครบ
+        await Swal.fire({
+            icon: 'error',
+            title: 'สมัครไม่สำเร็จ',
+            text: data.message,
+            confirmButtonText: confirmText
+        });
+    } else {
+        await Swal.fire({
+            icon: 'warning',
+            title: 'ยังไม่แน่ใจว่าสมัครสำเร็จหรือยัง',
+            text: 'สัญญาณเน็ตสะดุด ข้อมูลที่กรอกยังอยู่ครบ กด "ส่ง" อีกครั้งได้เลย ระบบกันสมัครซ้ำให้แล้ว',
+            confirmButtonText: confirmText
+        });
+    }
     });
 });
