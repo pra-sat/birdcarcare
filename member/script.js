@@ -1200,20 +1200,20 @@ function renderHistory(historyRows) {
               <button class="btn feedback-btn"
                 data-date="${dateStr}"
                 data-raw="${toBangkokISOString(parsedDate)}"
-                data-service="${row.service || ''}"
-                data-brand="${row.brand || ''}"
-                data-model="${row.model || ''}">
+                data-service="${esc(row.service || '')}"
+                data-brand="${esc(row.brand || '')}"
+                data-model="${esc(row.model || '')}">
                 ให้คะแนน / ข้อเสนอแนะ
               </button>
             `;
           }
           historyCardsHtml += `
             <p><b> วันที่:</b> ${dateStr}</p>
-            <p><b> ยี่ห้อ/รุ่น:</b> ${row.brand || '-'} ${row.model || '-'}</p>
-            <p><b> บริการ:</b> ${row.service}</p>
-            <p><b> ราคา:</b> ${row.price} ฿</p>
-            <p><b> แต้ม:</b> ${row.point}</p>
-            <p><b> หมายเหตุ:</b> ${row.note}</p>
+            <p><b> ยี่ห้อ/รุ่น:</b> ${esc(row.brand || '-')} ${esc(row.model || '-')}</p>
+            <p><b> บริการ:</b> ${esc(row.service)}</p>
+            <p><b> ราคา:</b> ${esc(row.price)} ฿</p>
+            <p><b> แต้ม:</b> ${esc(row.point)}</p>
+            <p><b> หมายเหตุ:</b> ${esc(row.note)}</p>
           `;
           if (!row.rating || !row.feedback) {
             historyCardsHtml += `
@@ -1240,11 +1240,11 @@ function renderHistory(historyRows) {
             return `
               <tr class="history-entry">
                 <td>${dateStr}</td>
-                <td>${row.brand || '-'} ${row.model || '-'}</td>
-                <td>${row.service}</td>
-                <td>${row.price} ฿</td>
-                <td>${row.point}</td>
-                <td>${row.note}</td>
+                <td>${esc(row.brand || '-')} ${esc(row.model || '-')}</td>
+                <td>${esc(row.service)}</td>
+                <td>${esc(row.price)} ฿</td>
+                <td>${esc(row.point)}</td>
+                <td>${esc(row.note)}</td>
                 <td>${starsTd}</td>
               </tr>
             `;
@@ -1253,18 +1253,18 @@ function renderHistory(historyRows) {
             return `
               <tr class="history-entry">
                 <td>${dateStr}</td>
-                <td>${row.brand || '-'} ${row.model || '-'}</td>
-                <td>${row.service}</td>
-                <td>${row.price} ฿</td>
-                <td>${row.point}</td>
-                <td>${row.note}</td>
+                <td>${esc(row.brand || '-')} ${esc(row.model || '-')}</td>
+                <td>${esc(row.service)}</td>
+                <td>${esc(row.price)} ฿</td>
+                <td>${esc(row.point)}</td>
+                <td>${esc(row.note)}</td>
                 <td>
                   <button class="btn feedback-btn"
                     data-date="${dateStr}"
                     data-raw="${toBangkokISOString(parsedDate)}"
-                    data-service="${row.service || ''}"
-                    data-brand="${row.brand || ''}"
-                    data-model="${row.model || ''}">
+                    data-service="${esc(row.service || '')}"
+                    data-brand="${esc(row.brand || '')}"
+                    data-model="${esc(row.model || '')}">
                     ให้คะแนน / ข้อเสนอแนะ
                   </button>
                 </td>
