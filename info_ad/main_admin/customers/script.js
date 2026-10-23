@@ -13,6 +13,7 @@ const $ = id => document.getElementById(id);
 let adminUserId = '', idToken = '';
 let list = [];          // ผลค้นที่แสดงอยู่
 let lastQuery = '';
+let canBonus = false;     // ⭐ เพิ่มแต้ม — เซิร์ฟเวอร์บอกมากับผลค้น (canBonus)
 
 function esc(s) {
   return String(s == null ? '' : s)
@@ -79,6 +80,9 @@ async function search(q) {
     if (data.status !== 'success') throw new Error(data.message || 'ค้นไม่สำเร็จ');
     if (q !== lastQuery) return;          // พิมพ์คำใหม่ไปแล้ว ทิ้งผลเก่า
     list = data.list || [];
+    // ⭐ เพิ่มแต้มโชว์เฉพาะระดับที่เซิร์ฟเวอร์ยอมให้ (BONUS_MIN_LEVEL · 23 ต.ค. 2569 = ระดับ 4+)
+    // เซิร์ฟเวอร์รุ่นเก่าไม่ส่ง canBonus มา = ซ่อนไว้ก่อน (กดแล้วโดนปฏิเสธแย่กว่าไม่เห็น)
+    canBonus = data.canBonus === true;
     renderList();
     const more = data.total > list.length ? ` · แสดง ${list.length} คนแรก พิมพ์ให้เจาะจงขึ้นได้` : '';
     $('status').textContent = q
@@ -105,7 +109,7 @@ function renderList() {
         <div class="cu-top">
           <div class="cu-name">${esc(c.name || '(ไม่มีชื่อ)')}${line}</div>
           <span class="cu-acts">
-            <span class="cu-bonus" role="button" tabindex="0" data-bonus="${i}">⭐ เพิ่มแต้ม</span>
+            ${canBonus ? `<span class="cu-bonus" role="button" tabindex="0" data-bonus="${i}">⭐ เพิ่มแต้ม</span>` : ''}
             <span class="cu-go">แก้ไข ›</span>
           </span>
         </div>
@@ -144,7 +148,7 @@ function openEdit(i, pre) {
       <div class="fld"><label class="fld-lbl" for="ePhone">เบอร์โทร</label>
         <input id="ePhone" class="swal2-input" type="tel" inputmode="numeric" maxlength="12" value="${esc(show.phone)}" autocomplete="off"></div>
       <div class="fld"><label class="fld-lbl">ทะเบียนรถ <span class="fld-sub">— เว้นว่างได้</span></label>${carsHtml}</div>
-      <p class="cu-note">ยี่ห้อ/รุ่น/ปี และแต้ม แก้ที่หน้านี้ไม่ได้ — ยี่ห้อ/รุ่น/ปีใช้ผูกกับประวัติการใช้บริการ ถ้าแก้แล้วประวัติกับแต้มจะหลุดจากรถคันนั้น · จะเพิ่มแต้มจากบัตรสะสม กดปุ่ม ⭐ เพิ่มแต้ม ที่การ์ดลูกค้า</p>`,
+      <p class="cu-note">ยี่ห้อ/รุ่น/ปี และแต้ม แก้ที่หน้านี้ไม่ได้ — ยี่ห้อ/รุ่น/ปีใช้ผูกกับประวัติการใช้บริการ ถ้าแก้แล้วประวัติกับแต้มจะหลุดจากรถคันนั้น${canBonus ? ' · จะเพิ่มแต้มจากบัตรสะสม กดปุ่ม ⭐ เพิ่มแต้ม ที่การ์ดลูกค้า' : ''}</p>`,
     showCancelButton: true,
     confirmButtonText: '💾 บันทึก',
     cancelButtonText: 'ยกเลิก',
