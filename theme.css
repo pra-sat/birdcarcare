@@ -1145,6 +1145,11 @@ body > .container > h2 { font-size: 1.28rem !important; margin: 0 0 10px !import
   padding: 12px 16px;
   line-height: 1.35;
 }
+/* 🔴 เมนูที่ applyAdmin ซ่อนตามระดับต้องหายจริง (23 ต.ค. 2569)
+   กฎ a.btn ข้างบนเป็น (0,2,1) ชนะ .hidden ของ style.css (0,1,0) อยู่เงียบ ๆ
+   ผลคือเมนูลิงก์ทุกปุ่มโผล่ให้ทุกระดับเห็นมาตั้งแต่มีธีม (พนักงานระดับ 2 เห็นสรุปยอด/ข้อมูลลูกค้า)
+   test_hidden_cascade.js คิด cascade จริงคุมไว้ */
+.admin-buttons .hidden, .menu-buttons .hidden { display: none !important; }
 
 /* ── ตารางประวัติบนจอแคบ ────────────────────────────────────────────── */
 .history-section-wrapper { -webkit-overflow-scrolling: touch; }
