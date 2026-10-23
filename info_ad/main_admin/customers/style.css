@@ -40,7 +40,16 @@
 .cu-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .cu-name { font-weight: 700; font-size: 15.5px; color: var(--bc-ink); }
 .cu-line { font-weight: 400; font-size: 12px; color: var(--bc-ink2); }
+.cu-acts { flex: 0 0 auto; display: flex; align-items: baseline; gap: 10px; }
 .cu-go { flex: 0 0 auto; font-size: 12.5px; font-weight: 600; color: var(--bc-waterD); }
+/* ปุ่ม ⭐ เพิ่มแต้ม บนการ์ด — span ไม่ใช่ button (กฎ button ใน theme.css ทาสีทึบ) */
+.cu-bonus {
+  font-size: 12px; font-weight: 600; color: #8A5A00;
+  background: #FFF6DB; border: 1px solid #F2DFA8; border-radius: 999px;
+  padding: 3px 9px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.cu-bonus:active { transform: scale(.95); }
+.cu-bonus:focus-visible { outline: 3px solid #F2C14E; outline-offset: 2px; }
 
 .cu-phone { font-size: 13.5px; color: var(--bc-ink); margin-top: 3px; }
 .cu-pts {
@@ -74,3 +83,28 @@
 
 .cu-diff { text-align: left; margin: 0 auto; padding-left: 20px; font-size: 14px; line-height: 1.7; }
 .cu-warn { font-size: 13px; color: var(--bc-ink2); }
+
+/* ── ⭐ เพิ่มแต้ม ─────────────────────────────────────────────────────────
+   ⚠️ ต้องเขียน .bp-chips button.bp-chip + !important ให้ชนะกฎ button ใน theme.css
+      (เหตุผลเดียวกับ .svc-chips button.svc-chip) */
+.bp-who { font-weight: 700; font-size: 15px; margin: 0 0 4px; color: var(--bc-ink); }
+.bp-one { font-size: 13.5px; font-weight: 700; color: var(--bc-ink); text-align: left; padding: 4px 2px; }
+.bp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.bp-chips button.bp-chip {
+  display: inline-block; margin: 0;
+  font-family: var(--bc-body) !important;
+  font-size: 13.5px; font-weight: 500;
+  padding: 7px 12px;
+  background: #F4FAFE !important; background-color: #F4FAFE !important;
+  color: var(--bc-deep) !important;
+  border: 1px solid #CFE6F4 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.bp-chips button.bp-chip:active { transform: scale(.96); }
+.bp-chips button.bp-chip.is-on {
+  background: var(--bc-water) !important; background-color: var(--bc-water) !important;
+  color: #fff !important; border-color: var(--bc-water) !important; font-weight: 600;
+}
+.swal2-popup #bpPts, .swal2-popup #bpReason { width: 100%; margin: 6px 0 0 !important; box-sizing: border-box; }
