@@ -235,16 +235,20 @@ function isPartsService(name) { return PARTS_RE.test(String(name || '')); }
 // ── เมนูตามระดับสิทธิ์ (23 ต.ค. 2569 · เจ้าของร้านสั่ง "ระดับ 3 ไม่ต้องแสดงหมด แสดงแค่ที่เข้าใช้งานได้")
 //   ระดับ 2 พนักงานหน้าร้าน : 🔍 สแกน · 🔐 ตรวจความปลอดภัย
 //   ระดับ 3 หัวหน้าหน้าร้าน  : + 👥 ข้อมูลลูกค้า · 📝 คำขอแก้ไข · 🏪 ดูข้อมูลร้าน (งานดูแลลูกค้า ไม่เห็นยอดเงิน)
-//   ระดับ 4 ผู้จัดการ        : + 📊 สรุปยอด · ⭐ เพิ่มแต้ม (เรื่องเงิน)
-//   ระดับ 5 เจ้าของร้าน       : + ⚙️ ตั้งค่า (ยังปิดอยู่)
+//   ระดับ 4 ผู้จัดการ        : + 📊 สรุปยอด · ⭐ เพิ่มแต้ม (เรื่องเงิน) · 🩺 สถานะระบบ
+//   ระดับ 5 เจ้าของร้าน       : + 🛟 กู้รายการ · 👤 จัดการแอดมิน · ⚙️ ตั้งค่า (ยังปิดอยู่)
 //   🔴 ซ่อนปุ่มไม่ใช่ด่านกัน — เลขทุกตัวต้องตรงกับเซิร์ฟเวอร์ (มีเทสต์เทียบ)
 //      customers/requests = CUST_MIN_LEVEL · stats = STATS_MIN_LEVEL · ⭐ = BONUS_MIN_LEVEL
+//      system/recover/admins = SYS_OPS_LEVEL (sys_admin.gs)
 const BC_MENU_LEVELS = [
   { sel: '#scanBtn',                 min: 2 },   // งานหลักของพนักงานหน้าร้าน
   { sel: '[data-menu="customers"]',  min: 3 },   // = CUST_MIN_LEVEL (customer_admin.gs)
   { sel: '[data-menu="requests"]',   min: 3 },   // edit_request.gs ใช้ CUST_MIN_LEVEL ตัวเดียวกัน
   { sel: '[data-menu="shopinfo"]',   min: 3 },   // หน้าที่ลูกค้าเห็นอยู่แล้ว ซ่อนไว้ให้จอพนักงานสะอาด
   { sel: '[data-menu="stats"]',      min: 4 },   // = STATS_MIN_LEVEL (stats.gs)
+  { sel: '[data-menu="system"]',     min: 4 },   // = SYS_STATUS_LEVEL (sys_admin.gs)
+  { sel: '[data-menu="recover"]',    min: 5 },   // = SYS_OWNER_LEVEL
+  { sel: '[data-menu="admins"]',     min: 5 },   // = SYS_OWNER_LEVEL
   { sel: '[data-menu="feedback"]',   min: 4 },
   { sel: '[data-menu="settings"]',   min: 5 }
 ];
@@ -827,23 +831,19 @@ class QRScanner {
   // พนักงานจึงต้องกดสลับกล้องทุกครั้ง วันละหลายสิบครั้ง
   //
   // ไล่ 3 ชั้น ถ้าชั้นแรกไม่ได้ค่อยตกไปชั้นถัดไป ชั้นสุดท้ายคือพฤติกรรมเดิม จึงไม่มีทางแย่ลงกว่าเดิม
-  // กรอบสแกนต้องเป็นจัตุรัสเสมอ (แก้ 19 ก.ย. 2569 ตามที่แอดมินแจ้ง)
-  //
-  // 🔴 ของเดิมเขียน qrbox: 250 ซึ่งเป็นเลขตายตัว
-  //    ถ้าภาพจากกล้องแคบกว่า 250 จุด html5-qrcode จะย่อกรอบให้พอดีภาพ
-  //    ด้านที่แคบถูกบีบ ด้านที่กว้างไม่ถูกบีบ -> กลายเป็นสี่เหลี่ยมผืนผ้า
-  //    บนมือถือแนวตั้งจึงเห็นเป็นผืนผ้าเกือบตลอด
-  //
-  //    ใช้ฟังก์ชันคำนวณจากขนาดภาพจริงแทน จะได้จัตุรัสทุกเครื่องทุกขนาดจอ
-  //    (รูปแบบฟังก์ชันเป็น API ที่ไลบรารีรองรับอยู่แล้ว)
-  static squareQrBox(viewW, viewH) {
-    const side = Math.floor(Math.min(viewW, viewH) * 0.72);
-    const s = Math.max(160, side);          // เล็กกว่านี้เล็งยาก
-    return { width: s, height: s };
+  // ── กรอบสแกน: จัตุรัสใหญ่ วาดเองด้วย CSS (23 ต.ค. 2569 · แอดมินแจ้งว่ายังเป็นผืนผ้า) ──
+  //   🔴 ต้นเหตุจริง: html5-qrcode วาดแถบเงา (#qr-shaded-region) เต็มกล่อง #reader
+  //      แต่คิดความหนาขอบบน-ล่างจาก "ความสูงของวิดีโอ" (กล้องส่วนใหญ่ 4:3)
+  //      ส่วน #reader ถูกทำเป็นจัตุรัส -> ช่องใสตรงกลางสูงกว่ากว้าง = ผืนผ้าเสมอ
+  //      (แก้ qrbox เป็นจัตุรัสเมื่อ 19 ก.ย. จึงไม่หาย เพราะปัญหาอยู่ที่แถบเงา ไม่ใช่ตัวเลข)
+  //   ตอนนี้: ไม่ส่ง qrbox -> ไลบรารีไม่วาดเงาและอ่าน QR ได้ทั้งภาพ (เล็งไม่ตรงกรอบก็ยังติด)
+  //           กรอบจัตุรัส 80% วาดเองใน theme.css (#reader::after) · วิดีโอเต็มกล่องด้วย object-fit
+  static camConfig() {
+    return { fps: 10 };
   }
 
   async startCamera() {
-    const cfg = { fps: 10, qrbox: QRScanner.squareQrBox };
+    const cfg = QRScanner.camConfig();
     const onOk = text => this.onScanSuccess(text);
 
     try {
@@ -887,7 +887,7 @@ class QRScanner {
       this.currentCameraIndex = (this.currentCameraIndex + 1) % this.cameraList.length;
       this.html5QrCode.start(
         this.cameraList[this.currentCameraIndex].id,
-        { fps: 10, qrbox: QRScanner.squareQrBox },   // ต้องใช้ตัวเดียวกับ startCamera
+        QRScanner.camConfig(),                       // ต้องใช้ตัวเดียวกับ startCamera
         text => this.onScanSuccess(text)
       );
     });

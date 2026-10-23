@@ -1061,8 +1061,23 @@ input#userId, input#name, input#phone { padding: 10px 12px; }
   border-radius: 14px;
   overflow: hidden;
   background-color: #0E2A35;
+  position: relative;          /* ฐานของกรอบเล็ง ::after (ไลบรารีตั้งให้ตอนเปิดกล้อง แต่ตั้งไว้ก่อนกันกรอบหลุด) */
 }
-#reader video { max-width: 100%; }
+#reader video { max-width: 100%; height: 100%; object-fit: cover; }
+/* กรอบเล็งจัตุรัส 80% กลางกล่อง (23 ต.ค. 2569) — แทนแถบเงาของ html5-qrcode ที่ออกมาเป็นผืนผ้า
+   ไลบรารีอ่าน QR ทั้งภาพอยู่แล้ว กรอบนี้แค่บอกว่าให้เล็งตรงไหน · ไม่รับการแตะ */
+#reader::after {
+  content: '';
+  position: absolute;
+  top: 10%; left: 10%;
+  width: 80%; height: 80%;
+  border: 3px solid rgba(255, 255, 255, .95);
+  border-radius: 18px;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, .38);
+  pointer-events: none;
+  z-index: 2;
+}
+#reader #qr-shaded-region { display: none !important; }
 
 /* ข้อความระหว่างรอไลบรารีสแกน (ปกติไม่ทันเห็น เพราะอุ่นไว้ตั้งแต่เปิดหน้าแล้ว) */
 .cam-wait {
@@ -1226,6 +1241,19 @@ input.pk-input, input.pk-input-sm {
 }
 [data-tone="sec"] {
   --bc-water: #557482; --bc-waterD: #3F5B67; --bc-deep: #2F4954;
+}
+/* 23 ต.ค. 2569 — เมนูดูแลระบบ: system เขียวมะกอก · recover แดงอิฐ · admins น้ำเงินคราม */
+[data-tone="system"] {
+  --bc-sky1: #F1F7EC; --bc-sky2: #D3E7C6;
+  --bc-water: #3F7D20; --bc-waterD: #2F5F18; --bc-deep: #264D13;
+}
+[data-tone="recover"] {
+  --bc-sky1: #FDF0EE; --bc-sky2: #F5CFCA;
+  --bc-water: #B42318; --bc-waterD: #8E1B12; --bc-deep: #73160F;
+}
+[data-tone="admins"] {
+  --bc-sky1: #EEF1FA; --bc-sky2: #CDD5F0;
+  --bc-water: #334E9E; --bc-waterD: #263C7C; --bc-deep: #1F3166;
 }
 
 /* ปุ่มเมนูในหน้าผู้ดูแล — ทุกปุ่มเป็นสีทึบตามสีเมนู (ของเดิมมีแต่ปุ่มสแกนที่ทึบ ที่เหลือขาวหมด)
