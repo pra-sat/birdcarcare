@@ -232,6 +232,48 @@ function ensureQrLibrary() {
 const PARTS_RE = /ถ่ายน้ำมัน|น้ำมันเครื่อง|กรองอากาศ|กรองแอร์|กรองน้ำมัน|กรองโซล่า|กรองเชื้อเพลิง|น้ำยาแอร์|อะไหล่|แบตเตอรี่|ผ้าเบรก|หัวเทียน|ใบปัดน้ำฝน|ยางรถ|เปลี่ยนยาง/;
 function isPartsService(name) { return PARTS_RE.test(String(name || '')); }
 
+// ── เมนูตามระดับสิทธิ์ (23 ต.ค. 2569 · เจ้าของร้านสั่ง "ระดับ 3 ไม่ต้องแสดงหมด แสดงแค่ที่เข้าใช้งานได้")
+//   ระดับ 2 พนักงานหน้าร้าน : 🔍 สแกน · 🔐 ตรวจความปลอดภัย
+//   ระดับ 3 หัวหน้าหน้าร้าน  : + 👥 ข้อมูลลูกค้า · 📝 คำขอแก้ไข · 🏪 ดูข้อมูลร้าน (งานดูแลลูกค้า ไม่เห็นยอดเงิน)
+//   ระดับ 4 ผู้จัดการ        : + 📊 สรุปยอด · ⭐ เพิ่มแต้ม (เรื่องเงิน)
+//   ระดับ 5 เจ้าของร้าน       : + ⚙️ ตั้งค่า (ยังปิดอยู่)
+//   🔴 ซ่อนปุ่มไม่ใช่ด่านกัน — เลขทุกตัวต้องตรงกับเซิร์ฟเวอร์ (มีเทสต์เทียบ)
+//      customers/requests = CUST_MIN_LEVEL · stats = STATS_MIN_LEVEL · ⭐ = BONUS_MIN_LEVEL
+const BC_MENU_LEVELS = [
+  { sel: '#scanBtn',                 min: 2 },   // งานหลักของพนักงานหน้าร้าน
+  { sel: '[data-menu="customers"]',  min: 3 },   // = CUST_MIN_LEVEL (customer_admin.gs)
+  { sel: '[data-menu="requests"]',   min: 3 },   // edit_request.gs ใช้ CUST_MIN_LEVEL ตัวเดียวกัน
+  { sel: '[data-menu="shopinfo"]',   min: 3 },   // หน้าที่ลูกค้าเห็นอยู่แล้ว ซ่อนไว้ให้จอพนักงานสะอาด
+  { sel: '[data-menu="stats"]',      min: 4 },   // = STATS_MIN_LEVEL (stats.gs)
+  { sel: '[data-menu="feedback"]',   min: 4 },
+  { sel: '[data-menu="settings"]',   min: 5 }
+];
+function bcMenuMin(sel) { return (BC_MENU_LEVELS.find(m => m.sel === sel) || { min: 99 }).min; }
+
+// ── แตะช่องตัวเลขแล้วลบค่าเดิมให้เลย (23 ต.ค. 2569 · เจ้าของร้านสั่ง) ──────────
+//   เดิมต้องลบเลขเก่าเองก่อนพิมพ์ใหม่ทุกครั้ง ช้าตอนลูกค้ายืนรอ
+//   แตะแล้วไม่ได้พิมพ์อะไร (แตะพลาด) -> ออกจากช่องแล้วคืนค่าเดิมให้ ไม่ให้ค่าหายเงียบ ๆ
+//   onRestore = ทำอะไรต่อหลังคืนค่า (เช่น คิดแต้มใหม่) · เรียกก่อนตัวฟัง blur อื่นของช่องนั้น
+//   ⚠️ ล้างด้วยการตั้งค่าเฉย ๆ ไม่ยิง input -> ตัวฟังที่นับว่า "แก้เองแล้ว" (pointTouched) ไม่ถูกปลุก
+function bcClearOnFocus(input, onRestore) {
+  if (!input || input._bcClear) return;
+  input._bcClear = true;
+  let prev = null, typed = false;
+  input.addEventListener('focus', () => {
+    typed = false;
+    prev = input.value;
+    if (prev !== '') input.value = '';
+  });
+  input.addEventListener('input', () => { typed = true; });
+  input.addEventListener('blur', () => {
+    if (!typed && input.value === '' && prev) {
+      input.value = prev;
+      if (onRestore) onRestore();
+    }
+    prev = null;
+  });
+}
+
 // ประเภทรถจากคอลัมน์ Category ของลูกค้า -> 'moto' | 'car' | '' (ไม่รู้)
 // ข้อมูลเก่ามีคำไทยปนอยู่ (เหมือน bcDecayPerMonth_ ฝั่งเซิร์ฟเวอร์)
 const BC_MOTO_RE = /มอเตอร์ไซ|บิ๊กไบค์|motorcycle|big ?bike/i;
@@ -1472,6 +1514,12 @@ class QRScanner {
           Swal.getConfirmButton().disabled = false;
         };
 
+        // แตะแล้วลบค่าเดิมให้เลย · แตะพลาดไม่ได้พิมพ์ = คืนค่าเดิม (ต้องผูกก่อนตัวฟังด้านล่าง)
+        bcClearOnFocus(priceInput, () => updatePointDisplay());
+        let ptWasTouched = false;
+        pointInput.addEventListener('focus', () => { ptWasTouched = this.pointTouched; });
+        bcClearOnFocus(pointInput, () => { this.pointTouched = ptWasTouched; });
+
         pointInput.addEventListener('input', () => {
           this.pointTouched = pointInput.value.trim() !== '';
           updatePointDisplay();
@@ -1839,33 +1887,13 @@ class AdminManager {
     document.getElementById('adminLevel').textContent = result.level || '1';
     document.getElementById('adminRole').textContent = result.role || '-';
 
-    // ── เมนูตามระดับสิทธิ์ (แก้ 18 ก.ย. 2569) ─────────────────────────────
-    //
-    //   ระดับ 2 (พนักงานหน้าร้าน) : 🔍 สแกน QR + 🔐 ตรวจความปลอดภัย เท่านั้น
-    //   ระดับ 3 ขึ้นไป            : เห็นเมนูอื่นทั้งหมด
-    //
-    //   ⚠️ นี่เป็นแค่การ "ซ่อนปุ่ม" ไม่ใช่ด่านกัน
-    //      คนที่รู้ URL ยังพิมพ์เข้ามาเองได้ ด่านจริงต้องอยู่ที่เซิร์ฟเวอร์
-    //      หน้าสรุปยอดตรวจ STATS_MIN_LEVEL ใน stats.gs อยู่แล้ว
-    //      ถ้าเพิ่มเมนูใหม่ที่มีข้อมูลสำคัญ ต้องไปใส่ด่านฝั่งเซิร์ฟเวอร์ด้วยเสมอ
-    //      (ส่วนหน้าข้อมูลร้านไม่ต้อง เพราะเป็นหน้าที่ลูกค้าทุกคนเห็นได้อยู่แล้ว
-    //       ซ่อนไว้เพื่อให้จอพนักงานสะอาด ไม่ใช่เพื่อความปลอดภัย)
-    //   🔴 ต้องสั่งทั้ง "โชว์" และ "ซ่อน" ห้ามสั่งแค่โชว์อย่างเดียว
-    //      ฟังก์ชันนี้ถูกเรียก 2 รอบ — จากของที่จำไว้ (ทันที) แล้วจากผลจริง
-    //      (ตามมาทีหลัง) · ของเดิมมีแต่ removeSTyle hidden ไม่เคยใส่กลับ
-    //      พอเจ้าของร้านลดระดับใครในชีต คนนั้นจะยังเห็นเมนูเดิมค้างอยู่
-    //      จนกว่าของที่จำไว้จะหมดอายุ (12 ชม.) เพราะรอบที่สองซ่อนคืนไม่ได้
-    //      ตอนนี้ใช้ toggle จึงแก้ตัวเองได้ทันทีที่ผลจริงมาถึง
+    // ── เมนูตามระดับสิทธิ์ — ตาราง BC_MENU_LEVELS ด้านบน ─────────────────
+    //   ⚠️ นี่เป็นแค่การ "ซ่อนปุ่ม" ไม่ใช่ด่านกัน ด่านจริงอยู่ที่เซิร์ฟเวอร์
+    //   🔴 ต้องสั่งทั้ง "โชว์" และ "ซ่อน" (toggle) ห้ามสั่งแค่โชว์อย่างเดียว
+    //      ฟังก์ชันนี้ถูกเรียก 2 รอบ — จากของที่จำไว้ (ทันที) แล้วจากผลจริง (ตามมาทีหลัง)
+    //      ลดระดับใครในชีต รอบที่สองต้องซ่อนคืนได้ทันที ไม่ใช่ค้างไว้ 12 ชม.
     const level = parseInt(result.level || '1');
-    [
-      { sel: '#scanBtn',                 min: 2 },   // งานหลักของพนักงานหน้าร้าน
-      { sel: '[data-menu="stats"]',      min: 3 },
-      { sel: '[data-menu="customers"]',  min: 3 },   // ต้องตรงกับ CUST_MIN_LEVEL (customer_admin.gs)
-      { sel: '[data-menu="requests"]',   min: 3 },   // edit_request.gs ใช้ CUST_MIN_LEVEL ตัวเดียวกัน
-      { sel: '[data-menu="shopinfo"]',   min: 3 },
-      { sel: '[data-menu="feedback"]',   min: 3 },
-      { sel: '[data-menu="settings"]',   min: 5 }
-    ].forEach(m => {
+    BC_MENU_LEVELS.forEach(m => {
       const el = document.querySelector(m.sel);
       if (el) el.classList.toggle('hidden', level < m.min);
     });
@@ -1911,7 +1939,7 @@ class AdminManager {
     }
 
     // ตัวเลขคำขอแก้ไขที่รอตรวจ บนปุ่ม 📝 (5 ต.ค. 2569) — เฉพาะคนที่เห็นเมนูนี้
-    if (level >= 3 && !this._reqCountAsked) {
+    if (level >= bcMenuMin('[data-menu="requests"]') && !this._reqCountAsked) {
       this._reqCountAsked = true;
       this.loadRequestCount();
     }
