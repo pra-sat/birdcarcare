@@ -1508,7 +1508,8 @@ class QRScanner {
 
           pointInfo.style.color = '';
           pointInfo.textContent =
-              this.pointTouched && p > 0 ? `ปกติ ${full} แต้ม · ลบให้ว่างเพื่อกลับไปคิด 10%`
+              // แตะช่องแล้วค่าหายเอง (bcClearOnFocus) ถ้าไม่พิมพ์ก็คืนค่าเดิม -> บอกเลขเต็มให้พิมพ์เองแทน "ลบให้ว่าง"
+              this.pointTouched && p > 0 ? `ปกติ ${full} แต้ม · จะให้เต็มพิมพ์ ${full}`
             : typed === '' && p > 0      ? `เว้นว่าง = คิด 10% ให้ (${full} แต้ม)`
             :                              'คิดให้ 10% อัตโนมัติ · งานอะไหล่แก้ให้น้อยลงได้';
           Swal.getConfirmButton().disabled = false;
