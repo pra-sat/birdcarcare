@@ -104,6 +104,45 @@ function bcAccessToken() {
   } catch (e) { return ''; }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  🔴 เซสชันร้าน (2 พ.ย. 2569) — เหตุจริง 31 ต.ค. ปิ๊งน้อย Hilux
+//  หน้าเปิดค้างจาก 12:06 ถึง 08:34 วันถัดไป ID token และ access token หมดทั้งคู่
+//  เปิดหน้าจากเมนู LINE (token สด) ขอเซสชันอายุ 7 วันจากเซิร์ฟเวอร์เก็บไว้ในเครื่อง
+//  ส่งไปกับงานหน้าร้าน (บันทึก ค้นเบอร์ ทะเบียน) เซิร์ฟเวอร์ใช้แทนเมื่อ token LINE ตาย
+//  ขอไม่สำเร็จไม่เป็นไร ทางเดิมยังทำงาน · ด่านจริงอยู่ที่ admin_session.gs
+// ═══════════════════════════════════════════════════════════════════════════
+const SHOP_SESSION_KEY = 'bcShopSession';
+const SHOP_SESSION_RENEW_SEC = 6 * 24 * 3600;   // เหลือน้อยกว่านี้ = ขอใหม่ (วันละครั้งโดยประมาณ)
+
+function bcReadShopSession(userId) {
+  try {
+    const s = JSON.parse(localStorage.getItem(SHOP_SESSION_KEY) || 'null');
+    if (!s || !s.session || s.userId !== userId) return null;
+    return Number(s.exp) * 1000 > Date.now() ? s : null;
+  } catch (e) { return null; }
+}
+
+function bcShopSession(userId) {
+  const s = bcReadShopSession(userId);
+  return s ? s.session : '';
+}
+
+async function bcRenewShopSession(userId, idToken) {
+  const cur = bcReadShopSession(userId);
+  if (cur && Number(cur.exp) - Date.now() / 1000 > SHOP_SESSION_RENEW_SEC) return;
+  try {
+    const res = await fetch(GAS_ENDPOINT + '?action=admin_session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'admin_session', adminUserId: userId, idToken, accessToken: bcAccessToken() })
+    });
+    const r = await res.json();
+    if (r && r.success && r.session) {
+      localStorage.setItem(SHOP_SESSION_KEY, JSON.stringify({ userId, session: r.session, exp: r.exp }));
+    }
+  } catch (e) { console.warn('ขอเซสชันร้านไม่สำเร็จ (ข้ามไป):', e); }
+}
+
 function bcInLineApp() {
   try {
     return typeof liff !== 'undefined' && typeof liff.isInClient === 'function' && liff.isInClient();
@@ -622,6 +661,7 @@ class QRScanner {
       adminUserId: this.adminUserId,   // ใครเป็นคนกดบันทึก
       idToken: this.token,             // LINE ID token ยืนยันว่าเป็นคนนั้นจริง
       accessToken: bcAccessToken(),    // ทางสำรองเมื่อ ID token หมดอายุ (อายุ 12 ชม.)
+      shopSession: bcShopSession(this.adminUserId),   // ทางสำรองเมื่อ token LINE หมดทั้งคู่ (7 วัน)
       scanToken: this.scanToken || '', // QR ที่สแกนมา (ว่างได้ถ้าค้นด้วยเบอร์)
       requestId: this.requestId,       // กันกดซ้ำ/เน็ตสะดุดแล้วยิงซ้ำ
       force: !!this.forceDuplicate     // แอดมินยืนยันแล้วว่าตั้งใจบันทึกซ้ำ
@@ -938,7 +978,8 @@ class QRScanner {
           body: JSON.stringify({
             action: 'search_phone', phone,
             adminUserId: this.adminUserId || (window.adminInfo || {}).userId || '',
-            idToken: this.token || (window.adminInfo || {}).token || '', accessToken: bcAccessToken()
+            idToken: this.token || (window.adminInfo || {}).token || '', accessToken: bcAccessToken(),
+            shopSession: bcShopSession(this.adminUserId || (window.adminInfo || {}).userId || '')
           })
         });
         const r = await res.json();
@@ -1270,7 +1311,8 @@ class QRScanner {
           // ── ข้อมูลยืนยันตัวตนคนที่กดแก้ (ด่านตรวจใน security.gs ใช้) ──
           adminUserId: this.adminUserId,
           idToken: this.token,
-          accessToken: bcAccessToken()
+          accessToken: bcAccessToken(),
+          shopSession: bcShopSession(this.adminUserId)
         })
       });
       const out = await res.json();
@@ -1921,6 +1963,8 @@ class AdminManager {
     // ทำครั้งเดียวพอ ถึงจะวาดหน้าซ้ำก็ไม่ยิงซ้ำ
     if (!this._afterReady) {
       this._afterReady = true;
+      // ไม่ await: เป็นตาข่ายสำรอง หน้าจอไม่ต้องรอ (bcRenewShopSession จับ error เอง)
+      bcRenewShopSession(this.userId, this.token);
       // มีงานค้างจากก่อนล็อกอินไหม
       // ⚠️ ห่อกันพังไว้ — ตัวนี้อยู่บนทางที่หน้าแอดมินต้องวิ่งผ่านตอนเปิด
       //    ถ้ามันพัง บรรทัดถัดไป (อุ่นรายการบริการ + อุ่นไลบรารีสแกน) จะไม่ทำงาน
