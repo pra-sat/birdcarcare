@@ -1,4 +1,5 @@
-// 🩺 สถานะระบบ (23 ต.ค. 2569) — อ่านอย่างเดียว ไม่แก้ข้อมูลใด ๆ · ระดับ 4+
+// 🩺 สถานะระบบ (23 ต.ค. 2569) — ส่วนตรวจระบบอ่านอย่างเดียว · ระดับ 4+
+// 🛑 แจ้งวันหยุดร้าน (1 พ.ย. 2569) เขียนได้อย่างเดียวคือรายการวันหยุด: closed_add / closed_remove
 // ข้อมูลชุดเดียวกับเมนูชีต "ตรวจสุขภาพระบบ" (bcSystemStatus_ ใน sys_admin.gs)
 const ICON = { ok: '✅', warn: '⚠️', bad: '🔴' };
 
@@ -37,8 +38,59 @@ function render(st) {
       ${it.todo ? `<div class="sy-card-todo">👉 ${esc(it.todo)}</div>` : ''}
     </div>`;
   }).join('');
-  $('main').innerHTML = banner + todo + `<div class="sy-list">${cards}</div>`;
+  $('main').innerHTML = banner + todo + `<div class="sy-list">${cards}</div><div id="closedBox"></div>`;
+  renderClosed(st.closed);
   renderTools(st);
+}
+
+// ── 🛑 วันหยุดร้าน ──────────────────────────────────────────────────────
+function thDay(key) {
+  const p = String(key).split('-').map(Number);
+  const d = new Date(p[0], p[1] - 1, p[2]);
+  return `${['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'][d.getDay()]} ${p[2]}/${p[1]}/${p[0]}`;
+}
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function renderClosed(c) {
+  const box = $('closedBox');
+  if (!box || !c) return;
+  const days = (c.days || []).map(k => `<div class="sy-row sy-closed-row">
+      <span>${esc(thDay(k))}</span>
+      <span class="sy-link" role="button" tabindex="0" data-closed-del="${esc(k)}">ยกเลิก</span>
+    </div>`).join('');
+  const t = todayKey();
+  box.innerHTML = `<div class="sy-sec-title">🛑 วันหยุดร้าน</div>
+    <div class="sy-card">
+      <div class="sy-card-detail">หยุดประจำทุกวันที่ ${esc((c.monthly || []).join(' และ '))} ของเดือน · วันหยุดไม่ส่งสรุป ยกเว้นมีรถลูกค้าหรือบันทึกไม่สำเร็จ</div>
+      ${days ? `<div class="sy-closed-list">${days}</div>` : ''}
+      <div class="sy-closed-form">
+        <label>ตั้งแต่<input type="date" class="sy-q" id="closedFrom" value="${t}" min="${t}"></label>
+        <label>ถึง<input type="date" class="sy-q" id="closedTo" value="${t}" min="${t}"></label>
+      </div>
+      <button type="button" class="btn sy-closed-save" id="closedSave">แจ้งร้านหยุด</button>
+    </div>`;
+  $('closedFrom').addEventListener('change', () => {
+    if ($('closedTo').value < $('closedFrom').value) $('closedTo').value = $('closedFrom').value;
+  });
+  $('closedSave').onclick = () => closedCall({ op: 'closed_add', from: $('closedFrom').value, to: $('closedTo').value });
+}
+
+async function closedCall(body) {
+  const btn = $('closedSave');
+  if (btn) btn.disabled = true;
+  let r;
+  try { r = await sysCallRetry(body); }
+  catch (e) { r = { status: 'error', message: 'เชื่อมต่อไม่ได้ เช็คสัญญาณเน็ตแล้วลองใหม่' }; }
+  if (!r) return;
+  if (r.status !== 'success') {
+    if (btn) btn.disabled = false;
+    Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: r.message || '', confirmButtonText: 'ปิด' });
+    return;
+  }
+  await loadStatus();     // ถ้าแจ้งวันนี้ การ์ดสรุปด้านบนต้องเปลี่ยนตาม
 }
 
 function renderTools(st) {
@@ -52,6 +104,8 @@ function renderTools(st) {
 
 document.addEventListener('DOMContentLoaded', () => {
   $('main').addEventListener('click', ev => {
+    const del = ev.target.closest('[data-closed-del]');
+    if (del) return closedCall({ op: 'closed_remove', day: del.dataset.closedDel });
     const c = ev.target.closest('[data-go]');
     if (c) location.href = c.dataset.go;
   });
