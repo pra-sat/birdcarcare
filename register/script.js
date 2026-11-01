@@ -8,6 +8,14 @@ const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxdxUvmwLS3_nETwGL
 const confirmText = 'ตกลง';
 
 
+// หลักฐานตัวตน (2 พ.ย. 2569 · customer_auth.gs) · อ่านไม่ได้ส่งค่าว่าง เซิร์ฟเวอร์เป็นคนตัดสิน
+function custAuth() {
+    let idToken = '', accessToken = '';
+    try { idToken = (liff.getIDToken && liff.getIDToken()) || ''; } catch (e) {}
+    try { accessToken = (liff.getAccessToken && liff.getAccessToken()) || ''; } catch (e) {}
+    return { idToken, accessToken };
+}
+
 async function initLIFF() {
     try {
         console.log('Initializing LIFF');
@@ -42,7 +50,8 @@ async function initLIFF() {
               userId: profile.userId,
               nameLine: profile.displayName,
               statusMessage: profile.statusMessage || "",
-              pictureUrl: profile.pictureUrl || ""
+              pictureUrl: profile.pictureUrl || "",
+              ...custAuth()
             };
         
             const res = await fetch(GAS_ENDPOINT + '?action=update_line_profile', {
@@ -740,7 +749,8 @@ form.addEventListener('submit', async event => {
             body: JSON.stringify({
                 action: 'check_duplicate',
                 userId, phone, brand, model, year: payload.year,
-                plate: payload.plate, province: payload.province
+                plate: payload.plate, province: payload.province,
+                ...custAuth()
             })
         });
         dup = await dupRes.json();
@@ -817,6 +827,7 @@ form.addEventListener('submit', async event => {
         window.__bcRegId = 'g' + Date.now() + Math.random().toString(36).slice(2, 8);
     }
     payload.regId = window.__bcRegId;
+    Object.assign(payload, custAuth());
 
     let data = null;
     for (let attempt = 1; attempt <= 3 && !data; attempt++) {

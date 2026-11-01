@@ -143,6 +143,27 @@ async function bcRenewShopSession(userId, idToken) {
   } catch (e) { console.warn('ขอเซสชันร้านไม่สำเร็จ (ข้ามไป):', e); }
 }
 
+// check_admin แบบ POST พร้อมหลักฐานตัวตน (2 พ.ย. 2569) · ส่งซ้ำเมื่อ POST ถูกแปลงเป็น GET ระหว่างทาง
+// needLogin = ยืนยันตัวตนไม่ได้ ไม่ใช่ "ไม่ใช่แอดมิน" ผู้เรียกห้ามล้างสิทธิ์ที่จำไว้
+async function bcPostCheckAdmin(userId, idToken, extra) {
+  let last = null, lastErr = null;
+  for (let i = 0; i < 3; i++) {
+    if (i) await new Promise(r => setTimeout(r, 600 * i));
+    try {
+      const res = await fetch(GAS_ENDPOINT + '?action=check_admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ action: 'check_admin', userId, idToken,
+          accessToken: bcAccessToken(), shopSession: bcShopSession(userId) }, extra || {}))
+      });
+      last = await res.json();
+      if (last && last.code !== 'NEED_POST') return last;
+    } catch (e) { lastErr = e; }
+  }
+  if (last) return last;
+  throw lastErr || new Error('ตรวจสิทธิ์ไม่สำเร็จ');
+}
+
 function bcInLineApp() {
   try {
     return typeof liff !== 'undefined' && typeof liff.isInClient === 'function' && liff.isInClient();
@@ -444,8 +465,7 @@ class QRScanner {
     this.adminUserId = profile.userId;
     this.token = await liff.getIDToken();
 
-    const res = await fetch(`${GAS_ENDPOINT}?action=check_admin&userId=${this.adminUserId}`);
-    const result = await res.json();
+    const result = await bcPostCheckAdmin(this.adminUserId, this.token);
     this.adminName = result.name || '-';
 
     this.logAction('เข้าสู่ระบบ Scan', 'มีการเข้าใช้งานหน้า scan');
@@ -464,6 +484,8 @@ class QRScanner {
         detail,
         device: navigator.userAgent,
         token: this.token,
+        accessToken: bcAccessToken(),
+        shopSession: bcShopSession(this.adminUserId),
       })
     });
   }
@@ -1028,8 +1050,22 @@ class QRScanner {
     let result;
     try {
       // ห่อ try/catch เพิ่ม — เน็ตหลุดตอนนี้แล้วหน้าจะค้างที่ "กำลังค้นหา QR..."
-      const res = await fetch(`${GAS_ENDPOINT}?action=verify_token&token=${encodeURIComponent(token)}`);
-      result = await res.json();
+      // 2 พ.ย. 2569: POST + ตัวตนแอดมิน · ส่งซ้ำเมื่อ POST ถูกแปลงเป็น GET ระหว่างทาง
+      const scanBody = JSON.stringify({
+        action: 'verify_token', qrToken: token,
+        adminUserId: this.adminUserId || (window.adminInfo || {}).userId || '',
+        idToken: this.token || (window.adminInfo || {}).token || '', accessToken: bcAccessToken(),
+        shopSession: bcShopSession(this.adminUserId || (window.adminInfo || {}).userId || '')
+      });
+      for (let i = 0; i < 3 && (!result || result.code === 'NEED_POST'); i++) {
+        if (i) await new Promise(r => setTimeout(r, 600 * i));
+        const res = await fetch(GAS_ENDPOINT + '?action=verify_token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: scanBody
+        });
+        result = await res.json();
+      }
     } catch (err) {
       Swal.close();
       await Swal.fire('❌ อ่าน QR ไม่สำเร็จ', 'เช็คสัญญาณเน็ตแล้วสแกนใหม่อีกครั้ง', 'error');
@@ -1038,6 +1074,13 @@ class QRScanner {
       return;
     }
     Swal.close();
+
+    // ยืนยันตัวตนแอดมินไม่ได้ ≠ QR เสีย · รู้ตั้งแต่ตอนสแกน ยังไม่มีงานให้เสีย
+    if (result && ['IDTOKEN_INVALID', 'LINE_UNAVAILABLE', 'DENIED', 'NEED_ADMIN'].includes(result.code)) {
+      await Swal.fire('🔐 ยืนยันตัวตนไม่ได้', result.message || 'ปิดหน้านี้แล้วเปิดเมนูแอดมินใน LINE ใหม่', 'warning');
+      this.isScanning = false;
+      return bcRelogin();
+    }
 
     if (!result || !result.success) {
       // 4 ต.ค. 2569 — บอกเหตุผลและทางไปต่อ ของเดิมขึ้น "QR ไม่ถูกต้อง" อย่างเดียวทุกกรณี
@@ -1868,7 +1911,9 @@ class AdminManager {
         userId: profile.userId,
         nameLine: profile.displayName,
         statusMessage: profile.statusMessage || "",
-        pictureUrl: profile.pictureUrl || ""
+        pictureUrl: profile.pictureUrl || "",
+        idToken: this.token,
+        accessToken: bcAccessToken()
       };
 
       const res = await fetch(GAS_ENDPOINT + '?action=update_line_profile', {
@@ -1889,8 +1934,8 @@ class AdminManager {
   async checkAdmin(background) {
     let result;
     try {
-      const res = await fetch(`${GAS_ENDPOINT}?action=check_admin&userId=${this.userId}&name=${encodeURIComponent(this.name)}&statusMessage=${encodeURIComponent(this.statusMessage)}&pictureUrl=${encodeURIComponent(this.pictureUrl)}`);
-      result = await res.json();
+      result = await bcPostCheckAdmin(this.userId, this.token,
+        { name: this.name, statusMessage: this.statusMessage, pictureUrl: this.pictureUrl });
     } catch (err) {
       // ตรวจเบื้องหลังแล้วเน็ตสะดุด -> เงียบไว้ หน้าที่แสดงอยู่ยังใช้ได้
       // ถ้าสิทธิ์ถูกถอนจริง เซิร์ฟเวอร์จะบล็อกตอนกดบันทึกอยู่ดี
@@ -1899,6 +1944,17 @@ class AdminManager {
     }
 
     if (!background) Swal.close();
+
+    // ยืนยันตัวตนไม่ได้ ≠ ถูกถอนสิทธิ์ ห้ามล้างของที่จำไว้
+    if (result.needLogin || result.code === 'NEED_POST') {
+      if (background) return;
+      return Swal.fire({
+        icon: 'info',
+        title: 'เปิดหน้าใหม่อีกครั้ง',
+        text: 'ปิดหน้านี้แล้วเปิดเมนูแอดมินใน LINE ใหม่',
+        confirmButtonText: 'ปิดหน้าต่าง'
+      }).then(() => liff.closeWindow());
+    }
 
     if (result.blacklisted || !result.isAdmin) {
       // สิทธิ์ถูกถอนไปแล้ว -> ล้างของที่จำไว้ ไม่งั้นเปิดครั้งหน้าจะยังเห็นหน้าอยู่
@@ -2108,7 +2164,9 @@ class AdminManager {
           actionTitle: action,
           detail,
           device: navigator.userAgent,
-          token: this.token
+          token: this.token,
+          accessToken: bcAccessToken(),
+          shopSession: bcShopSession(this.userId)
         })
       });
 

@@ -1,3 +1,11 @@
+// หลักฐานตัวตน (2 พ.ย. 2569 · customer_auth.gs)
+function custAuth() {
+  let idToken = '', accessToken = '';
+  try { idToken = (liff.getIDToken && liff.getIDToken()) || ''; } catch (e) {}
+  try { accessToken = (liff.getAccessToken && liff.getAccessToken()) || ''; } catch (e) {}
+  return { idToken, accessToken };
+}
+
 const SHEET_API = 'https://script.google.com/macros/s/AKfycbxdxUvmwLS3_nETwGLk4J8ipPq2LYNSWyhJ2ZwVsEJQgONG11NSSX3jVaeqWCU1TXvE5g/exec';
 const liffId = '2007421084-2OgzWbpV';
 
@@ -134,7 +142,8 @@ function setupFeedback(ctx) {
       pictureUrl: ctx.pictureUrl,
       phone: "'0",
       score,
-      feedback
+      feedback,
+      ...custAuth()
     };
 
     try {
@@ -250,7 +259,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         userId, name, statusMessage, pictureUrl,
-        phone: "'0", score: "", feedback: ""
+        phone: "'0", score: "", feedback: "",
+        ...custAuth()
       })
     }).catch(e => console.warn("⚠️ บันทึกยอดเข้าดูไม่สำเร็จ (ข้ามไป):", e.message));
 
@@ -265,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         method: 'POST',
         signal: c2.signal,
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ userId, name, statusMessage, pictureUrl })
+        body: JSON.stringify({ userId, name, statusMessage, pictureUrl, ...custAuth() })
       });
       clearTimeout(t2);
       const checkResult = await res2.json();

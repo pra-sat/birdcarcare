@@ -216,7 +216,9 @@ function toFullThaiDateTimeString(dateObj) {
 // ⏳ ฟังก์ชันสร้าง token ไม่ซ้ำ
 function generateToken(length = 20) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  // 2 พ.ย. 2569: ใช้ตัวสุ่มสำหรับงานความปลอดภัย · เศษจาก 256 เอียงเล็กน้อย ไม่มีผลกับความยาว 20 ตัว
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, b => chars[b % chars.length]).join('');
 }
 
 // ✅ เพิ่มใน script.js — หลัง currentUserId ถูกกำหนดแล้ว qr code
@@ -361,7 +363,7 @@ async function postWithRetry(action, body, isDone, tries) {
       const res = await fetch(GAS_ENDPOINT + '?action=' + action, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(Object.assign({ action }, body))
+        body: JSON.stringify(Object.assign({ action }, bcCustAuth(), body))
       });
       const json = await res.json();
       if (json && json.code !== 'NEED_POST' && isDone(json)) return json;
@@ -369,6 +371,38 @@ async function postWithRetry(action, body, isDone, tries) {
     } catch (e) { last = null; /* เน็ตหลุด / ได้หน้า HTML แทน JSON = ยังไม่รู้ผล */ }
   }
   return last;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  หลักฐานตัวตนลูกค้า (2 พ.ย. 2569 · customer_auth.gs)
+//  ทุกคำขอแนบ token LINE · เซสชันลูกค้า 7 วันมากับคำตอบ member
+//  เพื่อให้หน้าที่เปิดค้างจน token หมดยังแสดง QR ดูแต้มดูประวัติได้
+// ═══════════════════════════════════════════════════════════════════════════
+const CUST_SESSION_KEY = 'bcCustSession';
+
+function readCustSession(userId) {
+  try {
+    const s = JSON.parse(localStorage.getItem(CUST_SESSION_KEY) || 'null');
+    if (!s || !userId || s.userId !== userId || !(Number(s.exp) * 1000 > Date.now())) return '';
+    return s.session || '';
+  } catch (e) { return ''; }
+}
+
+function keepCustSession(userId, data) {
+  if (!data || !data.custSession) return;
+  try {
+    localStorage.setItem(CUST_SESSION_KEY, JSON.stringify({ userId, session: data.custSession, exp: data.custSessionExp }));
+  } catch (e) { /* เก็บไม่ได้ก็ใช้ token LINE ต่อไป */ }
+  delete data.custSession;       // ไม่ให้ติดไปกับแคชข้อมูลสมาชิก
+  delete data.custSessionExp;
+}
+
+function bcCustAuth() {
+  return { idToken: memberTokens.id, accessToken: memberTokens.access, custSession: readCustSession(currentUserId) };
+}
+
+function fetchMember(userId) {
+  return postWithRetry('member', { userId }, j => !!j && (!!j.name || j.status === 'error'));
 }
 
 function createTokenOnServer(token, vehicle) {
@@ -396,7 +430,7 @@ function deleteTokenOnServer(token) {
   fetch(GAS_ENDPOINT + '?action=delete_token', {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: "delete_token", token })
+    body: JSON.stringify(Object.assign({ action: "delete_token", token, userId: currentUserId }, bcCustAuth()))
   }).catch(() => { /* ลบไม่สำเร็จก็ปล่อย เดี๋ยวหมดอายุเองอยู่แล้ว */ });
 }
 
@@ -877,7 +911,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             userId: profile.userId,
             nameLine: profile.displayName,
             statusMessage: profile.statusMessage || "",
-            pictureUrl: profile.pictureUrl || ""
+            pictureUrl: profile.pictureUrl || "",
+            idToken: memberTokens.id,
+            accessToken: memberTokens.access
           };
 
           fetch(GAS_ENDPOINT + '?action=update_line_profile', {
@@ -907,11 +943,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ไม่ต้องรอข้อมูลสมาชิกก่อน เพราะใช้แค่ userId
     prewarmQRToken();
 
-    let res;
+    let data;
     try {
-      res = await fetch(`${GAS_ENDPOINT}?action=member&userId=${userId}`);
-      console.log("✅ response status:", res.status);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      data = await fetchMember(userId);
+      if (!data) throw new Error('ไม่ได้รับคำตอบจากเซิร์ฟเวอร์');
     } catch (err) {
       // มีของเก่าค้างจออยู่แล้ว -> ปล่อยให้ดูต่อไป ดีกว่าไล่ลูกค้าออกจากหน้า
       // แต่ต้องบอกให้รู้ว่านี่ไม่ใช่ของสด เผื่อเพิ่งใช้บริการมาแล้วแต้มยังไม่ขึ้น
@@ -932,7 +967,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    const data = await res.json();
+    // ยืนยันตัวตนไม่ผ่าน ≠ ไม่พบสมาชิก ห้ามลบของเก่าหรือชวนสมัครใหม่
+    if (data.code === 'CUST_AUTH') {
+      if (cached) { markStale('กรุณาปิดหน้านี้แล้วเปิดใหม่จากเมนูใน LINE'); return; }
+      hideLoadingOverlay();
+      Swal.fire({
+        icon: 'info',
+        title: 'เปิดหน้าใหม่อีกครั้ง',
+        text: data.message || 'กรุณาปิดหน้านี้แล้วเปิดใหม่จากเมนูใน LINE',
+        confirmButtonText: 'ปิดหน้านี้'
+      }).then(() => { liff.closeWindow(); });
+      return;
+    }
+
+    keepCustSession(userId, data);
 
     if (!data || !data.name) {
       // ของเก่าบอกว่าเคยเป็นสมาชิก แต่ตอนนี้หาไม่เจอ -> ของเก่าใช้ไม่ได้แล้ว ลบทิ้ง
@@ -1096,10 +1144,10 @@ document.addEventListener('visibilitychange', () => {
       !document.getElementById('qrSection').classList.contains('hidden')) {
     return;  // กำลังโชว์ QR อยู่ อย่าไปวาดทับ
   }
-  fetch(`${GAS_ENDPOINT}?action=member&userId=${currentUserId}`)
-    .then(res => (res.ok ? res.json() : null))
+  fetchMember(currentUserId)
     .then(data => {
       if (!data || !data.name) return;
+      keepCustSession(currentUserId, data);
       renderMember(data, false);
       writeMemberCache(currentUserId, data);
     })
@@ -1145,10 +1193,10 @@ function bindHistoryToggle() {
     historySection.classList.remove('hidden');
 
     try {
-      const res = await fetch(`${GAS_ENDPOINT}?action=member_history&userId=${encodeURIComponent(currentUserId)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data && data.status === 'error') throw new Error(data.message || 'โหลดประวัติไม่สำเร็จ');
+      const data = await postWithRetry('member_history', { userId: currentUserId },
+        j => !!j && (Array.isArray(j.serviceHistory) || j.status === 'error'));
+      if (!data) throw new Error('โหลดประวัติไม่สำเร็จ');
+      if (data.status === 'error') throw new Error(data.message || 'โหลดประวัติไม่สำเร็จ');
 
       historyCache = Array.isArray(data.serviceHistory) ? data.serviceHistory : [];
       toggleBtn.textContent = '▲ ซ่อนประวัติการใช้บริการ';
@@ -1447,7 +1495,7 @@ submitButtons.forEach(btn => {
         headers: {
           'Content-Type': 'text/plain;charset=utf-8'
         },
-        body: JSON.stringify({
+        body: JSON.stringify(Object.assign({
           action: 'feedback',
           userId: currentUserId,
           date: formattedDate,
@@ -1456,7 +1504,7 @@ submitButtons.forEach(btn => {
           feedback: feedbackText,
           brand,
           model
-        })
+        }, bcCustAuth()))
       });
 
 

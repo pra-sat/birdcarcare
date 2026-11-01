@@ -44,7 +44,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const statusMessage = profile.statusMessage || "";
     const pictureUrl = profile.pictureUrl || "";
 
-    const res = await fetch(`${GAS_ENDPOINT}?action=check_admin&userId=${userId}`);
+    const res = await fetch(`${GAS_ENDPOINT}?action=check_admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'check_admin', userId, idToken: liff.getIDToken(), accessToken: liff.getAccessToken() })
+    });
     const result = await res.json();
 
     if (!result.isAdmin || result.level < 5) {
