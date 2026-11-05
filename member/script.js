@@ -373,6 +373,10 @@ async function postWithRetry(action, body, isDone, tries) {
       last = json;
     } catch (e) { last = null; /* เน็ตหลุด / ได้หน้า HTML แทน JSON = ยังไม่รู้ผล */ }
   }
+  // 🔴 6 พ.ย. 2569: ส่งครบทุกรอบแล้วรอบสุดท้ายยังเป็น NEED_POST = ยังไม่รู้ผล ห้ามคืนเป็นคำตอบ
+  //    เดิมคืนไป หน้าสมาชิกอ่านว่า "ไม่มีชื่อ" -> ขึ้น "ไม่พบข้อมูลสมาชิก กรุณาสมัคร" และล้างข้อมูลที่จำไว้
+  //    ทั้งที่เป็นแค่เน็ตแย่ (test_e2e_chaos.js เน็ตสะดุด 50% จับได้)
+  if (last && last.code === 'NEED_POST') return null;
   return last;
 }
 
@@ -1503,28 +1507,19 @@ submitButtons.forEach(btn => {
       const brand = feedbackBtn.getAttribute('data-brand') || '';
       const model = feedbackBtn.getAttribute('data-model') || '';
       
-      const res = await fetch(GAS_ENDPOINT + '?action=feedback', {
-        redirect: "follow",
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
-        body: JSON.stringify(Object.assign({
-          action: 'feedback',
-          userId: currentUserId,
-          date: formattedDate,
-          service: serviceName,
-          rating: ratingVal,
-          feedback: feedbackText,
-          brand,
-          model
-        }, bcCustAuth()))
-      });
-
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      // 6 พ.ย. 2569: เดิมยิงครั้งเดียวแล้วขึ้น "สำเร็จ" โดยไม่ดูคำตอบ เน็ตสะดุด = คะแนนหายเงียบ ๆ
+      //   ส่งซ้ำได้ปลอดภัย: ให้คะแนนไปแล้วเซิร์ฟเวอร์ตอบ duplicate ไม่ส่ง LINE ขอบคุณซ้ำ
+      const fb = await postWithRetry('feedback', {
+        userId: currentUserId,
+        date: formattedDate,
+        service: serviceName,
+        rating: ratingVal,
+        feedback: feedbackText,
+        brand,
+        model
+      }, j => !!j && ['success', 'duplicate', 'error'].indexOf(j.status) >= 0);
+      if (!fb) throw new Error('สัญญาณเน็ตสะดุด ลองกดส่งอีกครั้ง');
+      if (fb.status === 'error') throw new Error(fb.message || 'ส่งไม่สำเร็จ');
       // On success, update the UI:
       if (window.innerWidth <= 480) {
         const card = btn.closest('.history-card');

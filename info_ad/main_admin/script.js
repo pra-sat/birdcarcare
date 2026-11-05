@@ -487,7 +487,7 @@ class QRScanner {
         accessToken: bcAccessToken(),
         shopSession: bcShopSession(this.adminUserId),
       })
-    });
+    }).catch(() => { /* บันทึก log ไม่สำเร็จไม่กระทบงาน (6 พ.ย. 2569: เดิมไม่ดัก เน็ตหลุด = error ค้างใน console) */ });
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -1057,15 +1057,23 @@ class QRScanner {
         idToken: this.token || (window.adminInfo || {}).token || '', accessToken: bcAccessToken(),
         shopSession: bcShopSession(this.adminUserId || (window.adminInfo || {}).userId || '')
       });
-      for (let i = 0; i < 3 && (!result || result.code === 'NEED_POST'); i++) {
-        if (i) await new Promise(r => setTimeout(r, 600 * i));
-        const res = await fetch(GAS_ENDPOINT + '?action=verify_token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: scanBody
-        });
-        result = await res.json();
+      // 6 พ.ย. 2569: เน็ตหลุดก็ส่งซ้ำเองด้วย (เดิมส่งซ้ำแค่ NEED_POST เน็ตหลุดทีเดียว = พนักงานต้องสแกนใหม่)
+      //   อ่าน QR ซ้ำได้ปลอดภัย verify_token ไม่เขียนอะไร ไม่ทำให้ QR ถูกใช้ไป
+      const SCAN_WAIT_MS = [0, 300, 900, 2000];
+      let lastErr = null;
+      for (let i = 0; i < SCAN_WAIT_MS.length && (!result || result.code === 'NEED_POST'); i++) {
+        if (SCAN_WAIT_MS[i]) await new Promise(r => setTimeout(r, SCAN_WAIT_MS[i]));
+        try {
+          const res = await fetch(GAS_ENDPOINT + '?action=verify_token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: scanBody
+          });
+          result = await res.json();
+        } catch (e) { result = null; lastErr = e; }
       }
+      // ส่งครบแล้วยังเป็น NEED_POST = เน็ตมีปัญหา ไม่ใช่ QR เสีย (เดิมขึ้น "QR ไม่ถูกต้อง" ทำให้พนักงานเข้าใจผิด)
+      if (!result || result.code === 'NEED_POST') throw lastErr || new Error('เชื่อมต่อไม่ได้');
     } catch (err) {
       Swal.close();
       await Swal.fire('❌ อ่าน QR ไม่สำเร็จ', 'เช็คสัญญาณเน็ตแล้วสแกนใหม่อีกครั้ง', 'error');
