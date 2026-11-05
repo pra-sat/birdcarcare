@@ -40,7 +40,39 @@ function render(st) {
   }).join('');
   $('main').innerHTML = banner + todo + `<div class="sy-list">${cards}</div><div id="closedBox"></div>`;
   renderClosed(st.closed);
+  renderEnforce(st.enforce, st.level);
   renderTools(st);
+}
+
+// ── 🔒 ด่านยืนยันตัวตนลูกค้า (5 พ.ย. 2569) · ระดับ 5 กดเปิด/ปิดได้ · ปิด = ลูกค้าใช้ได้ทันที ──
+function renderEnforce(e, level) {
+  if (!e || level < 5) return;
+  const box = document.createElement('div');
+  box.innerHTML = `<div class="sy-sec-title">🔒 ยืนยันตัวตนลูกค้า</div>
+    <div class="sy-card">
+      <div class="sy-card-detail">${e.on
+        ? 'เปิดอยู่: ลูกค้าต้องเปิดหน้าจากเมนู LINE เท่านั้น คนนอกแอบดูหรือแก้ข้อมูลลูกค้าไม่ได้'
+        : 'ปิดอยู่: ลูกค้าใช้ได้แบบเดิม ระบบแค่จดไว้ ไม่ปฏิเสธใคร'}${e.blockedToday ? ` · วันนี้ลูกค้าจริงโดนปฏิเสธ ${Number(e.blockedToday)} ครั้ง` : ''}</div>
+      <button type="button" class="btn${e.on ? ' outline' : ''}" id="enforceBtn">${e.on ? 'ปิดโหมดบังคับ (ลูกค้าใช้ได้ทันที)' : 'เปิดโหมดบังคับ'}</button>
+    </div>`;
+  $('main').appendChild(box);
+  $('enforceBtn').onclick = async () => {
+    const ask = await Swal.fire({
+      icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก',
+      title: e.on ? 'ปิดโหมดบังคับ?' : 'เปิดโหมดบังคับ?',
+      text: e.on ? 'ลูกค้าที่ใช้ไม่ได้จะใช้ได้ทันที ความปลอดภัยกลับเป็นแบบก่อน 5 พ.ย.'
+                 : 'ลูกค้าต้องเปิดจากเมนู LINE ถ้ามีลูกค้าบ่นว่าใช้ไม่ได้ กลับมากดปิดที่นี่'
+    });
+    if (!ask.isConfirmed) return;
+    $('enforceBtn').disabled = true;
+    let r;
+    try { r = await sysCallRetry({ op: 'enforce', on: !e.on }); }
+    catch (err) { r = { status: 'error', message: 'เชื่อมต่อไม่ได้ เช็คสัญญาณเน็ตแล้วลองใหม่' }; }
+    if (!r) { $('enforceBtn').disabled = false; return; }
+    await Swal.fire({ icon: r.status === 'success' ? 'success' : 'error', title: r.status === 'success' ? 'เรียบร้อย' : 'ไม่สำเร็จ',
+                      text: r.text || r.message || '', confirmButtonText: 'ปิด' });
+    await loadStatus();
+  };
 }
 
 // ── 🛑 วันหยุดร้าน ──────────────────────────────────────────────────────
