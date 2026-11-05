@@ -919,7 +919,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           };
 
           // ส่งซ้ำได้ปลอดภัย (เขียนค่าเดิมทับ) · เน็ตสะดุดแล้วส่งซ้ำเอง
-          postWithRetry('update_line_profile', payload, j => !!j && (j.status === 'success' || !!j.message))
+          // ได้คำตอบอะไรก็ได้ที่มี status = รู้ผลแล้ว (รวม "ignored" ตอนด่านปฏิเสธ) ไม่ต้องส่งซ้ำ
+          postWithRetry('update_line_profile', payload, j => !!j && !!j.status)
             .then(data => console.log("✅ LINE Profile อัปเดตอัตโนมัติ:", data))
             .catch(err => console.warn("⚠️ อัปเดตโปรไฟล์ LINE ล้มเหลว:", err));
         }
