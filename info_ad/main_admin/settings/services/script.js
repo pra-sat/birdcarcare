@@ -78,18 +78,23 @@ async function logAdminAction(action, detail) {
   }
 }
 
+// 5 พ.ย. 2569: ชื่อ/รายละเอียดบริการมาจากชีต ห้ามใส่ลง HTML ตรง ๆ
+function escSvc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function createServiceCard(service) {
   const card = document.createElement('div');
   card.className = 'service-card';
   card.draggable = true;
   card.dataset.id = service.serviceId;
   card.innerHTML = `
-    <h3>${service.name}</h3>
-    <p>ราคา: ${service.price} บาท</p>
-    <p>แต้ม: ${service.point}</p>
-    <p>รายละเอียด: ${service.detail}</p>
+    <h3>${escSvc(service.name)}</h3>
+    <p>ราคา: ${escSvc(service.price)} บาท</p>
+    <p>แต้ม: ${escSvc(service.point)}</p>
+    <p>รายละเอียด: ${escSvc(service.detail)}</p>
     <label class="toggle-switch">
-      <input type="checkbox" ${service.status === 'on' ? 'checked' : ''} data-id="${service.serviceId}">
+      <input type="checkbox" ${service.status === 'on' ? 'checked' : ''} data-id="${escSvc(service.serviceId)}">
       <span class="slider"></span>
     </label>
   `;

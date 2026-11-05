@@ -354,11 +354,13 @@ function vehKeyOf(v) {
 //    set_own_plate เขียนได้เฉพาะช่องที่ยังว่าง
 //  isDone(json) = คำตอบนี้ "รู้ผลแล้ว" (สำเร็จหรือถูกปฏิเสธจริง) ไม่ต้องส่งซ้ำ
 // ═══════════════════════════════════════════════════════════════════════════
+// 5 พ.ย. 2569: 3 รอบใน 2 วิ ไม่พอตอนเน็ตมือถือหลุดเป็นช่วง · เพิ่มเป็น 4 รอบ รอ 0.7 / 1.5 / 3 วิ (รวมราว 5 วิ)
+const RETRY_WAIT_MS = [0, 700, 1500, 3000];
 async function postWithRetry(action, body, isDone, tries) {
-  const max = tries || 3;
+  const max = tries || RETRY_WAIT_MS.length;
   let last = null;
   for (let i = 1; i <= max; i++) {
-    if (i > 1) await new Promise(r => setTimeout(r, 600 * (i - 1)));
+    if (i > 1) await new Promise(r => setTimeout(r, RETRY_WAIT_MS[Math.min(i - 1, RETRY_WAIT_MS.length - 1)]));
     try {
       const res = await fetch(GAS_ENDPOINT + '?action=' + action, {
         method: 'POST',
@@ -903,7 +905,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     //
     // ยิงพร้อมกับ action=member ได้ ไม่ชนกัน เพราะเขียนคนละคอลัมน์
     // (อันนี้เขียน C/D/E = ชื่อไลน์ สเตตัส รูป · หน้านี้แสดงชื่อจริงจากคอลัมน์ F)
-    silentlyUpdateLineProfile(profile);
+    // 5 พ.ย. 2569: ยิงหลังได้ข้อมูลสมาชิกแล้ว (ดู afterMemberLoaded) ไม่ยิงพร้อมกันตอนเพิ่งเปิดหน้า
 
     function silentlyUpdateLineProfile(profile) {
           const payload = {
@@ -916,15 +918,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             accessToken: memberTokens.access
           };
 
-          fetch(GAS_ENDPOINT + '?action=update_line_profile', {
-            method: 'POST',
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload)
-          })
-            .then(res => res.json())
+          // ส่งซ้ำได้ปลอดภัย (เขียนค่าเดิมทับ) · เน็ตสะดุดแล้วส่งซ้ำเอง
+          postWithRetry('update_line_profile', payload, j => !!j && (j.status === 'success' || !!j.message))
             .then(data => console.log("✅ LINE Profile อัปเดตอัตโนมัติ:", data))
             .catch(err => console.warn("⚠️ อัปเดตโปรไฟล์ LINE ล้มเหลว:", err));
         }
+
+    // 🔴 5 พ.ย. 2569: เปิดหน้าแล้วยิง 3 คำขอพร้อมกัน (ข้อมูลสมาชิก · เตรียม QR · โปรไฟล์ LINE)
+    //    ตอนเน็ตมือถือเพิ่งตื่น คำขอที่ยิงพร้อมกันหลุดเป็น GET ระหว่างทาง (Security_Log GET_FOR_POST 4–5 พ.ย.)
+    //    ข้อมูลสมาชิกไปก่อน อีกสองอย่างตามไปทีหลัง · เตรียม QR ยังเสร็จก่อนลูกค้ากดปุ่มเหมือนเดิม
+    let afterMemberDone = false;
+    function afterMemberLoaded() {
+      if (afterMemberDone) return;
+      afterMemberDone = true;
+      prewarmQRToken();
+      setTimeout(() => silentlyUpdateLineProfile(profile), 1500);
+    }
 
     const userId = profile.userId;
     console.log("✅ userId:", userId);
@@ -939,9 +948,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       hideLoadingOverlay();
     }
 
-    // เตรียม QR ไว้ล่วงหน้าตั้งแต่ตอนนี้ — ยิงพร้อมกับ action=member ไปเลย
-    // ไม่ต้องรอข้อมูลสมาชิกก่อน เพราะใช้แค่ userId
-    prewarmQRToken();
+    // เตรียม QR ล่วงหน้า: ยิงหลังได้ข้อมูลสมาชิก (afterMemberLoaded) ไม่ยิงพร้อมกัน
 
     let data;
     try {
@@ -953,6 +960,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (cached) {
         console.warn('⚠️ ขอข้อมูลล่าสุดไม่สำเร็จ ใช้ของที่เก็บไว้:', err);
         markStale('เชื่อมต่อไม่ได้ · กำลังแสดงข้อมูลที่บันทึกไว้');
+        afterMemberLoaded();               // ยังเตรียม QR ให้ เผื่อเน็ตกลับมาแล้ว
         return;
       }
       hideLoadingOverlay();
@@ -1000,6 +1008,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderMember(data, false);
     writeMemberCache(userId, data);
     hideLoadingOverlay();
+    afterMemberLoaded();
 
   } catch (error) {
     console.error('Error in DOMContentLoaded:', error);
@@ -1136,15 +1145,18 @@ document.addEventListener('visibilitychange', () => {
   if (qrShow) { qrTick(); return; }
 
   // QR ที่เตรียมไว้เก่าเกินไปแล้ว -> ขอใหม่เงียบ ๆ
-  if (warmTokenAgeSec() > QR_REWARM_AGE) prewarmQRToken();
+  // 5 พ.ย. 2569: ยิงหลังเช็คแต้มเสร็จ ไม่ยิงพร้อมกันตอนเน็ตเพิ่งตื่น (เหตุเดียวกับตอนเปิดหน้า)
+  const needWarm = warmTokenAgeSec() > QR_REWARM_AGE;
 
   // เช็คแต้มล่าสุดด้วย เผื่อแอดมินเพิ่งบันทึกบริการให้ระหว่างที่พับหน้าจอไว้
   // ไม่ขึ้นหน้าจอโหลดคั่น ถ้าได้ของใหม่ค่อยอัปเดตทับเงียบ ๆ
   if (document.getElementById('qrSection') &&
       !document.getElementById('qrSection').classList.contains('hidden')) {
+    if (needWarm) prewarmQRToken();
     return;  // กำลังโชว์ QR อยู่ อย่าไปวาดทับ
   }
   fetchMember(currentUserId)
+    .finally(() => { if (needWarm) prewarmQRToken(); })
     .then(data => {
       if (!data || !data.name) return;
       keepCustSession(currentUserId, data);
