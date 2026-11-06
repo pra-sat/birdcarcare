@@ -960,28 +960,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     prewarmQRToken();
 
     let data;
-    try {
-      data = await fetchMember(userId);
-      if (!data) throw new Error('ไม่ได้รับคำตอบจากเซิร์ฟเวอร์');
-    } catch (err) {
-      // มีของเก่าค้างจออยู่แล้ว -> ปล่อยให้ดูต่อไป ดีกว่าไล่ลูกค้าออกจากหน้า
-      // แต่ต้องบอกให้รู้ว่านี่ไม่ใช่ของสด เผื่อเพิ่งใช้บริการมาแล้วแต้มยังไม่ขึ้น
-      if (cached) {
-        console.warn('⚠️ ขอข้อมูลล่าสุดไม่สำเร็จ ใช้ของที่เก็บไว้:', err);
-        markStale('เชื่อมต่อไม่ได้ · กำลังแสดงข้อมูลที่บันทึกไว้');
-        afterMemberLoaded();               // อัปเดตโปรไฟล์ LINE เผื่อเน็ตกลับมาแล้ว
-        return;
+    for (;;) {
+      try {
+        data = await fetchMember(userId);
+        if (!data) throw new Error('ไม่ได้รับคำตอบจากเซิร์ฟเวอร์');
+        break;
+      } catch (err) {
+        // มีของเก่าค้างจออยู่แล้ว -> ปล่อยให้ดูต่อไป ดีกว่าไล่ลูกค้าออกจากหน้า
+        // แต่ต้องบอกให้รู้ว่านี่ไม่ใช่ของสด เผื่อเพิ่งใช้บริการมาแล้วแต้มยังไม่ขึ้น
+        if (cached) {
+          console.warn('⚠️ ขอข้อมูลล่าสุดไม่สำเร็จ ใช้ของที่เก็บไว้:', err);
+          markStale('เชื่อมต่อไม่ได้ · กำลังแสดงข้อมูลที่บันทึกไว้');
+          afterMemberLoaded();               // อัปเดตโปรไฟล์ LINE เผื่อเน็ตกลับมาแล้ว
+          return;
+        }
+        // 6 พ.ย. 2569: เปิดครั้งแรกบนเครื่องนี้ (ไม่มีของเก่า) + ส่ง 4 รอบหลุดหมด
+        //   เดิมกด Close แล้วปิดหน้า ลูกค้าต้องไปเปิดใหม่จากเมนู LINE เอง (test_e2e_chaos SEED=6 เจอ)
+        //   ตอนนี้กด "ลองใหม่" ได้ในหน้าเดิม · QR ที่เตรียมไว้ยังอยู่
+        hideLoadingOverlay();
+        const again = await Swal.fire({
+          icon: 'warning',
+          title: 'สัญญาณเน็ตสะดุด',
+          text: 'โหลดข้อมูลสมาชิกไม่สำเร็จ กดลองใหม่ได้เลย',
+          confirmButtonText: 'ลองใหม่',
+          showCancelButton: true,
+          cancelButtonText: 'ปิด',
+          allowOutsideClick: false
+        });
+        if (!again || !again.isConfirmed) { liff.closeWindow(); return; }
+        showLoadingOverlay();
       }
-      hideLoadingOverlay();
-      Swal.fire({
-        icon: 'error',
-        title: '❗️ ไม่สามารถโหลดข้อมูลจากเซิร์ฟเวอร์ได้',
-        text: 'กรุณาลองใหม่อีกครั้งหรือติดต่อ Admin',
-        confirmButtonText: 'Close'
-      }).then(() => {
-        liff.closeWindow();
-      });
-      return;
     }
 
     // ยืนยันตัวตนไม่ผ่าน ≠ ไม่พบสมาชิก ห้ามลบของเก่าหรือชวนสมัครใหม่

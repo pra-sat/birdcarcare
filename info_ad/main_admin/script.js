@@ -127,9 +127,10 @@ function bcShopSession(userId) {
   return s ? s.session : '';
 }
 
+// คืน 'skip' (ยังใหม่อยู่) · 'ok' · 'denied' (LINE ปฏิเสธ token แล้ว ขอซ้ำไม่มีประโยชน์) · 'net' (เน็ตสะดุด ลองใหม่ได้)
 async function bcRenewShopSession(userId, idToken) {
   const cur = bcReadShopSession(userId);
-  if (cur && Number(cur.exp) - Date.now() / 1000 > SHOP_SESSION_RENEW_SEC) return;
+  if (cur && Number(cur.exp) - Date.now() / 1000 > SHOP_SESSION_RENEW_SEC) return 'skip';
   try {
     const res = await fetch(GAS_ENDPOINT + '?action=admin_session', {
       method: 'POST',
@@ -139,8 +140,10 @@ async function bcRenewShopSession(userId, idToken) {
     const r = await res.json();
     if (r && r.success && r.session) {
       localStorage.setItem(SHOP_SESSION_KEY, JSON.stringify({ userId, session: r.session, exp: r.exp }));
+      return 'ok';
     }
-  } catch (e) { console.warn('ขอเซสชันร้านไม่สำเร็จ (ข้ามไป):', e); }
+    return r && r.code === 'NEED_POST' ? 'net' : 'denied';
+  } catch (e) { console.warn('ขอเซสชันร้านไม่สำเร็จ (ข้ามไป):', e); return 'net'; }
 }
 
 // check_admin แบบ POST พร้อมหลักฐานตัวตน (2 พ.ย. 2569) · ส่งซ้ำเมื่อ POST ถูกแปลงเป็น GET ระหว่างทาง
@@ -2028,7 +2031,8 @@ class AdminManager {
     if (!this._afterReady) {
       this._afterReady = true;
       // ไม่ await: เป็นตาข่ายสำรอง หน้าจอไม่ต้องรอ (bcRenewShopSession จับ error เอง)
-      bcRenewShopSession(this.userId, this.token);
+      this._sessTry = Date.now();
+      bcRenewShopSession(this.userId, this.token).then(st => { if (st === 'denied') this._sessGaveUp = true; });
       // มีงานค้างจากก่อนล็อกอินไหม
       // ⚠️ ห่อกันพังไว้ — ตัวนี้อยู่บนทางที่หน้าแอดมินต้องวิ่งผ่านตอนเปิด
       //    ถ้ามันพัง บรรทัดถัดไป (อุ่นรายการบริการ + อุ่นไลบรารีสแกน) จะไม่ทำงาน
@@ -2108,10 +2112,25 @@ class AdminManager {
   }
 
   // เฝ้าดูอายุเซสชันระหว่างเปิดหน้าอยู่
+  // ── เซสชันร้านต้องมีเสมอ (6 พ.ย. 2569 · เจ้าของร้าน: หน้าแอดมินเปิดค้างทั้งวันเป็นเรื่องปกติ) ──
+  // เซสชันร้านทำให้สแกน/บันทึกเร็วเท่ากันทั้งวัน เซิร์ฟเวอร์ไม่ต้องถาม LINE (ID token หมดใน 1 ชม.)
+  // ขอตอนเปิดหน้าไม่สำเร็จ (เน็ตสะดุด) -> ขอใหม่เงียบ ๆ ทุก 5 นาที
+  // LINE ปฏิเสธแล้ว (token ตายทั้งคู่) = เลิกขอ ไม่ยิงซ้ำให้ Security_Log บวม · หน้าเดิมยังทำงานด้วยทางเดิม
+  ensureShopSession() {
+    if (!this.userId || this.userId === 'N/A' || this._sessGaveUp || bcReadShopSession(this.userId)) return;
+    const now = Date.now();
+    if (this._sessTry && now - this._sessTry < 5 * 60 * 1000) return;
+    this._sessTry = now;
+    bcRenewShopSession(this.userId, this.token)
+      .then(st => { if (st === 'denied') this._sessGaveUp = true; })
+      .catch(() => {});
+  }
+
   watchSession() {
     if (this._sessionWatch) return;
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
+      try { this.ensureShopSession(); } catch (e) { /* ตาข่ายสำรอง ห้ามทำให้ตัวเฝ้าพัง */ }
       if (this.maybeAutoRefreshSession('ตรวจตามรอบ')) return;
       // ต่อเองไม่ได้ (มีงานค้าง หรือเพิ่งต่อไป) -> อย่างน้อยให้เห็นว่าต้องทำอะไร
       // ในแอป LINE ไม่เตือน — ID token หมดก็บันทึกได้ (access token) แตะเตือนไปก็ทำอะไรไม่ได้
